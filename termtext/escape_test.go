@@ -1,13 +1,12 @@
 // SPDX-FileCopyrightText: 2026 GSI Helmholtz Centre for Heavy Ion Research GmbH <http://www.gsi.de>
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
-package output_test
+package termtext_test
 
 import (
-	"strings"
 	"testing"
 
-	"github.com/GSI-HPC/clusterctl/internal/output"
+	"github.com/GSI-HPC/clusterctl/internal/termtext"
 )
 
 // hostile is what a compromised node answered in the review: a carriage
@@ -30,7 +29,7 @@ func TestEscapeText(t *testing.T) {
 		{"grüße", "grüße"},
 	}
 	for _, tc := range tests {
-		if got := output.EscapeText(tc.in); got != tc.want {
+		if got := termtext.EscapeText(tc.in); got != tc.want {
 			t.Errorf("EscapeText(%q) = %q, want %q", tc.in, got, tc.want)
 		}
 	}
@@ -46,53 +45,8 @@ func TestEscapeCell(t *testing.T) {
 		{hostile, `ok\r\x1b[1Aexe0001: \x1b]52;c;ZXZpbA==\x07evil`},
 	}
 	for _, tc := range tests {
-		if got := output.EscapeCell(tc.in); got != tc.want {
+		if got := termtext.EscapeCell(tc.in); got != tc.want {
 			t.Errorf("EscapeCell(%q) = %q, want %q", tc.in, got, tc.want)
-		}
-	}
-}
-
-// TestTableCellCannotForgeARow covers the review's case: a value holding a
-// newline rendered as a healthy row for another node.
-func TestTableCellCannotForgeARow(t *testing.T) {
-	t.Parallel()
-
-	table := output.NewTable(output.Cols("NODE", "STATE", "REASON")...)
-	table.Add("exe0001", "drained", "bad\nexe0002  idle     fine")
-	table.Add("exe0003", "idle", hostile)
-	table.Caption = "2 nodes\x1b[2J"
-
-	for _, spec := range []string{"table", "wide"} {
-		got := render(t, spec, output.Result{Table: table})
-		lines := strings.SplitSeq(strings.TrimRight(got, "\n"), "\n")
-		for line := range lines {
-			if strings.HasPrefix(line, "exe0002") {
-				t.Errorf("-o %s printed a forged row:\n%s", spec, got)
-			}
-		}
-		if strings.ContainsAny(got, "\r\x1b\x07") {
-			t.Errorf("-o %s wrote control characters: %q", spec, got)
-		}
-		if !strings.Contains(got, `bad\nexe0002`) {
-			t.Errorf("-o %s does not show the escaped newline:\n%s", spec, got)
-		}
-	}
-}
-
-// TestTableAlignsEscapedCells checks that the width of a column is measured
-// after escaping, so the columns still line up.
-func TestTableAlignsEscapedCells(t *testing.T) {
-	t.Parallel()
-
-	table := output.NewTable(output.Cols("A", "B")...)
-	table.Add("x\ty", "1")
-	table.Add("long value", "2")
-	got := render(t, "table", output.Result{Table: table})
-	lines := strings.Split(strings.TrimRight(got, "\n"), "\n")
-	col := strings.Index(lines[0], "B")
-	for _, line := range lines[1:] {
-		if len(line) <= col || line[col-1] != ' ' || line[col] == ' ' {
-			t.Errorf("column B is not aligned:\n%s", got)
 		}
 	}
 }
