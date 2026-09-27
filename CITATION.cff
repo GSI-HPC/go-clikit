@@ -1,0 +1,34 @@
+# SPDX-FileCopyrightText: 2026 GSI Helmholtz Centre for Heavy Ion Research GmbH <http://www.gsi.de>
+# SPDX-License-Identifier: Apache-2.0
+#
+# How to cite this module (https://citation-file-format.github.io). It names
+# no version: a version exists only in a signed tag
+# (doc/decisions.md, decision 4).
+
+cff-version: 1.2.0
+message: If you use this software, please cite it as below.
+type: software
+title: "go-clikit: the shared runtime of GSI-HPC's command-line tools in Go"
+abstract: >-
+  Go packages that command-line tools share: progress reported as spans in
+  a context, drawn as a live tree, a counter or plain lines for CI, and
+  written to a JSONL event log; bounded worker pools that report their
+  targets; and escaping untrusted text for a terminal.
+authors:
+  - family-names: Klein
+    given-names: Dennis
+    orcid: https://orcid.org/0000-0003-3787-1910
+    affiliation: GSI Helmholtz Centre for Heavy Ion Research GmbH
+  - name: GSI Helmholtz Centre for Heavy Ion Research GmbH
+    website: https://www.gsi.de
+    city: Darmstadt
+    country: DE
+repository-code: https://github.com/GSI-HPC/go-clikit
+url: https://pkg.go.dev/github.com/GSI-HPC/go-clikit
+license: Apache-2.0
+keywords:
+  - HPC
+  - command line
+  - progress
+  - terminal
+  - Go
