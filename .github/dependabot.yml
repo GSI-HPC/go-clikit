@@ -1,0 +1,47 @@
+# SPDX-FileCopyrightText: 2026 GSI Helmholtz Centre for Heavy Ion Research GmbH <http://www.gsi.de>
+# SPDX-License-Identifier: Apache-2.0
+#
+# Weekly version updates.
+# The Go release lines in go.mod and mise.toml are moved by hand
+# (doc/decisions.md, decision 2).
+
+version: 2
+
+updates:
+  # The requirements in go.mod.
+  - package-ecosystem: gomod
+    directory: /
+    schedule:
+      interval: weekly
+    # A release has a week to be found out before it is proposed. Security
+    # updates do not wait, and neither do GSI-HPC's own modules, go-nodeset
+    # among them.
+    cooldown:
+      default-days: 7
+      exclude:
+        - github.com/GSI-HPC/*
+    commit-message:
+      prefix: build
+      include: scope
+    # CI runs the whole suite on every pull request, so minor and patch
+    # releases can travel together; GSI-HPC's modules travel apart, so that
+    # their updates arrive without the others.
+    groups:
+      gsi-hpc:
+        patterns: [github.com/GSI-HPC/*]
+      go-modules:
+        update-types: [minor, patch]
+
+  # The actions the workflows use, one pull request each: the release
+  # workflow does not run on pull requests, so a new major version of one of
+  # its actions is reviewed on its own release notes.
+  - package-ecosystem: github-actions
+    directories: [/, /.github/actions/setup-go]
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    open-pull-requests-limit: 15
+    commit-message:
+      prefix: ci
+      include: scope
