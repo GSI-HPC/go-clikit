@@ -10,6 +10,8 @@ edited: a later one supersedes it, and the earlier one's status names it.
 | | Decision | Status |
 | --- | --- | --- |
 | [1](#1-apache-20-and-gsi-holds-the-copyright) | Apache-2.0, and GSI holds the copyright | accepted |
+| [2](#2-the-go-line-is-the-oldest-go-release-still-supported) | The go line is the oldest Go release still supported | accepted |
+| [3](#3-what-the-kit-may-require) | What the kit may require | accepted |
 
 ## 1. Apache-2.0, and GSI holds the copyright
 
@@ -68,3 +70,85 @@ licence in the history of the repository it comes from.
 - A contributor from outside GSI keeps the copyright of their contribution
   and licenses it under Apache-2.0 (section 5); a file they change then
   names them in an `SPDX-FileCopyrightText` line of their own.
+
+## 2. The go line is the oldest Go release still supported
+
+Status: accepted
+
+### Context
+
+Since Go 1.21 the `go` line in `go.mod` is a requirement, not a hint.
+An older toolchain refuses the module, or downloads a newer one, and every
+module that requires this one inherits at least this `go` line when it
+runs `go mod tidy`. The line is therefore the oldest Go that every
+importer has to use.
+
+The Go project ships a release in February and in August. It supports the
+two newest, and only those receive security fixes. In September 2026 those
+are Go 1.27 and Go 1.26.
+
+The kit's code needs Go 1.25, the first release with `sync.WaitGroup.Go`,
+which `fanout` uses. Go 1.25 has had no security fixes since August 2026,
+and at 1.25 the kit would have to hold `golang.org/x/text` at v0.41.0,
+since v0.42.0 requires Go 1.26.
+
+### Decision
+
+- `go.mod` names the oldest Go release that the Go project still supports,
+  as the `golang.org/x` modules do: `go 1.26.0` today. It names a `.0`
+  release, never a patch release, and `go.mod` has no `toolchain` line.
+- When a new Go release ships, the line moves up to the release before it,
+  in a commit of its own, and the next release of the module is a minor
+  version. Raising it further takes a record of its own.
+- `mise.toml` names the newest Go release line. Contributors and CI use its
+  newest patch.
+- CI tests both ends: the newest patch of the release `go.mod` names, and
+  that of the one `mise.toml` names.
+
+### Costs
+
+- A program built with a Go release that is no longer supported cannot take
+  a new version of the module. It keeps the version it has.
+- A requirement whose newest release needs a newer Go than the floor is held
+  back until the floor moves.
+- The line is moved twice a year, by hand, since Dependabot does not; the
+  `bump-go` skill describes how.
+
+## 3. What the kit may require
+
+Status: accepted
+
+### Context
+
+Every requirement of the kit becomes a requirement of each tool that uses
+it, and, through library packages that report progress with it, of every
+program that imports those. Minimal version selection then raises their
+versions of shared modules to the highest any requirement asks for: a
+single package of the MCP Go SDK inside the kit would raise every such
+program's version of that SDK to the kit's.
+
+### Decision
+
+- The kit may require `github.com/GSI-HPC/go-nodeset`, to fold node names,
+  and `golang.org/x/text`, for display widths. Anything else takes a record
+  here first.
+- Never: the MCP Go SDK (an MCP bridge takes a send callback instead),
+  charmbracelet (the displays write to an `io.Writer` themselves), testify
+  and OpenTelemetry (progress is reported as the kit's own events).
+- cobra only in a package about cobra, `cobratree`, when it arrives.
+  `termtext`, `progress` and `fanout` are imported by library packages too,
+  and never import cobra.
+- Test helpers ship as `xxxtest` packages, such as `progress/progresstest`,
+  and report through `testing.TB`. Tests use the standard library.
+- golangci-lint's depguard refuses the imports this record rules out.
+
+With the Go floor at 1.26 (decision 2), `golang.org/x/sys` and
+`golang.org/x/term` no longer need a newer Go than the kit; either one still
+takes a record here before it is required.
+
+### Costs
+
+- A display, a test assertion or an exporter that a third-party module
+  would offer is written here, or done without.
+- A program's exit codes stay in the program, behind a `Classify` hook, so
+  that the kit needs no package of exit codes.
