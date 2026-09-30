@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2026 GSI Helmholtz Centre for Heavy Ion Research GmbH <http://www.gsi.de>
-// SPDX-License-Identifier: LGPL-3.0-or-later
+// SPDX-License-Identifier: Apache-2.0
 
 package progresstest
 
@@ -13,7 +13,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/GSI-HPC/clusterctl/internal/progress"
+	"github.com/GSI-HPC/go-clikit/progress"
 )
 
 // pool runs n targets under a Fold step, limit at a time, the way the pool

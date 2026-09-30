@@ -4,3 +4,8 @@
 module github.com/GSI-HPC/go-clikit
 
 go 1.26.0
+
+require (
+	github.com/GSI-HPC/go-nodeset v0.0.0-20260930191642-58e08c3fbdc5
+	golang.org/x/text v0.42.0
+)

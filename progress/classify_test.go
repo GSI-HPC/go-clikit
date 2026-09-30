@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2026 GSI Helmholtz Centre for Heavy Ion Research GmbH <http://www.gsi.de>
-// SPDX-License-Identifier: LGPL-3.0-or-later
+// SPDX-License-Identifier: Apache-2.0
 
 package progress_test
 
@@ -12,7 +12,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/GSI-HPC/clusterctl/internal/progress"
+	"github.com/GSI-HPC/go-clikit/progress"
 )
 
 // classified is an error that says its own class, as a pin mismatch or a
@@ -29,7 +29,7 @@ func (timeout) Error() string { return "i/o timeout" }
 func (timeout) Timeout() bool { return true }
 
 // errUnreachable is an error a program's own rule, byCode below, says is
-// the transport's, as an exit code of 3 is clusterctl's.
+// the transport's, as a program may say of one of its exit codes.
 var errUnreachable = errors.New("exe0001: no route to host")
 
 // byCode is a program's fallback: the transport's for errUnreachable,

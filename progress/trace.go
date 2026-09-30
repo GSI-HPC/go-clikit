@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2026 GSI Helmholtz Centre for Heavy Ion Research GmbH <http://www.gsi.de>
-// SPDX-License-Identifier: LGPL-3.0-or-later
+// SPDX-License-Identifier: Apache-2.0
 
 package progress
 
@@ -30,7 +30,7 @@ const maxTraceState = 512
 
 // ParseTraceContext reads the trace context another program handed on, as
 // a traceparent and a tracestate in the W3C Trace Context format, such as
-// the TRACEPARENT and TRACESTATE a CI job runs clusterctl with.
+// the TRACEPARENT and TRACESTATE a CI job runs a program with.
 //
 // A traceparent is four fields of lowercase hexadecimal digits split by
 // dashes: the version, the trace id, the parent's span id and the trace

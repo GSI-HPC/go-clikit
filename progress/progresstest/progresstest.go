@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2026 GSI Helmholtz Centre for Heavy Ion Research GmbH <http://www.gsi.de>
-// SPDX-License-Identifier: LGPL-3.0-or-later
+// SPDX-License-Identifier: Apache-2.0
 
 // Package progresstest captures the progress events of a test, draws them
 // as a tree that does not depend on the order concurrent work happened in,
@@ -38,9 +38,9 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/GSI-HPC/clusterctl/internal/progress"
-	"github.com/GSI-HPC/clusterctl/internal/termtext"
-	"github.com/GSI-HPC/clusterctl/nodeset"
+	"github.com/GSI-HPC/go-clikit/progress"
+	"github.com/GSI-HPC/go-clikit/termtext"
+	"github.com/GSI-HPC/go-nodeset"
 )
 
 // Capture is a sink that keeps every event it is sent. It is safe for

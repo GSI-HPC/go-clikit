@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2026 GSI Helmholtz Centre for Heavy Ion Research GmbH <http://www.gsi.de>
-// SPDX-License-Identifier: LGPL-3.0-or-later
+// SPDX-License-Identifier: Apache-2.0
 
 package progress
 
@@ -36,7 +36,7 @@ type Options struct {
 	// end's diagnostics; nil is the process's standard error.
 	PanicLog io.Writer
 	// Program names the program in the line that says a sink panicked,
-	// "clusterctl: …", so that it is not read as a line of the work's;
+	// "prog: …", so that it is not read as a line of the work's;
 	// empty leaves the name out.
 	Program string
 	// Classify is the fallback of the classes End gives the errors of

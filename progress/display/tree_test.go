@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2026 GSI Helmholtz Centre for Heavy Ion Research GmbH <http://www.gsi.de>
-// SPDX-License-Identifier: LGPL-3.0-or-later
+// SPDX-License-Identifier: Apache-2.0
 
 package display_test
 
@@ -15,11 +15,11 @@ import (
 	"testing/synctest"
 	"time"
 
-	"github.com/GSI-HPC/clusterctl/internal/clikit/fanout"
-	"github.com/GSI-HPC/clusterctl/internal/progress"
-	"github.com/GSI-HPC/clusterctl/internal/progress/display"
-	"github.com/GSI-HPC/clusterctl/internal/progress/progresstest"
-	"github.com/GSI-HPC/clusterctl/nodeset"
+	"github.com/GSI-HPC/go-clikit/fanout"
+	"github.com/GSI-HPC/go-clikit/progress"
+	"github.com/GSI-HPC/go-clikit/progress/display"
+	"github.com/GSI-HPC/go-clikit/progress/progresstest"
+	"github.com/GSI-HPC/go-nodeset"
 )
 
 // treeFixture is a tree on a screen that shows what a terminal would, with
@@ -735,10 +735,10 @@ func TestCloseTakesTheTreeOff(t *testing.T) {
 	f.tree.Close()
 	f.tree.Close()
 	f.draw(time.Second)
-	_, _ = io.WriteString(errOut, "clusterctl: interrupted\n")
+	_, _ = io.WriteString(errOut, "prog: interrupted\n")
 	checkScreen(t, f.screen.String(), `
 ✓ run  1.0s
-clusterctl: interrupted
+prog: interrupted
 `)
 }
 

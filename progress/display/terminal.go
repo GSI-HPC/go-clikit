@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2026 GSI Helmholtz Centre for Heavy Ion Research GmbH <http://www.gsi.de>
-// SPDX-License-Identifier: LGPL-3.0-or-later
+// SPDX-License-Identifier: Apache-2.0
 
 // Package display shows the progress of a command on its standard error,
 // from the events of its progress.Bus: the live tree, a few rows at the
@@ -36,7 +36,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/GSI-HPC/clusterctl/internal/termtext"
+	"github.com/GSI-HPC/go-clikit/termtext"
 )
 
 // maxWaiting is the most the lines of the Lines writers may hold, in
@@ -91,7 +91,7 @@ type Terminal struct {
 	// drew, the front end's diagnostics; nil is the terminal itself.
 	PanicLog io.Writer
 	// Program names the program in the line that says a display stopped,
-	// "clusterctl: …", so that it is not read as the command's own; empty
+	// "prog: …", so that it is not read as the command's own; empty
 	// leaves the name out.
 	Program string
 	// Foreground, when it is set, reports whether the process is the job
