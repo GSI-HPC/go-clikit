@@ -71,6 +71,8 @@ const (
 	KindWait
 )
 
+// String returns the name the event log writes for the kind, such as
+// "command", or "kind(n)" for a value this package does not define.
 func (k Kind) String() string {
 	switch k {
 	case KindCommand:
@@ -102,6 +104,8 @@ const (
 	StateEnded
 )
 
+// String returns the name the event log writes for the state, such as
+// "queued", or "state(n)" for a value this package does not define.
 func (s State) String() string {
 	switch s {
 	case StateQueued:
@@ -130,6 +134,8 @@ const (
 	StatusSkipped
 )
 
+// String returns the name the event log writes for the status, such as
+// "ok", or "status(n)" for a value this package does not define.
 func (s Status) String() string {
 	switch s {
 	case StatusOK:
@@ -168,6 +174,8 @@ const (
 	ClassCanceled
 )
 
+// String returns the name the event log writes for the class, such as
+// "none", or "class(n)" for a value this package does not define.
 func (c Class) String() string {
 	switch c {
 	case ClassNone:
@@ -213,6 +221,8 @@ const (
 // inherited are the flags a span passes to the spans started under it.
 const inherited = Hidden | ShowLines
 
+// String returns the names of the flags set, split by commas; the event
+// log writes the same names as a list.
 func (f Flags) String() string { return strings.Join(f.names(), ",") }
 
 // names returns the names of the flags set, nil for none.
@@ -250,6 +260,8 @@ const (
 	TypeResume
 )
 
+// String returns the name the event log writes for the type, such as
+// "start", or "type(n)" for a value this package does not define.
 func (t Type) String() string {
 	switch t {
 	case TypeStart:
@@ -280,6 +292,8 @@ const (
 	Stderr Stream = 2
 )
 
+// String returns the name the event log writes for the stream, such as
+// "stdout", or "stream(n)" for a value this package does not define.
 func (s Stream) String() string {
 	switch s {
 	case Stdout:
@@ -343,18 +357,22 @@ type Fields struct {
 type Event struct {
 	// Seq numbers the events of a Bus from 1, with no gaps: the order in
 	// which every sink sees them.
-	Seq  uint64
+	Seq uint64
+	// Time is when the event happened, by the Bus's clock.
 	Time time.Time
+	// Type says what happened to the span.
 	Type Type
 
 	// Span is the span the event is about, and Parent the span it was
 	// started under; zero for the root. A TypeSuspend or TypeResume names
 	// the span it was asked for under, if any.
 	Span, Parent SpanID
-	Kind         Kind
+	// Kind is the level of the tree the span is on.
+	Kind Kind
 	// Name says what the span is, in few words: "ssh", "redfish",
 	// "reset the machines", or a target's name.
-	Name  string
+	Name string
+	// Flags are the span's flags, which say how displays show it.
 	Flags Flags
 	// State is the span's state once the event has happened.
 	State State
@@ -380,12 +398,14 @@ type Event struct {
 // Bus back; drawing happens on the sink's own time. A sink that panics is
 // removed from the Bus.
 type Sink interface {
+	// Handle receives one event.
 	Handle(Event)
 }
 
 // LineSink is a Sink that may ask for the lines of output, which are only
 // produced when a sink asks. The Bus asks once, when it is made.
 type LineSink interface {
+	// WantsLines reports whether the sink wants the lines of output.
 	WantsLines() bool
 }
 
@@ -393,6 +413,7 @@ type LineSink interface {
 // event log does. The Bus tells it once, when it is made, before any
 // event.
 type TraceSink interface {
+	// Begin receives the trace the Bus's events belong to.
 	Begin(TraceContext)
 }
 
@@ -401,7 +422,10 @@ type TraceSink interface {
 // outside the Bus lock, and Suspend returns once the terminal is clear: they
 // are the only calls in which a sink may write to the terminal itself.
 type Suspender interface {
+	// Suspend takes the sink off the terminal, and returns once it is
+	// clear.
 	Suspend()
+	// Resume lets the sink draw again.
 	Resume()
 }
 
@@ -409,6 +433,7 @@ type Suspender interface {
 // that does not match its pin or an account a service processor refused.
 // ClassNone leaves the error to the rules of Classify.
 type Classifier interface {
+	// ProgressClass returns the error's class.
 	ProgressClass() Class
 }
 

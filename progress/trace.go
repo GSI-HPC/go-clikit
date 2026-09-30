@@ -12,6 +12,7 @@ import "encoding/hex"
 // nothing else by it: a trace the other program does not sample is shown
 // and logged all the same.
 type TraceContext struct {
+	// Trace is the trace the spans belong to.
 	Trace TraceID
 	// Parent is the other program's span the work runs under; zero when
 	// the trace began with the Bus.

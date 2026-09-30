@@ -28,6 +28,7 @@ type Tally struct {
 // Count is where the targets below a step or a batch that counts them
 // stand.
 type Count struct {
+	// Span, Name and Flags are the step's or the batch's.
 	Span  SpanID
 	Name  string
 	Flags Flags

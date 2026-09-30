@@ -57,6 +57,8 @@ type PanicError struct {
 	Value string
 }
 
+// Error says that the program panicked, that this is a bug to report, and
+// what the panic was called with.
 func (e *PanicError) Error() string {
 	return fmt.Sprintf("%s panicked; this is a bug, please report it: %q", cmp.Or(e.Program, "the program"), e.Value)
 }
