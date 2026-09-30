@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2026 GSI Helmholtz Centre for Heavy Ion Research GmbH <http://www.gsi.de>
-// SPDX-License-Identifier: LGPL-3.0-or-later
+// SPDX-License-Identifier: Apache-2.0
 
 package fanout
 
@@ -22,7 +22,7 @@ var panicLogMu sync.Mutex
 // Recovered(log, program, name, recover()) in a function deferred by the
 // goroutine doing the work, and returns a *PanicError, or nil when nothing
 // panicked. program
-// names the program, in front of the line in the log, as "clusterctl: ",
+// names the program, in front of the line in the log, as "prog: ",
 // and in the error, which asks for the bug to be reported; empty leaves the
 // name out of the line and calls it "the program" in the error.
 //

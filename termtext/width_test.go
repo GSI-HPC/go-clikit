@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2026 GSI Helmholtz Centre for Heavy Ion Research GmbH <http://www.gsi.de>
-// SPDX-License-Identifier: LGPL-3.0-or-later
+// SPDX-License-Identifier: Apache-2.0
 
 package termtext_test
 
@@ -8,7 +8,7 @@ import (
 	"testing"
 	"unicode/utf8"
 
-	"github.com/GSI-HPC/clusterctl/internal/termtext"
+	"github.com/GSI-HPC/go-clikit/termtext"
 )
 
 // A terminal gives CJK, Hangul, fullwidth forms and emoji two columns, a

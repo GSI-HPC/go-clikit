@@ -1,0 +1,4 @@
+github.com/GSI-HPC/go-nodeset v0.0.0-20260930191642-58e08c3fbdc5 h1:dIY15ZOryRXlecPv5IMWQyCHq2TVxlQmRn+GNoBKRLo=
+github.com/GSI-HPC/go-nodeset v0.0.0-20260930191642-58e08c3fbdc5/go.mod h1:YG7JOHU9XvWCuIGLSn9yOnR1mprbLASNhQ8SuZKkPpI=
+golang.org/x/text v0.42.0 h1:JbOZXgfeCPU9gacVtYliJqOhD+zhrEqK4LfdpmlUZqI=
+golang.org/x/text v0.42.0/go.mod h1:ojzP1Z+2QtioaF8DTtO8K5q7JWVVYwZKenzujK0Zd0E=

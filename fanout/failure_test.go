@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2026 GSI Helmholtz Centre for Heavy Ion Research GmbH <http://www.gsi.de>
-// SPDX-License-Identifier: LGPL-3.0-or-later
+// SPDX-License-Identifier: Apache-2.0
 
 package fanout_test
 
@@ -8,8 +8,8 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/GSI-HPC/clusterctl/internal/clikit/fanout"
-	"github.com/GSI-HPC/clusterctl/internal/progress"
+	"github.com/GSI-HPC/go-clikit/fanout"
+	"github.com/GSI-HPC/go-clikit/progress"
 )
 
 // Failure counts and names the items that failed, with the noun given, as

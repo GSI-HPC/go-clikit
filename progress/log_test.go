@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2026 GSI Helmholtz Centre for Heavy Ion Research GmbH <http://www.gsi.de>
-// SPDX-License-Identifier: LGPL-3.0-or-later
+// SPDX-License-Identifier: Apache-2.0
 
 package progress_test
 
@@ -23,8 +23,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/GSI-HPC/clusterctl/internal/progress"
-	"github.com/GSI-HPC/clusterctl/internal/progress/progresstest"
+	"github.com/GSI-HPC/go-clikit/progress"
+	"github.com/GSI-HPC/go-clikit/progress/progresstest"
 )
 
 // logged runs work on a Bus that writes an event log, closes both, and
@@ -586,7 +586,7 @@ func TestTheLogIsWrittenInWholeLines(t *testing.T) {
 }
 
 // Two runs appending to one file at once, as the commands of a CI job that
-// sets CLUSTERCTL_PROGRESS_LOG once do, and sharing the trace the job
+// names one log file for all of them do, and sharing the trace the job
 // hands on, leave lines that are whole, each of one run, and each run's
 // own events, seq 1 up without a gap, in their order.
 func TestTwoRunsAppendingToOneFileCanBeToldApart(t *testing.T) {

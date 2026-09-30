@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2026 GSI Helmholtz Centre for Heavy Ion Research GmbH <http://www.gsi.de>
-// SPDX-License-Identifier: LGPL-3.0-or-later
+// SPDX-License-Identifier: Apache-2.0
 
 package display_test
 
@@ -13,8 +13,8 @@ import (
 	"testing/synctest"
 	"time"
 
-	"github.com/GSI-HPC/clusterctl/internal/progress/display"
-	"github.com/GSI-HPC/clusterctl/internal/progress/progresstest"
+	"github.com/GSI-HPC/go-clikit/progress/display"
+	"github.com/GSI-HPC/go-clikit/progress/progresstest"
 )
 
 // terminalFixture is a counter on a Screen, drawn from a clock two seconds
@@ -47,7 +47,7 @@ func (f *terminalFixture) shows(t *testing.T, what, want string) {
 
 // A panic's stack from a pool's worker, written while a password is asked
 // for, waits until the question has been answered, and is not written
-// into it: neither into clusterctl's own prompt, which the command writes
+// into it: neither into the program's own prompt, which the command writes
 // and ends through the Terminal while the display is suspended, nor into
 // that of a helper, such as sops, which writes to the terminal itself.
 func TestLinesWaitWhileAQuestionIsAsked(t *testing.T) {
@@ -59,7 +59,7 @@ func TestLinesWaitWhileAQuestionIsAsked(t *testing.T) {
 
 	f.counter.Suspend()
 	_, _ = io.WriteString(errOut, "Password for bmc@node1: ")
-	_, _ = io.WriteString(diag, "clusterctl: panic while working on exe1: \"boom\"\n")
+	_, _ = io.WriteString(diag, "prog: panic while working on exe1: \"boom\"\n")
 	_, _ = io.WriteString(diag, "goroutine 7 [running]:\n")
 	f.shows(t, "while the question is asked", "Password for bmc@node1: \n")
 	// The terminal echoes nothing, so the command ends the line itself,
@@ -68,7 +68,7 @@ func TestLinesWaitWhileAQuestionIsAsked(t *testing.T) {
 	f.shows(t, "once the line has ended", "Password for bmc@node1: \n")
 	f.counter.Resume()
 	f.shows(t, "once it is answered", "Password for bmc@node1: \n"+
-		"clusterctl: panic while working on exe1: \"boom\"\n"+
+		"prog: panic while working on exe1: \"boom\"\n"+
 		"goroutine 7 [running]:\n")
 
 	f.counter.Suspend()

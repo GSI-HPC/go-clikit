@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2026 GSI Helmholtz Centre for Heavy Ion Research GmbH <http://www.gsi.de>
-// SPDX-License-Identifier: LGPL-3.0-or-later
+// SPDX-License-Identifier: Apache-2.0
 
 package fanout_test
 
@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/GSI-HPC/clusterctl/internal/clikit/fanout"
+	"github.com/GSI-HPC/go-clikit/fanout"
 )
 
 // Without a log, the stack of a panic goes to the process's standard

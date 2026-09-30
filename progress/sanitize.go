@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2026 GSI Helmholtz Centre for Heavy Ion Research GmbH <http://www.gsi.de>
-// SPDX-License-Identifier: LGPL-3.0-or-later
+// SPDX-License-Identifier: Apache-2.0
 
 package progress
 
@@ -7,7 +7,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/GSI-HPC/clusterctl/internal/termtext"
+	"github.com/GSI-HPC/go-clikit/termtext"
 )
 
 // Sanitize makes text from elsewhere, a remote line or an error, safe to

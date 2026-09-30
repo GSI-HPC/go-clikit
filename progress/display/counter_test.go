@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2026 GSI Helmholtz Centre for Heavy Ion Research GmbH <http://www.gsi.de>
-// SPDX-License-Identifier: LGPL-3.0-or-later
+// SPDX-License-Identifier: Apache-2.0
 
 package display_test
 
@@ -14,11 +14,11 @@ import (
 	"testing/synctest"
 	"time"
 
-	"github.com/GSI-HPC/clusterctl/internal/clikit/fanout"
-	"github.com/GSI-HPC/clusterctl/internal/progress"
-	"github.com/GSI-HPC/clusterctl/internal/progress/display"
-	"github.com/GSI-HPC/clusterctl/internal/progress/progresstest"
-	"github.com/GSI-HPC/clusterctl/nodeset"
+	"github.com/GSI-HPC/go-clikit/fanout"
+	"github.com/GSI-HPC/go-clikit/progress"
+	"github.com/GSI-HPC/go-clikit/progress/display"
+	"github.com/GSI-HPC/go-clikit/progress/progresstest"
+	"github.com/GSI-HPC/go-nodeset"
 )
 
 // screen is a terminal a test reads back.
@@ -418,8 +418,8 @@ func TestCloseTakesTheCounterOff(t *testing.T) {
 	f.counter.Close()
 	f.counter.Close()
 	f.draw(time.Second)
-	_, _ = io.WriteString(errOut, "clusterctl: interrupted\n")
-	if got, want := f.screen.String(), "\n<erase>exec · 0:01\n<erase>clusterctl: interrupted\n"; got != want {
+	_, _ = io.WriteString(errOut, "prog: interrupted\n")
+	if got, want := f.screen.String(), "\n<erase>exec · 0:01\n<erase>prog: interrupted\n"; got != want {
 		t.Errorf("screen:\n%q\nwant:\n%q", got, want)
 	}
 }
