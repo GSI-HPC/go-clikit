@@ -87,7 +87,8 @@ func TestMapKeepsToItsLimit(t *testing.T) {
 					func(context.Context, string) (struct{}, error) {
 						started.Add(1)
 						n := now.Add(1)
-						for p := peak.Load(); n > p && !peak.CompareAndSwap(p, n); p = peak.Load() {
+						for p := peak.Load(); n > p && !peak.CompareAndSwap(p, n); {
+							p = peak.Load()
 						}
 						time.Sleep(time.Second)
 						now.Add(-1)
