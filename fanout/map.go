@@ -45,8 +45,8 @@ type Options[T any] struct {
 	// code of its own.
 	Summarize func(n int, names []string, errs []error, interrupted bool) error
 	// Acquire, when it is set, takes what an item's work needs besides its
-	// place in the pool, such as a place on each host it goes to (Hosts),
-	// and returns the function that gives that back once the work is done.
+	// place in the pool, such as a place on each host it goes to, and
+	// returns the function that gives that back once the work is done.
 	// It is called once the item has its place in the pool, and the item
 	// stays queued until it returns. An error it returns is the item's,
 	// whose work is then never started.
@@ -165,9 +165,9 @@ func (o Options[T]) endsCanceled(err error) bool {
 // Skip returns the error of work that leaves its item out on purpose:
 // returned by fn, Map ends the item's target skipped, with reason as what
 // it says, and does not count the item among those that failed. A command
-// can record it too, as secrets push does for the secrets it no longer
-// tries on a node it could not reach, so that IsSkipped tells them from
-// those that failed.
+// can record it too, such as for the work it no longer tries on a node it
+// could not reach, so that IsSkipped tells that work from the work that
+// failed.
 func Skip(reason string) error { return &skipped{reason: reason} }
 
 // IsSkipped reports whether err says that an item was left out on purpose.
