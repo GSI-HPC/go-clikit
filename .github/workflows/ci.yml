@@ -59,6 +59,35 @@ jobs:
         with:
           config: .testcoverage.yml
 
+  # Escaping and truncation never let a control character through and never
+  # break UTF-8, and Sanitize never returns what a terminal would act on or
+  # more than its bound, whatever text a remote host sends. A short run on
+  # every change catches a regression; a failing input is committed under
+  # the package's testdata/fuzz/, where every later run replays it.
+  fuzz:
+    name: Fuzz (${{ matrix.target }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {package: termtext, target: FuzzEscape}
+          - {package: termtext, target: FuzzTruncate}
+          - {package: progress, target: FuzzSanitize}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup-go
+
+      - name: Fuzz
+        run: make fuzz FUZZ=${{ matrix.package }}:${{ matrix.target }} FUZZTIME=60s
+
+      - name: Upload the failing input
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: fuzz-corpus-${{ matrix.target }}
+          path: ${{ matrix.package }}/testdata/fuzz/
+
   lint:
     name: Lint
     runs-on: ubuntu-latest
