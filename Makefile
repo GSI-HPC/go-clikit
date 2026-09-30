@@ -1,8 +1,12 @@
 # SPDX-FileCopyrightText: 2026 GSI Helmholtz Centre for Heavy Ion Research GmbH <http://www.gsi.de>
 # SPDX-License-Identifier: Apache-2.0
 
-GO      ?= go
-COVER   ?= coverage.out
+GO       ?= go
+COVER    ?= coverage.out
+FUZZTIME ?= 60s
+# The fuzz targets, as package:target, which make fuzz runs one after the
+# other; FUZZ=progress:FuzzSanitize runs one of them.
+FUZZ     ?= termtext:FuzzEscape termtext:FuzzTruncate progress:FuzzSanitize
 
 .PHONY: all
 all: lint test
@@ -23,6 +27,13 @@ floor:
 cover:
 	$(GO) test -race -coverprofile=$(COVER) -covermode=atomic ./...
 	go-test-coverage --config .testcoverage.yml
+
+## fuzz: run each fuzz target for FUZZTIME (60s); a failing input lands in its package's testdata/fuzz/
+.PHONY: fuzz
+fuzz:
+	set -e; for t in $(FUZZ); do \
+		$(GO) test "./$${t%%:*}" -run '^$$' -fuzz "^$${t#*:}$$" -fuzztime $(FUZZTIME); \
+	done
 
 ## lint: golangci-lint (.golangci.yml), gofmt and goimports included
 .PHONY: lint
