@@ -11,8 +11,8 @@ import (
 )
 
 // Sanitize makes text from elsewhere, a remote line or an error, safe to
-// show on one line of a terminal, in at most max bytes; max of zero or less
-// sets no bound.
+// show on one line of a terminal, in at most limit bytes; a limit of zero
+// or less sets no bound.
 //
 // A carriage return is first applied the way a terminal shows it: it goes
 // back to the start of the line and what follows overwrites what was
@@ -22,35 +22,35 @@ import (
 // character, an escape sequence's introducer, a bidirectional control, a
 // newline and bytes that are not UTF-8 as a visible escape such as \x1b.
 // The result is cut on a rune boundary.
-func Sanitize(s string, max int) string {
+func Sanitize(s string, limit int) string {
 	if strings.IndexByte(s, '\r') >= 0 {
-		s = foldCR(s, max)
+		s = foldCR(s, limit)
 	}
-	// Escaping never makes text shorter, so what lies past max before it
-	// lies past max after it too, and need not be escaped.
-	if max > 0 && len(s) > max {
-		s = s[:runeCut(s, max)]
+	// Escaping never makes text shorter, so what lies past limit before it
+	// lies past limit after it too, and need not be escaped.
+	if limit > 0 && len(s) > limit {
+		s = s[:runeCut(s, limit)]
 	}
 	s = termtext.EscapeCell(s)
-	if max > 0 && len(s) > max {
-		s = s[:runeCut(s, max)]
+	if limit > 0 && len(s) > limit {
+		s = s[:runeCut(s, limit)]
 	}
 	return s
 }
 
 // foldCR applies every carriage return of s, line by line, as a cursor
 // that returns to the first column. The newline that ends a line moves on
-// to the next and overwrites nothing. Only what can land in the first max
-// bytes is kept.
-func foldCR(s string, max int) string {
+// to the next and overwrites nothing. Only what can land in the first
+// limit bytes is kept.
+func foldCR(s string, limit int) string {
 	var b strings.Builder
 	for line := range strings.SplitAfterSeq(s, "\n") {
 		body, ended := strings.CutSuffix(line, "\n")
-		b.WriteString(foldLine(body, max))
+		b.WriteString(foldLine(body, limit))
 		if ended {
 			b.WriteByte('\n')
 		}
-		if max > 0 && b.Len() >= max {
+		if limit > 0 && b.Len() >= limit {
 			break
 		}
 	}
@@ -59,9 +59,9 @@ func foldCR(s string, max int) string {
 
 // foldLine folds the carriage returns of one line. A cell is one rune, or
 // one byte that is not UTF-8, which stays as it is for EscapeCell to show.
-// Every cell takes at least a byte, so no cell past the first max columns
-// can reach the first max bytes, and none is kept.
-func foldLine(line string, max int) string {
+// Every cell takes at least a byte, so no cell past the first limit columns
+// can reach the first limit bytes, and none is kept.
+func foldLine(line string, limit int) string {
 	if strings.IndexByte(line, '\r') < 0 {
 		return line
 	}
@@ -77,7 +77,7 @@ func foldLine(line string, max int) string {
 			continue
 		case col < len(cells):
 			cells[col] = cell
-		case max <= 0 || col < max:
+		case limit <= 0 || col < limit:
 			cells = append(cells, cell)
 		}
 		col++

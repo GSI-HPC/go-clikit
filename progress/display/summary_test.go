@@ -52,7 +52,7 @@ func TestTheSummary(t *testing.T) {
 			c.Add(300 * time.Millisecond)
 			return errors.New("1 of 3 hosts failed: exe2")
 		}, ""},
-		{"a target interrupted at once", func(ctx context.Context, c *clock) error {
+		{"a target interrupted at once", func(ctx context.Context, _ *clock) error {
 			step(ctx, "run", three, map[string]error{"exe3": context.Canceled})
 			return context.Canceled
 		}, ""},

@@ -550,9 +550,9 @@ func (b *Bus) wantLines() bool {
 // sanitizeFields makes the text fields of f that differ from those of prev
 // safe to show.
 func sanitizeFields(f, prev Fields) Fields {
-	clean := func(s *string, was string, max int) {
+	clean := func(s *string, was string, limit int) {
 		if *s != was {
-			*s = Sanitize(*s, max)
+			*s = Sanitize(*s, limit)
 		}
 	}
 	// Node is a node set a display folds, so it is escaped but never cut.

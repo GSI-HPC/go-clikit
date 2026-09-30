@@ -71,25 +71,25 @@ func FuzzSanitize(f *testing.F) {
 		if len(in) > 1<<16 {
 			return
 		}
-		max := int(bound % 2048)
-		got := progress.Sanitize(in, max)
+		limit := int(bound % 2048)
+		got := progress.Sanitize(in, limit)
 		if !utf8.ValidString(got) {
-			t.Fatalf("Sanitize(%q, %d) = %q, which is not UTF-8", in, max, got)
+			t.Fatalf("Sanitize(%q, %d) = %q, which is not UTF-8", in, limit, got)
 		}
 		if termtext.EscapeCell(got) != got || strings.ContainsAny(got, "\r\n\t\x1b") {
-			t.Fatalf("Sanitize(%q, %d) = %q, which still holds a control character", in, max, got)
+			t.Fatalf("Sanitize(%q, %d) = %q, which still holds a control character", in, limit, got)
 		}
-		if max > 0 && len(got) > max {
-			t.Fatalf("Sanitize(%q, %d) is %d bytes long", in, max, len(got))
+		if limit > 0 && len(got) > limit {
+			t.Fatalf("Sanitize(%q, %d) is %d bytes long", in, limit, len(got))
 		}
-		if max == 0 && len(got) > 6*len(in) {
+		if limit == 0 && len(got) > 6*len(in) {
 			t.Fatalf("Sanitize(%q) grew to %d bytes", in, len(got))
 		}
-		if again := progress.Sanitize(got, max); again != got {
+		if again := progress.Sanitize(got, limit); again != got {
 			t.Fatalf("Sanitize is not idempotent for %q: %q, then %q", in, got, again)
 		}
-		if !strings.Contains(in, "\r") && termtext.EscapeCell(in) == in && (max == 0 || len(in) <= max) && got != in {
-			t.Fatalf("Sanitize(%q, %d) = %q changed text that needed nothing", in, max, got)
+		if !strings.Contains(in, "\r") && termtext.EscapeCell(in) == in && (limit == 0 || len(in) <= limit) && got != in {
+			t.Fatalf("Sanitize(%q, %d) = %q changed text that needed nothing", in, limit, got)
 		}
 	})
 }
