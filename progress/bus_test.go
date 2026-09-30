@@ -111,6 +111,27 @@ func lifecycle(ctx context.Context) {
 	target.End(nil)
 }
 
+// TestWithoutABusTheRestAllocatesNothing holds the rest of what a library
+// calls to the same promise: updating and skipping a span, suspending the
+// displays, and passing a command's output through Tee.
+func TestWithoutABusTheRestAllocatesNothing(t *testing.T) {
+	ctx := context.Background()
+	failed := errors.New("failed")
+	allocs := testing.AllocsPerRun(100, func() {
+		ctx, step := progress.Start(ctx, progress.KindStep, "reset the machines", progress.WithFlags(progress.Fold), progress.Total(3))
+		step.Update(progress.Message("waiting for the machines"), progress.Total(4))
+		_, skipped := progress.Start(ctx, progress.KindTarget, "exe0002", progress.Queued())
+		skipped.Skip("dry run")
+		progress.Suspend(ctx)()
+		_ = progress.Tee(ctx, io.Discard, progress.Stdout, nil)
+		_ = progress.SpanFrom(ctx)
+		step.End(failed)
+	})
+	if allocs != 0 {
+		t.Errorf("a step's updates without a Bus allocate %v times, want 0", allocs)
+	}
+}
+
 func BenchmarkTargetLifecycle(b *testing.B) {
 	b.Run("without a bus", func(b *testing.B) {
 		ctx := context.Background()
