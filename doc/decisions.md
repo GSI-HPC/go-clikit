@@ -13,6 +13,8 @@ edited: a later one supersedes it, and the earlier one's status names it.
 | [2](#2-the-go-line-is-the-oldest-go-release-still-supported) | The go line is the oldest Go release still supported | accepted |
 | [3](#3-what-the-kit-may-require) | What the kit may require | accepted |
 | [4](#4-a-release-is-a-signed-tag) | A release is a signed tag | accepted |
+| [5](#5-progress-and-its-displays-are-the-kits-own) | Progress and its displays are the kit's own | accepted |
+| [6](#6-the-pools-are-the-kits-own) | The pools are the kit's own | accepted |
 
 ## 1. Apache-2.0, and GSI holds the copyright
 
@@ -201,3 +203,118 @@ verification.
 - An OpenPGP key is trusted as the variable holds it: an expired key stops
   verifying on its own, a revoked one only once the variable holds its
   revocation.
+
+## 5. Progress and its displays are the kit's own
+
+Status: accepted
+
+### Context
+
+The kit's packages came from clusterctl, whose
+[ADR 0021](https://github.com/GSI-HPC/clusterctl/blob/v0.4.0/doc/adr/0021-progress-as-our-own-events.md)
+chose events of its own over OpenTelemetry and measured the two in its
+binary: the event model added 69,632 B, one package and no module;
+OpenTelemetry's `sdk/trace` 1,056,768 B, 39 packages, 12 modules and 9
+requirements. A target's lifecycle cost 1.7 µs and 8 allocations with a
+sink, against 2.9 µs and 20 allocations with a span processor that does
+nothing; and 19 ns and no allocation without a Bus. ADR 0021 compared no
+display library, and a kit that sind and the libraries it exports import too
+has to answer for both.
+
+The design review of 27 September 2026 that preceded the kit built the
+candidates into sind and clusterctl and measured what each costs a program
+that links it:
+
+| Candidate | What it costs | What it lacks |
+| --- | --- | --- |
+| The kit: `progress` alone | +65,536 B in sind | |
+| The kit: `progress`, `display`, `fanout` and `go-nodeset` | +233,472 B in sind (+2.2%), 5 packages, no third-party module | |
+| OpenTelemetry's API alone | 3 to 7 requirements | A display, a queued state, an in-process sink |
+| [mpb](https://github.com/vbauerster/mpb) | +704 KB, and a `go 1.26` line when the kit's floor was lower | A tree of spans; its bars are the model |
+| [bubbletea](https://github.com/charmbracelet/bubbletea) | +1.17 MB, +15 modules | It owns the terminal and the event loop; charmbracelet is ruled out by decision 3 |
+| BuildKit's `progressui` | +53 requirements | A module of its own; it lives in BuildKit's |
+| [go-pretty](https://github.com/jedib0t/go-pretty)'s progress | Little | A tree, and a region that yields to a question |
+| kind's spinner | None | It is internal to kind, and one line |
+
+None of them keeps the promises the kit's displays make to the command they
+share the terminal with: a region taken off before every write the command
+makes and never drawn over a question, lines from other goroutines held while
+one is asked, a count that reaches its total after an interrupt, and nothing
+but the command's own output without a display. Nor does any escaper found
+for the text a display draws: those of `kenn/termtext`, `runesafe` and
+`loglayer` delete or replace characters, `go-gh` covers C0 and C1 alone,
+Kubernetes' `EscapeTerminal` ESC and CR alone, and `strconv.Quote` adds
+quotes and escapes newlines.
+
+### Decision
+
+- The kit reports progress as its own events, `progress`, and draws them
+  with its own displays, `progress/display`, which write to an `io.Writer`
+  themselves.
+- It escapes text for a terminal with its own escaper, `termtext`, whose
+  policy its package comment records.
+- A program that wants OpenTelemetry converts the event log
+  ([event-log.md](event-log.md)); the kit never imports it, and depguard
+  keeps it so (decision 3).
+
+### Costs
+
+- The displays, the event model, the escaper and their fuzz targets are the
+  kit's to maintain, and a terminal UI among them has narrow terminals,
+  resizes, multiplexers and locales to cope with.
+- A change to how a display looks is a release of the kit, and a change to
+  the text consumers compare in their tests is a breaking one.
+- There is no exporter and no propagation beyond reading a `traceparent`.
+
+## 6. The pools are the kit's own
+
+Status: accepted
+
+### Context
+
+A command on many hosts works on them side by side, a bounded number at a
+time, and a display counts them. For the count to be right, the pool has to
+announce every item as queued before the first runs, mark each running as it
+takes its place, end each before it gives the place up, and end those it
+never started, so that the count reaches its total after an interrupt too.
+`progresstest.Check` holds every source of events to this.
+
+The design review of 27 September 2026 tried the pools a Go program would
+reach for:
+
+- `golang.org/x/sync/errgroup` with `SetLimit` went on starting work after
+  its context was cancelled, in 10 of 10 runs against none of 10 for the
+  kit's `Each`, and it does not recover a panic, so a panic in one item's
+  work ends the process. Its first error cancels the rest, which is right
+  for some commands, but the step it reports has to be assembled around it:
+  a prototype of sind's that announced and ran the items in one loop broke
+  `Check`'s rule that every item is queued before the first runs.
+- [`sourcegraph/conc`](https://github.com/sourcegraph/conc) recovers panics,
+  but has had no release since v0.3.0, in February 2023.
+- [`alitto/pond`](https://github.com/alitto/pond) is a pool that outlives
+  the call, with workers to stop, where a command wants one bounded loop per
+  step.
+
+None of them reports its items, and none keeps the order of the results.
+
+### Decision
+
+- The kit's pools are its own: `fanout.Each`, the one bounded loop, which
+  starts nothing once its context has ended; `Map`, which reports its items
+  as the targets of a step, returns what each came to in the order given,
+  and turns a panic in one into that item's error; and `Batches`, which runs
+  a node set in batches with a pause between them.
+- A pool knows no program: the program's name, its rule for the class of an
+  error and the error a step ends with are options.
+- A pool that stops at the first failure, as errgroup does, is a later
+  option of `Map`, specified by tests that compare it with errgroup, when a
+  program needs it.
+
+### Costs
+
+- The pools are the kit's to maintain, and their concurrency is the kit's
+  to get right; the race detector, `testing/synctest` and `Check` are how
+  it is tested.
+- A program that wants errgroup's semantics, the first failure cancelling
+  the rest, keeps errgroup until `Map` has them, and announces its items
+  queued itself.
