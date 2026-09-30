@@ -13,9 +13,9 @@ gitignored).
 
 ## Status
 
-A scaffold. The packages move here with their history (`git filter-repo`)
-from the repository where they were written, which `README.md` names; the
-maintainer decides when. Do not copy code over by hand.
+The packages, moved here with their history from the repository where they
+were written, which `README.md` names. v0: the API may still change in a
+minor release (see Compatibility).
 
 | Package | What it holds | Release |
 | --- | --- | --- |
@@ -29,8 +29,27 @@ maintainer decides when. Do not copy code over by hand.
 ## Layout
 
 - `doc.go`: the package comment of `clikit`, which lists the packages.
-- `doc/`: `README.md` maps the documentation, `decisions.md` records what
-  was decided and why, and `release.md` says how a release is cut.
+- `termtext/`: `escape.go`, the escaper and its policy (`doc.go`);
+  `width.go`, display widths and `Truncate`.
+- `progress/`: `progress.go`, the vocabulary (kinds, states, classes,
+  flags, `Fields`, `Event`, the sink interfaces and the options); `bus.go`,
+  the `Bus`, spans and `Suspend`; `classify.go`; `lines.go`, `Tee` and the
+  lines of output; `sanitize.go`; `tally.go`; `log.go`, the event log;
+  `trace.go`, the W3C trace context. `testdata/log-v1.jsonl` is the golden
+  event log.
+- `progress/display/`: `terminal.go`, the `Terminal` and its writers;
+  `tree.go`, `counter.go`, `plain.go` and `summary.go`, one display each.
+  `contract_test.go` holds the displays to their promises on a `Screen`.
+- `progress/progresstest/`: `progresstest.go`, `Capture`, `Check`,
+  `Checked`, `Watch` and `Tree`; `screen.go`, `Screen`.
+- `fanout/`: `each.go`, `Each` and the package comment; `map.go`, `Map`,
+  `Failure` and `Skip`; `batches.go`; `recover.go`, `Recovered`.
+- Every package has an `example_test.go`. Failing fuzz inputs go under the
+  package's `testdata/fuzz/`.
+- `doc/`: `README.md` maps the documentation; `architecture.md` says how
+  the packages fit together, `event-log.md` describes the event log,
+  `testing.md` says how the kit is tested, `decisions.md` records what was
+  decided and why, and `release.md` says how a release is cut.
 - `.github/workflows/ci.yml`: tests on both Go lines and on macOS, coverage,
   fuzzing, lint, Markdown, REUSE, govulncheck and the tag verification test.
   `release.yml`: verifies a pushed `v*` tag and publishes the release.

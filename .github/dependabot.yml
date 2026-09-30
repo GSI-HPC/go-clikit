@@ -8,7 +8,10 @@
 version: 2
 
 updates:
-  # The requirements in go.mod.
+  # The requirements in go.mod: go-nodeset and golang.org/x/text, and
+  # nothing else without a record (doc/decisions.md, decision 3). An update
+  # that raises the go line of go.mod is closed: the requirement waits until
+  # the line moves (decision 2).
   - package-ecosystem: gomod
     directory: /
     schedule:
