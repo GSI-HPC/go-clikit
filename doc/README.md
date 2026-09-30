@@ -10,24 +10,11 @@ which pkg.go.dev publishes:
 
 | Document | What it covers |
 | --- | --- |
-| [decisions.md](decisions.md) | What was decided, why, and what it costs |
+| [architecture.md](architecture.md) | How the kit came to be, how the packages fit together, what runs on which goroutine, the hooks a program fills in, and the convention for standard error |
+| [event-log.md](event-log.md) | The JSONL event log as an interface: its lines, keys and values, the rule for versions, and what never goes in |
+| [testing.md](testing.md) | What is tested and how: the contract of the events, fake clocks, the Screen, the pools, fuzzing and the path that allocates nothing |
+| [decisions.md](decisions.md) | What was decided, why, and what it costs, the measured comparison with other display and pool libraries among it |
 | [release.md](release.md) | Cutting, withdrawing and verifying a release |
-
-Three more arrive with the packages:
-
-- `architecture.md`: how the kit came to be, with links to the programs it
-  was written for, and how the packages fit together: their dependencies,
-  the concurrency of the Bus, the hooks a program fills in, and the
-  convention for standard error that the programs using the kit follow,
-  with progress, notes, logs, and one escaped line for the final error;
-- `event-log.md`: the JSONL event log as an interface, with its lines, keys
-  and value names, the rule for versions, and what never goes in;
-- `testing.md`: what is tested and how, from fake clocks and the Screen
-  terminal model to the bounds of the pools, fuzzing, and the path that
-  allocates nothing.
-
-The measured comparison with other display and pool libraries arrives with
-them, as decisions in `decisions.md`.
 
 ## Everything else
 
@@ -47,8 +34,8 @@ them, as decisions in `decisions.md`.
 - A change of behaviour updates the doc comments, and the document here that
   describes it, in the same pull request.
 - A decision is never edited; a later one supersedes it.
-- Once `event-log.md` is here, the golden log in `testdata/` pins the format
-  it describes.
+- The golden log, `progress/testdata/log-v1.jsonl`, pins the format
+  `event-log.md` describes.
 
 Deliberately absent: a documentation site, a changelog, a `CONTRIBUTING.md`
 and a README per package. pkg.go.dev, the signed tags and `AGENTS.md` say
