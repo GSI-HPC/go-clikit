@@ -20,9 +20,10 @@ spans costs nothing when no command is listening.
 The packages were written for [clusterctl](https://github.com/GSI-HPC/clusterctl), a
 command-line tool for administering HPC clusters, and became a module of
 their own when [sind](https://github.com/GSI-HPC/sind), which runs Slurm
-clusters in Docker, set out to use them too. They move here, with their
-history, once they have shipped in a clusterctl release and their API has
-held still for a while. Until then the module holds no API.
+clusters in Docker, set out to use them too. They moved here with their
+history, as clusterctl v0.4.0 shipped them, and their first release will be
+v0.1.0. [`doc/architecture.md`](doc/architecture.md) says how they fit
+together.
 
 | Package | What it holds |
 | --- | --- |
