@@ -210,8 +210,9 @@ const (
 	// counts: its Total is what the counter expects.
 	Fold
 	// ShowLines lets the output of the calls below be shown as it
-	// arrives, for exec, where the output is the product. A span started
-	// under one shows lines too.
+	// arrives, for a command whose output is the product, such as one that
+	// runs a command on many hosts. A span started under one shows lines
+	// too.
 	ShowLines
 	// DryRun marks the command of a dry run, and a call a dry run only
 	// recorded. It is not passed down.

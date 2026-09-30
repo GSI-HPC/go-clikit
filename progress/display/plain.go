@@ -36,8 +36,7 @@ const (
 // target that fails, once; and, every ten seconds, for each counted step
 // under way, a root of a progress.Tally, with how far it has got. Hidden
 // spans and calls get no line, and neither do the lines of output the work
-// prints: exec prints them at the end, and the machine formats carry them
-// whole.
+// prints: a command whose product that output is prints it itself.
 //
 // The lines go out through the Terminal: ahead of whatever the command
 // writes after the events they tell of, never into a line the command has
