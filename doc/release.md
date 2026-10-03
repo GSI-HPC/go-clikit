@@ -113,9 +113,12 @@ releases before it expires.
 
 ## Withdrawing a release
 
-Never move or delete a pushed tag: the module proxy and the checksum
-database keep it regardless. Add a `retract` directive with the reason to
-`go.mod` and ship it in the next release:
+Never move or delete a tag you pushed as a release: the module proxy and
+the checksum database keep it regardless. The one exception is a tag that
+was not pushed as a release, such as one an intruder moved, or deleted and
+pushed again, which the audit below asks you to restore or delete. Add a
+`retract` directive with the reason to `go.mod` and ship it in the next
+release:
 
 ```go
 retract v0.2.0 // Tagged from the wrong commit.
@@ -137,10 +140,17 @@ It still fails a retracted version whose tag names another commit than the
 proxy serves, such as a tag that was moved, or deleted and pushed again,
 after the proxy fetched it: the tag then names content that nobody withdrew.
 Restore the tag the proxy fetched, or delete the tag, which leaves a
-version without a tag. A bad tag that the proxy has not fetched, or whose
-`.info` names no commit, is not acknowledged either, since nothing records
-which commit was withdrawn: delete it, or fetch the version through the
-proxy, which records the commit, if the tag names the commit to withdraw.
+version without a tag. A bad tag whose version the proxy does not record a
+commit for is not acknowledged either, since nothing records which commit
+was withdrawn:
+
+- if the proxy has not fetched the version, delete the tag, or, if the tag
+  names the commit to withdraw, fetch the version through the proxy, which
+  records the commit;
+- if the proxy has fetched it but its `.info` has no `Origin`, delete the
+  tag: the proxy goes on serving that `.info`, so fetching the version again
+  records nothing.
+
 Any version that `go.mod` does not retract still fails the audit. A range
 such as `retract [v0.2.0, v0.2.3]` acknowledges none of its versions, so
 retract each version the audit names on a line of its own. Never pin a bad
