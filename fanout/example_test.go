@@ -115,10 +115,17 @@ func ExampleBatches() {
 	// exe[08-10] false not tried: an earlier batch failed
 }
 
-// Failure sums up the items that failed, as the error a step ends with.
+// Failure sums up the items that failed, as the error a step ends with. A
+// program's MapOptions.Summarize builds on it, to give the error an exit
+// code of its own.
 func ExampleFailure() {
-	err := fanout.Failure("hosts", 480, []string{"exe0007", "exe0008"},
-		[]error{errors.New("exe0007: no answer"), context.Canceled}, false)
+	err := fanout.Failure("hosts", fanout.Summary{
+		Total: 480,
+		Failed: []fanout.Failed{
+			{Name: "exe0007", Err: errors.New("exe0007: no answer")},
+			{Name: "exe0008", Err: context.Canceled},
+		},
+	})
 	fmt.Println(err)
 	fmt.Println(errors.Is(err, context.Canceled), progress.Classify(err, nil))
 	// Output:

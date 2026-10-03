@@ -171,17 +171,16 @@ func uptime(s *session, call bool) error {
 			}
 			return "up 3 days", nil
 		})
-	var names []string
-	var errs []error
+	summary := fanout.Summary{Total: len(nodes)}
 	for i, o := range outcomes {
 		if o.Err != nil {
 			_, _ = fmt.Fprintf(s.errOut, "%s: %v\n", nodes[i], o.Err)
-			names, errs = append(names, nodes[i]), append(errs, o.Err)
+			summary.Failed = append(summary.Failed, fanout.Failed{Name: nodes[i], Err: o.Err})
 			continue
 		}
 		_, _ = fmt.Fprintf(s.out, "%s: %s\n", nodes[i], o.Value)
 	}
-	return fanout.Failure("hosts", len(nodes), names, errs, false)
+	return fanout.Failure("hosts", summary)
 }
 
 // The counter is drawn on the terminal, and taken off before anything else

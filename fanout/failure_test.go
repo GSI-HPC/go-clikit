@@ -23,13 +23,13 @@ func TestFailure(t *testing.T) {
 
 	refused := errors.New("exe2: connection refused")
 	for _, tc := range []struct {
-		name        string
-		noun        string
-		names       []string
-		errs        []error
-		interrupted bool
-		want        string
-		class       progress.Class
+		name     string
+		noun     string
+		names    []string
+		errs     []error
+		canceled bool
+		want     string
+		class    progress.Class
 	}{
 		{"none failed", "hosts", nil, nil, false, "", progress.ClassNone},
 		{"hosts", "hosts", []string{"exe3", "exe1", "exe2"}, []error{nil, nil, refused}, false,
@@ -44,12 +44,12 @@ func TestFailure(t *testing.T) {
 		{"names that repeat", "hosts", []string{"exe1", "exe1", "exe2"}, []error{refused, nil, nil}, false,
 			"3 of 5 hosts failed: exe1,exe1,exe2", progress.ClassTarget},
 		{"a name that is a group", "", []string{"@compute"}, []error{refused}, false, "1 of 5 failed: @compute", progress.ClassTarget},
-		{"interrupted", "hosts", []string{"exe1", "exe2"}, []error{context.Canceled, refused}, true,
+		{"canceled", "hosts", []string{"exe1", "exe2"}, []error{context.Canceled, refused}, true,
 			"2 of 5 hosts failed: exe[1-2]", progress.ClassCanceled},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			err := fanout.Failure(tc.noun, 5, tc.names, tc.errs, tc.interrupted)
+			err := fanout.Failure(tc.noun, summary(5, tc.names, tc.errs, tc.canceled))
 			if tc.want == "" {
 				if err != nil {
 					t.Errorf("Failure = %v, want nil", err)
@@ -71,6 +71,21 @@ func TestFailure(t *testing.T) {
 	}
 }
 
+// summary makes the Summary of total items of which those named names
+// failed, each with the error of the same place in errs, or none past its
+// end.
+func summary(total int, names []string, errs []error, canceled bool) fanout.Summary {
+	s := fanout.Summary{Total: total, Canceled: canceled}
+	for i, name := range names {
+		f := fanout.Failed{Name: name}
+		if i < len(errs) {
+			f.Err = errs[i]
+		}
+		s.Failed = append(s.Failed, f)
+	}
+	return s
+}
+
 // manyNames returns n host names, exe00000 up.
 func manyNames(n int) []string {
 	names := make([]string, n)
@@ -87,7 +102,7 @@ func TestFailureOfManyItemsIsQuick(t *testing.T) {
 	t.Parallel()
 	names := manyNames(16000)
 	start := time.Now()
-	err := fanout.Failure("hosts", len(names), names, nil, true)
+	err := fanout.Failure("hosts", summary(len(names), names, nil, true))
 	if took := time.Since(start); took > 5*time.Second {
 		t.Errorf("Failure of %d names took %s", len(names), took)
 	}
@@ -98,10 +113,10 @@ func TestFailureOfManyItemsIsQuick(t *testing.T) {
 
 func BenchmarkFailure(b *testing.B) {
 	for _, n := range []int{1000, 16000} {
-		names := manyNames(n)
+		s := summary(n, manyNames(n), nil, false)
 		b.Run(fmt.Sprint(n), func(b *testing.B) {
 			for b.Loop() {
-				_ = fanout.Failure("hosts", n, names, nil, false)
+				_ = fanout.Failure("hosts", s)
 			}
 		})
 	}
