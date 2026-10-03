@@ -87,8 +87,11 @@ keeps it without a line of the caller's.
 - **Sinks run under the Bus's lock.** The Bus calls every sink's `Handle`
   with its lock held, in `Seq` order. A sink updates memory and returns: it
   never blocks, never writes to a terminal or a file there, and never calls
-  the Bus back. A sink that panics is taken off the Bus, and its stack goes
-  to `Options.PanicLog`.
+  the Bus back. A sink that panics is taken off the Bus, whatever its type,
+  and its stack goes to `Options.PanicLog`. The Bus knows its sinks by
+  where they are listed, never by comparing them, and releases its lock
+  however a call under it ends, so neither a sink nor a clock that panics
+  leaves it locked.
 - **Displays draw on their own time.** `Start` gives a display a goroutine
   that draws from what `Handle` kept, ten times a second for the tree and
   the counter; a test calls `Draw` instead, on a clock it moves. The event

@@ -397,7 +397,8 @@ type Event struct {
 // Sink receives the events of a Bus, one at a time, in Seq order, while the
 // Bus is locked. It only updates memory, never blocks and never calls the
 // Bus back; drawing happens on the sink's own time. A sink that panics is
-// removed from the Bus.
+// removed from the Bus, whatever its type, one that cannot be compared,
+// such as a func type, included.
 type Sink interface {
 	// Handle receives one event.
 	Handle(Event)
