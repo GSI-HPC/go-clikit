@@ -59,12 +59,13 @@ type Options[T any] struct {
 type Outcome[R any] struct {
 	// Value is what the work returned; the zero value when it panicked.
 	Value R
-	// Err is the error the work returned, or the one a panic in it, or
-	// in the release Options.Acquire gave, became; for work that ended its
-	// goroutine with runtime.Goexit rather than return, such as by
-	// t.FailNow, it is an error that says so. For an item that was never started it is the one
-	// Options.Acquire refused it with, or, when the pool left it out, the
-	// context's.
+	// Err is the error the work returned, or the one a panic in it
+	// became; a panic in the release Options.Acquire gave is joined to the
+	// error the work returned, or replaces it when that was nil or an error
+	// of Skip. For work that ended its goroutine with runtime.Goexit rather
+	// than return, such as by t.FailNow, it is an error that says so. For
+	// an item that was never started it is the one Options.Acquire refused
+	// it with, or, when the pool left it out, the context's.
 	Err error
 	// Started says whether the work for the item was started, which it
 	// is not once the context has ended.
@@ -79,8 +80,9 @@ type Outcome[R any] struct {
 // becomes that item's error, with its stack in o.PanicLog, as Recovered has
 // it, and so does a call of runtime.Goexit in them, as t.FailNow makes,
 // which ends the item failed rather than the worker without a word. The
-// release is called however fn ended. Map returns once every call has
-// returned.
+// release is called however fn ended, and an item whose release panicked
+// ends failed whatever fn returned, an error of Skip or one after the
+// context had ended included. Map returns once every call has returned.
 //
 // The work is reported under the span ctx carries as a step, o.Step, with
 // a target for each item, as every pool reports it: every target is
@@ -140,8 +142,19 @@ func Map[T, R any](ctx context.Context, items []T, o Options[T], fn func(ctx con
 		}
 		spans[i].Run()
 		out[i].Started = true
-		value, err := call(ctxs[i], o.PanicLog, o.Program, names[i], items[i], fn, release)
+		value, err, broke := call(ctxs[i], o.PanicLog, o.Program, names[i], items[i], fn, release)
 		returned = true
+		if broke != nil {
+			out[i].Value, out[i].Err = value, broke
+			end := broke
+			if err != nil && !IsSkipped(err) {
+				out[i].Err = errors.Join(err, broke)
+				end = releasePanic{text: out[i].Err.Error(), panic: broke}
+			}
+			canceled[i] = o.endsCanceled(end)
+			spans[i].End(end)
+			return
+		}
 		out[i].Value, out[i].Err = value, err
 		if reason, ok := skipReason(err); ok {
 			spans[i].Skip(reason)
@@ -257,18 +270,11 @@ func (o Options[T]) acquire(ctx context.Context, name string, item T) (release f
 }
 
 // call calls fn with one item, and then release, however fn ended. A
-// panic in either becomes the item's error rather than the end of the
-// process, with its stack written to log; one in release is joined to the
-// error fn returned, and keeps the value.
-func call[T, R any](ctx context.Context, log io.Writer, program, name string, item T, fn func(context.Context, T) (R, error), release func()) (value R, err error) {
+// panic in fn becomes its error, and one in release is returned as broke,
+// rather than the end of the process, each with its stack written to log.
+func call[T, R any](ctx context.Context, log io.Writer, program, name string, item T, fn func(context.Context, T) (R, error), release func()) (value R, err, broke error) {
 	defer func() {
-		if p := Recovered(log, program, name, recover()); p != nil {
-			if err == nil {
-				err = p
-			} else {
-				err = errors.Join(err, p)
-			}
-		}
+		broke = Recovered(log, program, name, recover())
 	}()
 	defer release()
 	defer func() {
@@ -277,8 +283,22 @@ func call[T, R any](ctx context.Context, log io.Writer, program, name string, it
 			value, err = zero, p
 		}
 	}()
-	return fn(ctx, item)
+	value, err = fn(ctx, item)
+	return value, err, nil
 }
+
+// releasePanic is what the target of an item ends with when its release
+// panicked after fn returned an error: the text of both, with only the
+// panic in its chain, so that the target is classed as the panic is and not
+// as fn's error, which may be the context's.
+type releasePanic struct {
+	text  string
+	panic error
+}
+
+func (e releasePanic) Error() string { return e.text }
+
+func (e releasePanic) Unwrap() error { return e.panic }
 
 // errGoexit is the error of an item whose work, Options.Acquire or release
 // ended its goroutine with runtime.Goexit, as t.FailNow does, rather than
