@@ -15,12 +15,13 @@ edited: a later one supersedes it, and the earlier one's status names it.
 | [4](#4-a-release-is-a-signed-tag) | A release is a signed tag | accepted, superseded in part by [10](#10-a-daily-audit-holds-the-releases-to-their-record) |
 | [5](#5-progress-and-its-displays-are-the-kits-own) | Progress and its displays are the kit's own | accepted |
 | [6](#6-the-pools-are-the-kits-own) | The pools are the kit's own | accepted |
-| [7](#7-escapes-are-for-a-reader-not-for-decoding) | Escapes are for a reader, not for decoding | accepted |
+| [7](#7-escapes-are-for-a-reader-not-for-decoding) | Escapes are for a reader, not for decoding | accepted, refined by [14](#14-the-escape-deny-list-may-grow-in-a-minor-release) |
 | [8](#8-widths-err-wide-and-follow-unicode-180) | Widths err wide, and follow Unicode 18.0 | accepted |
 | [9](#9-the-region-comes-off-one-line-a-row) | The region comes off one line a row | accepted |
 | [10](#10-a-daily-audit-holds-the-releases-to-their-record) | A daily audit holds the releases to their record | accepted |
 | [11](#11-a-deadline-ends-a-pools-items-as-an-interrupt-does) | A deadline ends a pool's items as an interrupt does | accepted |
 | [13](#13-the-skip-error-lives-in-progress) | The skip error lives in progress | accepted |
+| [14](#14-the-escape-deny-list-may-grow-in-a-minor-release) | The escape deny-list may grow in a minor release | accepted |
 
 ## 1. Apache-2.0, and GSI holds the copyright
 
@@ -328,7 +329,8 @@ None of them reports its items, and none keeps the order of the results.
 
 ## 7. Escapes are for a reader, not for decoding
 
-Status: accepted
+Status: accepted, refined by
+[decision 14](#14-the-escape-deny-list-may-grow-in-a-minor-release)
 
 ### Context
 
@@ -639,3 +641,41 @@ away from for `errors.Is` and a sentinel.
   `errors.Is` first.
 - Programs that called `fanout.Skip` or `fanout.IsSkipped` change, each
   call mechanically.
+
+## 14. The escape deny-list may grow in a minor release
+
+Status: accepted, refines
+[decision 7](#7-escapes-are-for-a-reader-not-for-decoding)
+
+### Context
+
+`termtext` escapes by a deny-list: the runes that can move the cursor,
+change the state of the terminal, or change the order or the lines text is
+shown in. Terminals keep adding sequences, and a character the list leaves
+out today may turn out to act on one tomorrow. The text the displays draw is
+an interface consumers compare in their tests, and so are the escapes in
+it. If the set of runes escaped were frozen with that text, adding a rune to
+the list, a fix for a terminal's safety, would be a breaking change, and
+would wait for a major release or be weighed against one.
+
+### Decision
+
+- The forms of the escapes are stable: `\r`, and `\n` and `\t` where
+  `Escape` escapes them; `\x` and two digits for any other C0 control, DEL
+  and a byte that is not UTF-8; `\u` and four digits for any other rune;
+  hexadecimal digits in lower case. Changing a form is a breaking change.
+- The set of runes escaped may grow in a minor release, which names the
+  runes it adds in its release notes. Removing a rune from it is a breaking
+  change.
+- Escaping stays idempotent: an escape is printable ASCII, which the
+  deny-list never names.
+- The package comment of `termtext` says this, and the list of interfaces
+  beyond the Go API in `AGENTS.md` does not name the escapes.
+
+### Costs
+
+- Text that held a rune added to the list is shown, and stored in the event
+  log, escaped by a later release where an earlier one wrote it as it was;
+  a consumer's test that compares such text changes with the release.
+- An event log written before the change and one written after can hold
+  the same text in two forms.

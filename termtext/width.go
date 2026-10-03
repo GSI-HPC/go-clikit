@@ -77,6 +77,10 @@ func advance(r rune, last int) (cols, next int) {
 // counted as two, since a terminal draws it as an emoji picture, as it does
 // a keycap such as 1, U+FE0F, U+20E3. The width of one rune is
 // Width(string(r)).
+//
+// s must be plain text that is already escaped, by Escape or EscapeLines: a
+// control character or an escape sequence is counted as the columns of its
+// runes, not as what it does to the terminal.
 func Width(s string) int {
 	n, last := 0, 0
 	for _, r := range s {

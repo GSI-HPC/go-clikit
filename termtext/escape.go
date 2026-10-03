@@ -17,7 +17,9 @@ import (
 // tab are escaped too, as \n and \t, so that a message, a log line or a
 // table cell cannot start a line that seems to be another.
 //
-// Text that holds none of these is returned unchanged.
+// Text that holds none of these is returned unchanged. Escaping is
+// idempotent: Escape changes nothing in text it returned, so text escaped
+// once, such as an event's text, can be escaped again safely.
 func Escape(s string) string {
 	return escape(s, true)
 }
@@ -25,7 +27,8 @@ func Escape(s string) string {
 // EscapeLines is Escape for text whose lines are kept, such as the output
 // of a program: newline and tab are written as they are, since they cannot
 // move the cursor back over text already written. Text that has to stay on
-// one line needs Escape.
+// one line needs Escape. Escaping is idempotent: EscapeLines changes
+// nothing in text it returned.
 func EscapeLines(s string) string {
 	return escape(s, false)
 }

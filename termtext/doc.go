@@ -30,6 +30,20 @@
 //   - the line and paragraph separators U+2028 and U+2029;
 //   - every byte that is not part of valid UTF-8, such as a lone 0x9b.
 //
+// An escaped rune or byte is written in one of these forms, with lower-case
+// hexadecimal digits: carriage return as \r, and newline and tab, where
+// Escape escapes them, as \n and \t; any other C0 control, DEL and a byte
+// that is not UTF-8 as \x and two digits, such as \x1b, \x7f or \xff;
+// and any other rune as \u and four digits, such as \u009b or \u202e.
+// These forms are stable. The set of runes escaped is not: the deny-list
+// may grow in a minor release, when a character turns out to act on a
+// terminal too, and text that holds such a character is escaped by the
+// release that adds it, where an earlier release wrote it as it was.
+//
+// Escaping is idempotent: escaping text that either escaper returned, with
+// the same escaper, changes nothing, since every escape is made of
+// printable ASCII that no policy escapes.
+//
 // Other invisible characters, such as a zero-width space, a byte order mark
 // or a tag character, are written as they are: they change neither the
 // cursor nor the terminal, and an allow-list that escaped them would escape
@@ -64,5 +78,7 @@
 // up to version 18.0: a wide character assigned later is counted as one
 // column, and a terminal that draws U+FE0F narrow shows less than Width
 // counts. Truncate shortens text to a number of columns with the same
-// widths.
+// widths. Both expect text that is already escaped: a control character or
+// an escape sequence is counted as the columns of its runes, not as what it
+// does to the terminal.
 package termtext
