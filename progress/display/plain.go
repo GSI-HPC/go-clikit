@@ -73,9 +73,10 @@ type Plain struct {
 	// heartbeat falls due.
 	suspended int
 
-	wake          chan struct{}
-	stop, stopped chan struct{}
-	closing       sync.Once
+	// wake has the lines not yet written flushed by the goroutine Start
+	// begins, sooner than its next tick.
+	wake   chan struct{}
+	ticker ticker
 }
 
 type plainSpan struct {
@@ -113,7 +114,7 @@ type PlainOptions struct {
 // NewPlain returns a display of plain lines on term, which counts the time
 // in front of its lines from now.
 func NewPlain(term *Terminal, o PlainOptions) *Plain {
-	p := &Plain{term: term, now: o.Now, spans: map[progress.SpanID]*plainSpan{}, between: " › ", noun: o.Noun}
+	p := &Plain{term: term, now: o.Now, spans: map[progress.SpanID]*plainSpan{}, between: " › ", noun: o.Noun, wake: make(chan struct{}, 1)}
 	if o.ASCII {
 		p.between = " > "
 	}
@@ -131,29 +132,9 @@ func NewPlain(term *Terminal, o PlainOptions) *Plain {
 }
 
 // Start writes the lines as they come, and the heartbeats as they fall due,
-// until Close.
-func (p *Plain) Start() {
-	p.mu.Lock()
-	p.wake = make(chan struct{}, 1)
-	p.mu.Unlock()
-	p.stop, p.stopped = make(chan struct{}), make(chan struct{})
-	go func() {
-		defer close(p.stopped)
-		defer p.term.recovered()
-		tick := time.NewTicker(plainEvery)
-		defer tick.Stop()
-		for {
-			select {
-			case <-p.stop:
-				return
-			case <-p.wake:
-				p.term.flush()
-			case <-tick.C:
-				p.Draw()
-			}
-		}
-	}()
-}
+// until Close. Start does nothing if the Plain was already started or
+// closed.
+func (p *Plain) Start() { p.ticker.start(p.term, plainEvery, p.Draw, p.wake) }
 
 // Draw writes the lines not yet written and the heartbeats due now, where
 // the terminal lets it.
@@ -171,15 +152,7 @@ func (p *Plain) Draw() {
 
 // Close stops the writing Start began, and writes what is left. Closing a
 // closed Plain does nothing.
-func (p *Plain) Close() {
-	p.closing.Do(func() {
-		if p.stop != nil {
-			close(p.stop)
-			<-p.stopped
-		}
-		p.term.close()
-	})
-}
+func (p *Plain) Close() { p.ticker.close(p.term) }
 
 // Suspend writes the lines not yet written, and then no more until Resume.
 func (p *Plain) Suspend() {
@@ -348,11 +321,9 @@ func (p *Plain) heartbeats(now time.Time) {
 // is held.
 func (p *Plain) line(t time.Time, text string) {
 	fmt.Fprintf(&p.lines, "[%s] %s\n", elapsed(max(0, t.Sub(p.start))), text)
-	if p.wake != nil {
-		select {
-		case p.wake <- struct{}{}:
-		default:
-		}
+	select {
+	case p.wake <- struct{}{}:
+	default:
 	}
 }
 

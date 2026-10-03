@@ -588,3 +588,14 @@ func TestPlainLinesSayTheNounTheyAreGiven(t *testing.T) {
 [0:00] create cluster › start: done in 0.0s: 4 ok
 `)
 }
+
+// A second Start, and a Start after Close, do nothing.
+func TestPlainStartsOnce(t *testing.T) {
+	t.Parallel()
+	startsOnce(t, time.Second, func(now func() time.Time) interface {
+		Start()
+		Close()
+	} {
+		return display.NewPlain(display.NewTerminal(&screen{}, display.TerminalOptions{}), display.PlainOptions{Now: now})
+	})
+}

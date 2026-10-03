@@ -10,6 +10,7 @@ import (
 	"io"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"testing/synctest"
 	"time"
@@ -57,6 +58,42 @@ func (c *clock) Add(d time.Duration) {
 	c.mu.Lock()
 	c.now = c.now.Add(d)
 	c.mu.Unlock()
+}
+
+// startsOnce checks that a display, which newDisplay makes with the clock
+// it is given and which draws every so often from Start, reads the clock
+// once a frame: a second Start begins no second goroutine, which would
+// draw twice as often and never stop, and a Start after Close begins
+// none, which would draw on for good.
+func startsOnce(t *testing.T, every time.Duration, newDisplay func(now func() time.Time) interface {
+	Start()
+	Close()
+}) {
+	t.Helper()
+	synctest.Test(t, func(t *testing.T) {
+		t.Helper()
+		var reads atomic.Int64
+		d := newDisplay(func() time.Time {
+			reads.Add(1)
+			return time.Now()
+		})
+		reads.Store(0)
+		d.Start()
+		d.Start()
+		time.Sleep(time.Second + every/2)
+		synctest.Wait()
+		if got, want := reads.Load(), int64(time.Second/every); got != want {
+			t.Errorf("started twice, the display drew %d frames in a second, want %d", got, want)
+		}
+		d.Close()
+		reads.Store(0)
+		d.Start()
+		time.Sleep(10 * time.Second)
+		synctest.Wait()
+		if got := reads.Load(); got != 0 {
+			t.Errorf("started after Close, the display drew %d frames, want none", got)
+		}
+	})
 }
 
 // fixture is a counter on a screen, fed by a Bus whose events are checked
@@ -476,6 +513,17 @@ func TestCloseTakesTheCounterOff(t *testing.T) {
 	if got, want := f.screen.String(), "\n<erase>exec · 0:01\n<erase>prog: interrupted\n"; got != want {
 		t.Errorf("screen:\n%q\nwant:\n%q", got, want)
 	}
+}
+
+// A second Start, and a Start after Close, do nothing.
+func TestTheCounterStartsOnce(t *testing.T) {
+	t.Parallel()
+	startsOnce(t, 100*time.Millisecond, func(now func() time.Time) interface {
+		Start()
+		Close()
+	} {
+		return display.NewCounter(display.NewTerminal(&screen{}, display.TerminalOptions{}), display.CounterOptions{Now: now})
+	})
 }
 
 // A display that panics while it draws, on its own goroutine, draws no

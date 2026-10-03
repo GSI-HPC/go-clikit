@@ -51,8 +51,7 @@ type Counter struct {
 	// label of the span above it.
 	labels map[progress.SpanID]string
 
-	stop, stopped chan struct{}
-	closing       sync.Once
+	ticker ticker
 }
 
 type named struct {
@@ -81,24 +80,9 @@ func NewCounter(term *Terminal, o CounterOptions) *Counter {
 }
 
 // Start draws the counter every 100ms, from a second after it was made,
-// until Close.
-func (c *Counter) Start() {
-	c.stop, c.stopped = make(chan struct{}), make(chan struct{})
-	go func() {
-		defer close(c.stopped)
-		defer c.term.recovered()
-		tick := time.NewTicker(counterEvery)
-		defer tick.Stop()
-		for {
-			select {
-			case <-c.stop:
-				return
-			case <-tick.C:
-				c.Draw()
-			}
-		}
-	}()
-}
+// until Close. Start does nothing if the Counter was already started or
+// closed.
+func (c *Counter) Start() { c.ticker.start(c.term, counterEvery, c.Draw, nil) }
 
 // Draw draws the line as the work stands now, unless the command has run
 // for less than a second.
@@ -117,15 +101,7 @@ func (c *Counter) Draw() {
 
 // Close stops the drawing and takes the line off the terminal. Closing a
 // closed Counter does nothing.
-func (c *Counter) Close() {
-	c.closing.Do(func() {
-		if c.stop != nil {
-			close(c.stop)
-			<-c.stopped
-		}
-		c.term.close()
-	})
-}
+func (c *Counter) Close() { c.ticker.close(c.term) }
 
 // Handle counts e in.
 func (c *Counter) Handle(e progress.Event) {
