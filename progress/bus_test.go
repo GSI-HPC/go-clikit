@@ -853,6 +853,35 @@ func TestADisplayRemovedWhileSuspendedIsResumed(t *testing.T) {
 	}
 }
 
+// A display listed twice in the sinks is sent a Suspend for each time it
+// is listed, and as many resumes, by its resume or by Close.
+func TestADisplayListedTwiceIsResumedTwice(t *testing.T) {
+	t.Parallel()
+
+	display := &fragile{}
+	sinks := []progress.Sink{display, display}
+	ctx, _, _ := watched(t, progress.Options{Sinks: sinks, PanicLog: io.Discard})
+	progress.Suspend(ctx)()
+	if got := display.Calls(); got != "suspend suspend resume resume" {
+		t.Errorf("after its resume the display saw %q, want two suspends and two resumes", got)
+	}
+
+	display = &fragile{}
+	sinks = []progress.Sink{display, display}
+	ctx, bus, _ := watched(t, progress.Options{Sinks: sinks, PanicLog: io.Discard})
+	outer := progress.Suspend(ctx)
+	inner := progress.Suspend(ctx)
+	inner()
+	if got := display.Calls(); got != "suspend suspend suspend suspend resume resume" {
+		t.Errorf("after the inner resume the display saw %q, want four suspends and two resumes", got)
+	}
+	bus.Close()
+	outer()
+	if got := display.Calls(); got != "suspend suspend suspend suspend resume resume resume resume" {
+		t.Errorf("after Close the display saw %q, want four suspends and four resumes", got)
+	}
+}
+
 func equal(a, b []string) bool {
 	return strings.Join(a, "\n") == strings.Join(b, "\n")
 }
