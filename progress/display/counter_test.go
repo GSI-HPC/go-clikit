@@ -258,27 +258,30 @@ func TestTheCounterOfAWideFanOut(t *testing.T) {
 }
 
 // A power-on in batches is counted as a whole, with the batch under way,
-// the pause between two, and the batches left out after one failed.
+// the pause between two, and the batches left out after one failed. The
+// test runs in a testing/synctest bubble, so that a frame is drawn during
+// the pause.
 func TestTheCounterCountsAPowerOnInBatches(t *testing.T) {
 	t.Parallel()
+	synctest.Test(t, testTheCounterCountsAPowerOnInBatches)
+}
+
+func testTheCounterCountsAPowerOnInBatches(t *testing.T) {
 	f := newFixture(t, "bmc power on", nil)
 	nodes, err := nodeset.Parse("exe[1-6]")
 	if err != nil {
 		t.Fatal(err)
 	}
 	f.clock.Add(time.Second)
-	fanout.Batches(f.ctx, nodes, fanout.BatchOptions{
+	o := duringPauses(fanout.BatchOptions{
 		Step:  "power on",
 		Size:  2,
 		Pause: 30 * time.Second,
-		After: func(d time.Duration) <-chan time.Time {
-			f.draw(time.Second)
-			f.clock.Add(d)
-			ready := make(chan time.Time, 1)
-			ready <- f.clock.Now()
-			return ready
-		},
-	}, func(ctx context.Context, batch *nodeset.NodeSet) error {
+	}, func(d time.Duration) {
+		f.draw(time.Second)
+		f.clock.Add(d)
+	})
+	fanout.Batches(f.ctx, nodes, o, func(ctx context.Context, batch *nodeset.NodeSet) error {
 		f.draw(time.Second)
 		names := batch.Expand()
 		spans := make([]*progress.Span, len(names))

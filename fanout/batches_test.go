@@ -35,6 +35,10 @@ func set(t *testing.T, expr string) *nodeset.NodeSet {
 type sender struct {
 	log  []string
 	fail map[string]bool
+	// last is when the hooks were last called, on the clock of the
+	// testing/synctest bubble the test runs in, where only a pause takes
+	// time.
+	last time.Time
 }
 
 func (s *sender) run(ctx context.Context, batch *nodeset.NodeSet) error {
@@ -57,22 +61,22 @@ func (s *sender) run(ctx context.Context, batch *nodeset.NodeSet) error {
 	return failed
 }
 
-// options returns batch options whose hooks and pauses write to the
-// sender's log, and whose pauses end at once.
+// options returns batch options whose hooks write to the sender's log,
+// with the time that passed before a batch, which only a pause takes in a
+// testing/synctest bubble, whose fake clock lets it pass at once.
 func (s *sender) options(size int, pause time.Duration) fanout.BatchOptions {
+	s.last = time.Now()
 	return fanout.BatchOptions{
-		Step:  "power on",
-		Size:  size,
-		Limit: 2,
-		Pause: pause,
-		After: func(d time.Duration) <-chan time.Time {
-			s.log = append(s.log, fmt.Sprintf("wait %s", d))
-			ready := make(chan time.Time, 1)
-			ready <- time.Time{}
-			return ready
-		},
+		Step:        "power on",
+		Size:        size,
+		Limit:       2,
+		Pause:       pause,
 		BeforePause: func(d time.Duration) { s.log = append(s.log, fmt.Sprintf("note: waiting %s", d)) },
 		Before: func(i, n int, batch *nodeset.NodeSet) {
+			if waited := time.Since(s.last); waited > 0 {
+				s.log = append(s.log, fmt.Sprintf("waited %s", waited))
+			}
+			s.last = time.Now()
 			s.log = append(s.log, fmt.Sprintf("note: %s (%d of %d)", batch, i+1, n))
 		},
 	}
@@ -128,9 +132,9 @@ func TestBatchesPauseBetweenBatches(t *testing.T) {
 	}{
 		{"a pause", 5 * time.Second, []string{
 			"note: exe[1-2] (1 of 3)", "run exe[1-2]",
-			"note: waiting 5s", "wait 5s",
+			"note: waiting 5s", "waited 5s",
 			"note: exe[3-4] (2 of 3)", "run exe[3-4]",
-			"note: waiting 5s", "wait 5s",
+			"note: waiting 5s", "waited 5s",
 			"note: exe[5-6] (3 of 3)", "run exe[5-6]",
 		}},
 		{"no pause", 0, []string{
@@ -141,11 +145,13 @@ func TestBatchesPauseBetweenBatches(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			s := &sender{}
-			fanout.Batches(context.Background(), set(t, "exe[1-6]"), s.options(2, tc.pause), s.run)
-			if got, want := strings.Join(s.log, "\n"), strings.Join(tc.want, "\n"); got != want {
-				t.Errorf("got:\n%s\nwant:\n%s", got, want)
-			}
+			synctest.Test(t, func(t *testing.T) {
+				s := &sender{}
+				fanout.Batches(context.Background(), set(t, "exe[1-6]"), s.options(2, tc.pause), s.run)
+				if got, want := strings.Join(s.log, "\n"), strings.Join(tc.want, "\n"); got != want {
+					t.Errorf("got:\n%s\nwant:\n%s", got, want)
+				}
+			})
 		})
 	}
 }
@@ -155,27 +161,32 @@ func TestBatchesPauseBetweenBatches(t *testing.T) {
 // after it either.
 func TestBatchesStopAfterAFailedBatch(t *testing.T) {
 	t.Parallel()
-
-	s := &sender{fail: map[string]bool{"exe4": true}}
-	batches := fanout.Batches(context.Background(), set(t, "exe[1-8]"), s.options(2, time.Second), s.run)
-	want := []string{
-		"note: exe[1-2] (1 of 4)", "run exe[1-2]",
-		"note: waiting 1s", "wait 1s",
-		"note: exe[3-4] (2 of 4)", "run exe[3-4]",
-	}
-	if got := strings.Join(s.log, "\n"); got != strings.Join(want, "\n") {
-		t.Errorf("got:\n%s\nwant:\n%s", got, strings.Join(want, "\n"))
-	}
-	for i, b := range batches {
-		switch {
-		case i == 0 && (!b.Started || b.Err != nil):
-			t.Errorf("batch 1 = %+v, want it run without an error", b)
-		case i == 1 && (!b.Started || b.Err == nil || !strings.Contains(b.Err.Error(), "exe4")):
-			t.Errorf("batch 2 = %+v, want it run with exe4's error", b)
-		case i > 1 && (b.Started || !errors.Is(b.Err, fanout.ErrNotTried)):
-			t.Errorf("batch %d = %+v, want it not tried", i+1, b)
+	synctest.Test(t, func(t *testing.T) {
+		s := &sender{fail: map[string]bool{"exe4": true}}
+		start := time.Now()
+		batches := fanout.Batches(context.Background(), set(t, "exe[1-8]"), s.options(2, time.Second), s.run)
+		want := []string{
+			"note: exe[1-2] (1 of 4)", "run exe[1-2]",
+			"note: waiting 1s", "waited 1s",
+			"note: exe[3-4] (2 of 4)", "run exe[3-4]",
 		}
-	}
+		if got := strings.Join(s.log, "\n"); got != strings.Join(want, "\n") {
+			t.Errorf("got:\n%s\nwant:\n%s", got, strings.Join(want, "\n"))
+		}
+		if took := time.Since(start); took != time.Second {
+			t.Errorf("the batches took %s, want the one pause of 1s", took)
+		}
+		for i, b := range batches {
+			switch {
+			case i == 0 && (!b.Started || b.Err != nil):
+				t.Errorf("batch 1 = %+v, want it run without an error", b)
+			case i == 1 && (!b.Started || b.Err == nil || !strings.Contains(b.Err.Error(), "exe4")):
+				t.Errorf("batch 2 = %+v, want it run with exe4's error", b)
+			case i > 1 && (b.Started || !errors.Is(b.Err, fanout.ErrNotTried)):
+				t.Errorf("batch %d = %+v, want it not tried", i+1, b)
+			}
+		}
+	})
 }
 
 // An interrupt during a pause, or between batches without one, sends
@@ -184,47 +195,69 @@ func TestBatchesStopAfterAFailedBatch(t *testing.T) {
 func TestBatchesStopWhenInterrupted(t *testing.T) {
 	t.Parallel()
 
+	// The interrupt comes 10s into a pause of a minute, which ends then.
 	t.Run("during a pause", func(t *testing.T) {
 		t.Parallel()
-		ctx, cancel := context.WithCancel(context.Background())
-		s := &sender{}
-		o := s.options(2, time.Minute)
-		o.After = func(time.Duration) <-chan time.Time {
-			s.log = append(s.log, "interrupted while waiting")
-			cancel()
-			return nil
-		}
-		batches := fanout.Batches(ctx, set(t, "exe[1-6]"), o, s.run)
-		want := "note: exe[1-2] (1 of 3)\nrun exe[1-2]\nnote: waiting 1m0s\ninterrupted while waiting"
-		if got := strings.Join(s.log, "\n"); got != want {
-			t.Errorf("got:\n%s\nwant:\n%s", got, want)
-		}
-		for i, b := range batches[1:] {
-			if b.Started || !errors.Is(b.Err, context.Canceled) {
-				t.Errorf("batch %d = %+v, want it left out as cancelled", i+2, b)
+		synctest.Test(t, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			s := &sender{}
+			o := s.options(2, time.Minute)
+			before := o.BeforePause
+			o.BeforePause = func(d time.Duration) {
+				before(d)
+				time.AfterFunc(10*time.Second, func() {
+					s.log = append(s.log, "interrupted while waiting")
+					cancel()
+				})
 			}
-		}
+			start := time.Now()
+			batches := fanout.Batches(ctx, set(t, "exe[1-6]"), o, s.run)
+			if took := time.Since(start); took != 10*time.Second {
+				t.Errorf("the batches took %s, want the 10s until the interrupt", took)
+			}
+			want := "note: exe[1-2] (1 of 3)\nrun exe[1-2]\nnote: waiting 1m0s\ninterrupted while waiting"
+			if got := strings.Join(s.log, "\n"); got != want {
+				t.Errorf("got:\n%s\nwant:\n%s", got, want)
+			}
+			for i, b := range batches[1:] {
+				if b.Started || !errors.Is(b.Err, context.Canceled) {
+					t.Errorf("batch %d = %+v, want it left out as cancelled", i+2, b)
+				}
+			}
+		})
 	})
 
 	t.Run("during a batch, without a pause", func(t *testing.T) {
 		t.Parallel()
-		ctx, cancel := context.WithCancel(context.Background())
-		s := &sender{}
-		batches := fanout.Batches(ctx, set(t, "exe[1-6]"), s.options(2, 0), func(ctx context.Context, batch *nodeset.NodeSet) error {
-			cancel()
-			return s.run(ctx, batch)
-		})
-		if got, want := strings.Join(s.log, "\n"), "note: exe[1-2] (1 of 3)\nrun exe[1-2]"; got != want {
-			t.Errorf("got:\n%s\nwant:\n%s", got, want)
-		}
-		if !batches[0].Started {
-			t.Errorf("batch 1 = %+v, want it run", batches[0])
-		}
-		for i, b := range batches[1:] {
-			if b.Started || !errors.Is(b.Err, context.Canceled) {
-				t.Errorf("batch %d = %+v, want it left out as cancelled", i+2, b)
+		synctest.Test(t, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			s := &sender{}
+			batches := fanout.Batches(ctx, set(t, "exe[1-6]"), s.options(2, 0), func(ctx context.Context, batch *nodeset.NodeSet) error {
+				cancel()
+				return s.run(ctx, batch)
+			})
+			if got, want := strings.Join(s.log, "\n"), "note: exe[1-2] (1 of 3)\nrun exe[1-2]"; got != want {
+				t.Errorf("got:\n%s\nwant:\n%s", got, want)
 			}
-		}
+			if !batches[0].Started {
+				t.Errorf("batch 1 = %+v, want it run", batches[0])
+			}
+			for i, b := range batches[1:] {
+				if b.Started || !errors.Is(b.Err, context.Canceled) {
+					t.Errorf("batch %d = %+v, want it left out as cancelled", i+2, b)
+				}
+			}
+		})
+	})
+}
+
+// inBubble runs f as the parallel subtest name, in a testing/synctest
+// bubble, whose fake clock lets a pause pass at once.
+func inBubble(t *testing.T, name string, f func(t *testing.T)) {
+	t.Helper()
+	t.Run(name, func(t *testing.T) {
+		t.Parallel()
+		synctest.Test(t, f)
 	})
 }
 
@@ -235,8 +268,7 @@ func TestBatchesStopWhenInterrupted(t *testing.T) {
 func TestBatchesReportTheirWork(t *testing.T) {
 	t.Parallel()
 
-	t.Run("a failed batch", func(t *testing.T) {
-		t.Parallel()
+	inBubble(t, "a failed batch", func(t *testing.T) {
 		ctx, w := progresstest.Watch(context.Background(), t)
 		s := &sender{fail: map[string]bool{"exe5": true}}
 		fanout.Batches(ctx, set(t, "exe[1-7]"), s.options(3, 5*time.Second), s.run)
@@ -254,13 +286,13 @@ func TestBatchesReportTheirWork(t *testing.T) {
 		}
 	})
 
-	t.Run("an interrupt during a pause", func(t *testing.T) {
-		t.Parallel()
+	// The interrupt comes as the pause is announced, before it starts.
+	inBubble(t, "an interrupt during a pause", func(t *testing.T) {
 		ctx, w := progresstest.Watch(context.Background(), t)
 		ctx, cancel := context.WithCancel(ctx)
 		s := &sender{}
 		o := s.options(2, 5*time.Second)
-		o.After = func(time.Duration) <-chan time.Time { cancel(); return nil }
+		o.BeforePause = func(time.Duration) { cancel() }
 		fanout.Batches(ctx, set(t, "exe[1-6]"), o, s.run)
 		want := `step power on total=6 [fold]: canceled (canceled): context canceled
   batch 1/3 node=exe[1-2] batch=1/3 total=2 limit=2: ok
@@ -276,8 +308,7 @@ func TestBatchesReportTheirWork(t *testing.T) {
 
 	// A batch whose run returns a skip ends skipped, and the run goes on:
 	// nothing failed, so nothing is left out for it, and the step ends ok.
-	t.Run("a skipped batch", func(t *testing.T) {
-		t.Parallel()
+	inBubble(t, "a skipped batch", func(t *testing.T) {
 		ctx, w := progresstest.Watch(context.Background(), t)
 		s := &sender{}
 		run := func(ctx context.Context, batch *nodeset.NodeSet) error {
@@ -309,8 +340,7 @@ func TestBatchesReportTheirWork(t *testing.T) {
 
 	// A batch the interrupt cut short fails, but the batches after it were
 	// left out for the interrupt, not for that failure.
-	t.Run("an interrupt during a batch", func(t *testing.T) {
-		t.Parallel()
+	inBubble(t, "an interrupt during a batch", func(t *testing.T) {
 		ctx, w := progresstest.Watch(context.Background(), t)
 		ctx, cancel := context.WithCancel(ctx)
 		s := &sender{fail: map[string]bool{"exe4": true}}
@@ -338,19 +368,19 @@ func TestBatchesReportTheirWork(t *testing.T) {
 		}
 	})
 
-	// A context that runs out of time leaves the batches out as an
-	// interrupt does: canceled, counted as their Total, not failed.
-	t.Run("a deadline during a pause", func(t *testing.T) {
-		t.Parallel()
+	// A context that runs out of time, 2s into a pause of 5s, ends the
+	// pause then and leaves the batches out as an interrupt does:
+	// canceled, counted as their Total, not failed.
+	inBubble(t, "a deadline during a pause", func(t *testing.T) {
 		ctx, w := progresstest.Watch(context.Background(), t)
-		ctx, cancel := context.WithDeadline(ctx, time.Now().Add(time.Hour))
-		defer cancel()
-		deadline, stop := context.WithTimeout(ctx, 0)
+		deadline, stop := context.WithTimeout(ctx, 2*time.Second)
 		defer stop()
 		s := &sender{}
-		o := s.options(2, 5*time.Second)
-		o.After = func(time.Duration) <-chan time.Time { return nil }
-		fanout.Batches(deadline, set(t, "exe[1-4]"), o, s.run)
+		start := time.Now()
+		fanout.Batches(deadline, set(t, "exe[1-4]"), s.options(2, 5*time.Second), s.run)
+		if took := time.Since(start); took != 2*time.Second {
+			t.Errorf("the batches took %s, want the 2s until the deadline", took)
+		}
 		want := `step power on total=4 [fold]: failed (timeout): context deadline exceeded
   batch 1/2 node=exe[1-2] batch=1/2 total=2 limit=2: ok
     target exe[1-2]: ok
@@ -359,22 +389,6 @@ func TestBatchesReportTheirWork(t *testing.T) {
 `
 		if got := w.Finish(); got != want {
 			t.Errorf("tree:\n%s\nwant:\n%s", got, want)
-		}
-	})
-}
-
-// Without an After of its own, the pause between two batches is one of the
-// clock's, which testing/synctest's fake clock lets pass at once.
-func TestBatchesPauseOnTheClockWithoutAnAfter(t *testing.T) {
-	t.Parallel()
-	synctest.Test(t, func(t *testing.T) {
-		s := &sender{}
-		o := s.options(2, 30*time.Second)
-		o.After = nil
-		start := time.Now()
-		fanout.Batches(context.Background(), set(t, "exe[1-4]"), o, s.run)
-		if got := time.Since(start); got != 30*time.Second {
-			t.Errorf("the batches took %s, want the pause of 30s", got)
 		}
 	})
 }

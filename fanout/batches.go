@@ -25,10 +25,9 @@ type BatchOptions struct {
 	// Limit is how many targets of a batch are worked on at once, for a
 	// display; zero says nothing.
 	Limit int
-	// Pause is how long to wait between two batches.
+	// Pause is how long to wait between two batches. The wait ends early,
+	// and its timer is stopped, when the context ends.
 	Pause time.Duration
-	// After waits out a pause; nil is time.After. The tests replace it.
-	After func(time.Duration) <-chan time.Time
 	// BeforePause is called before each pause, with its length. There is
 	// no pause, and no call, when Pause is zero.
 	BeforePause func(pause time.Duration)
@@ -99,10 +98,6 @@ func Batches(ctx context.Context, nodes *nodeset.NodeSet, o BatchOptions, run fu
 		}
 	}
 	chunks := nodes.Split(parts)
-	after := o.After
-	if after == nil {
-		after = time.After
-	}
 
 	stepCtx, step := progress.Start(ctx, progress.KindStep, o.Step,
 		progress.WithFlags(progress.Fold), progress.Total(nodes.Len()))
@@ -122,7 +117,7 @@ func Batches(ctx context.Context, nodes *nodeset.NodeSet, o BatchOptions, run fu
 	for i, chunk := range chunks {
 		if i > 0 {
 			if err == nil && o.Pause > 0 {
-				pause(ctx, stepCtx, o, after)
+				pause(ctx, stepCtx, o)
 			}
 			if cause := ctx.Err(); cause != nil {
 				for j := i; j < len(chunks); j++ {
@@ -167,16 +162,18 @@ type leftOut struct{ error }
 func (leftOut) ProgressClass() progress.Class { return progress.ClassCanceled }
 
 // pause waits between two batches, until o.Pause has passed or ctx has
-// ended, and reports the wait under the step.
-func pause(ctx, stepCtx context.Context, o BatchOptions, after func(time.Duration) <-chan time.Time) {
+// ended, when it stops its timer, and reports the wait under the step.
+func pause(ctx, stepCtx context.Context, o BatchOptions) {
 	if o.BeforePause != nil {
 		o.BeforePause(o.Pause)
 	}
 	_, wait := progress.Start(stepCtx, progress.KindWait, "stagger", progress.Timeout(o.Pause))
+	timer := time.NewTimer(o.Pause)
+	defer timer.Stop()
 	select {
 	case <-ctx.Done():
 		wait.End(ctx.Err())
-	case <-after(o.Pause):
+	case <-timer.C:
 		wait.End(nil)
 	}
 }

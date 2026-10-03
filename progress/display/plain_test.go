@@ -123,25 +123,25 @@ func onBMC(node string) fanout.Item { return fanout.Item{Node: node, Host: node 
 
 // A power-on in batches: each batch starts and ends, with the pause before
 // the next; the whole step says where it stands; a batch left out after
-// one that failed says so and why.
+// one that failed says so and why. The test runs in a testing/synctest
+// bubble, so that the plain lines are drawn during the pause.
 func TestPlainLinesOfAPowerOnInBatches(t *testing.T) {
 	t.Parallel()
+	synctest.Test(t, testPlainLinesOfAPowerOnInBatches)
+}
+
+func testPlainLinesOfAPowerOnInBatches(t *testing.T) {
 	f := newPlainFixture(t, "bmc power on")
 	nodes, err := nodeset.Parse("exe[1-6]")
 	if err != nil {
 		t.Fatal(err)
 	}
-	batches := fanout.Batches(f.ctx, nodes, fanout.BatchOptions{
+	o := duringPauses(fanout.BatchOptions{
 		Step:  "power on",
 		Size:  2,
 		Pause: 5 * time.Second,
-		After: func(d time.Duration) <-chan time.Time {
-			f.draw(d)
-			ready := make(chan time.Time, 1)
-			ready <- f.clock.Now()
-			return ready
-		},
-	}, func(ctx context.Context, batch *nodeset.NodeSet) error {
+	}, func(d time.Duration) { f.draw(d) })
+	batches := fanout.Batches(f.ctx, nodes, o, func(ctx context.Context, batch *nodeset.NodeSet) error {
 		names := batch.Expand()
 		spans := make([]*progress.Span, len(names))
 		for i, node := range names {

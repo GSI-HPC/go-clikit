@@ -436,9 +436,14 @@ provision reinstall · 0:02
 // A power-on in batches: the batch under way has a row under the step,
 // with its targets; the pause between two counts down; what a batch that
 // is over did is folded into the step, a failure too, and so are the
-// batches left out after it.
+// batches left out after it. The test runs in a testing/synctest bubble,
+// so that a frame is drawn during the pause.
 func TestTheTreeOfAPowerOnInBatches(t *testing.T) {
 	t.Parallel()
+	synctest.Test(t, testTheTreeOfAPowerOnInBatches)
+}
+
+func testTheTreeOfAPowerOnInBatches(t *testing.T) {
 	f := newTreeFixture(t, "bmc power on", treeSetup{})
 	set, err := nodeset.Parse("exe[1-6]")
 	if err != nil {
@@ -446,18 +451,15 @@ func TestTheTreeOfAPowerOnInBatches(t *testing.T) {
 	}
 	var frames []string
 	f.clock.Add(time.Second)
-	fanout.Batches(f.ctx, set, fanout.BatchOptions{
+	o := duringPauses(fanout.BatchOptions{
 		Step:  "power on",
 		Size:  2,
 		Pause: 30 * time.Second,
-		After: func(d time.Duration) <-chan time.Time {
-			frames = append(frames, f.draw(10*time.Second))
-			f.clock.Add(d - 10*time.Second)
-			ready := make(chan time.Time, 1)
-			ready <- f.clock.Now()
-			return ready
-		},
-	}, func(ctx context.Context, batch *nodeset.NodeSet) error {
+	}, func(d time.Duration) {
+		frames = append(frames, f.draw(10*time.Second))
+		f.clock.Add(d - 10*time.Second)
+	})
+	fanout.Batches(f.ctx, set, o, func(ctx context.Context, batch *nodeset.NodeSet) error {
 		_, spans := targets(ctx, batch.Expand()...)
 		var failed error
 		for i, node := range batch.Expand() {
