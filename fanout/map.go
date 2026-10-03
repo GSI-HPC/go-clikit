@@ -59,8 +59,10 @@ type Options[T any] struct {
 type Outcome[R any] struct {
 	// Value is what the work returned; the zero value when it panicked.
 	Value R
-	// Err is the error the work returned, or the one a panic in it
-	// became. For an item that was never started it is the one
+	// Err is the error the work returned, or the one a panic in it, or
+	// in the release Options.Acquire gave, became; for work that ended its
+	// goroutine with runtime.Goexit rather than return, such as by
+	// t.FailNow, it is an error that says so. For an item that was never started it is the one
 	// Options.Acquire refused it with, or, when the pool left it out, the
 	// context's.
 	Err error
@@ -73,8 +75,11 @@ type Outcome[R any] struct {
 // each call came to in the order of the items, whatever order they finished
 // in. An item that fails does not stop the others. It runs on Each: once
 // ctx ends no further item is started, and those left out come back with
-// the context's error. A panic in fn becomes that item's error, with its
-// stack in o.PanicLog, as Recovered has it. Map returns once every call has
+// the context's error. A panic in fn, o.Acquire or the release it gave
+// becomes that item's error, with its stack in o.PanicLog, as Recovered has
+// it, and so does a call of runtime.Goexit in them, as t.FailNow makes,
+// which ends the item failed rather than the worker without a word. The
+// release is called however fn ended. Map returns once every call has
 // returned.
 //
 // The work is reported under the span ctx carries as a step, o.Step, with
@@ -117,16 +122,27 @@ func Map[T, R any](ctx context.Context, items []T, o Options[T], fn func(ctx con
 	// canceled are the items whose targets ended canceled.
 	canceled := make([]bool, len(items))
 	Each(ctx, len(items), limit, func(i int) {
+		// returned says whether the worker came to its end; one that
+		// runtime.Goexit ends runs only what it deferred.
+		returned := false
+		defer func() {
+			if !returned {
+				out[i].Err = errGoexit
+				spans[i].End(errGoexit)
+			}
+		}()
 		release, err := o.acquire(ctxs[i], names[i], items[i])
 		if err != nil {
+			returned = true
 			out[i].Err = err
 			canceled[i] = o.refused(ctxs[i], spans[i], err)
 			return
 		}
-		defer release()
 		spans[i].Run()
-		value, err := call(ctxs[i], o.PanicLog, o.Program, names[i], items[i], fn)
-		out[i] = Outcome[R]{Value: value, Err: err, Started: true}
+		out[i].Started = true
+		value, err := call(ctxs[i], o.PanicLog, o.Program, names[i], items[i], fn, release)
+		returned = true
+		out[i].Value, out[i].Err = value, err
 		if reason, ok := skipReason(err); ok {
 			spans[i].Skip(reason)
 			return
@@ -240,9 +256,21 @@ func (o Options[T]) acquire(ctx context.Context, name string, item T) (release f
 	return release, err
 }
 
-// call calls fn with one item. A panic in it becomes the item's error
-// rather than the end of the process, with its stack written to log.
-func call[T, R any](ctx context.Context, log io.Writer, program, name string, item T, fn func(context.Context, T) (R, error)) (value R, err error) {
+// call calls fn with one item, and then release, however fn ended. A
+// panic in either becomes the item's error rather than the end of the
+// process, with its stack written to log; one in release is joined to the
+// error fn returned, and keeps the value.
+func call[T, R any](ctx context.Context, log io.Writer, program, name string, item T, fn func(context.Context, T) (R, error), release func()) (value R, err error) {
+	defer func() {
+		if p := Recovered(log, program, name, recover()); p != nil {
+			if err == nil {
+				err = p
+			} else {
+				err = errors.Join(err, p)
+			}
+		}
+	}()
+	defer release()
 	defer func() {
 		if p := Recovered(log, program, name, recover()); p != nil {
 			var zero R
@@ -251,6 +279,11 @@ func call[T, R any](ctx context.Context, log io.Writer, program, name string, it
 	}()
 	return fn(ctx, item)
 }
+
+// errGoexit is the error of an item whose work, Options.Acquire or release
+// ended its goroutine with runtime.Goexit, as t.FailNow does, rather than
+// return.
+var errGoexit = errors.New("the work called runtime.Goexit instead of returning")
 
 // Failure sums up the items of a fan-out of n that failed, named names,
 // with the errors errs: "k of n <noun> failed: <names>", or "k of n failed:

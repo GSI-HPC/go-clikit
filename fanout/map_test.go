@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"runtime"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -528,4 +529,94 @@ func TestMapEndsTheItemsADeadlineLeftOutCanceled(t *testing.T) {
 			t.Errorf("tree:\n%s\nwant:\n%s", got, want)
 		}
 	})
+}
+
+// A panic in the release Acquire gave is the item's failure, not the end of
+// the process, beside whatever the work returned.
+func TestMapTurnsAPanicInAReleaseIntoThatItemsFailure(t *testing.T) {
+	t.Parallel()
+
+	var log strings.Builder
+	failed := errors.New("exe2: command exited 1")
+	ctx, tree := progresstest.Watch(context.Background(), t)
+	outcomes := fanout.Map(ctx, nodes(3), fanout.Options[string]{
+		Step: "check", Limit: 1, PanicLog: &log,
+		Acquire: func(_ context.Context, node string) (func(), error) {
+			if node == "exe3" {
+				return func() {}, nil
+			}
+			return func() { panic("release " + node) }, nil
+		},
+	}, func(_ context.Context, node string) (string, error) {
+		if node == "exe2" {
+			return "", failed
+		}
+		return node, nil
+	})
+	var p *fanout.PanicError
+	if o := outcomes[0]; !o.Started || o.Value != "exe1" || !errors.As(o.Err, &p) || p.Value != "release exe1" {
+		t.Errorf("exe1 = %+v, want its value and the panic of its release", o)
+	}
+	if o := outcomes[1]; !errors.Is(o.Err, failed) || !errors.As(o.Err, &p) || p.Value != "release exe2" {
+		t.Errorf("exe2 = %+v, want its own error and the panic of its release", o)
+	}
+	if o := outcomes[2]; o.Err != nil {
+		t.Errorf("exe3 = %+v, want it done", o)
+	}
+	want := `step check total=3 limit=1 [fold]: failed (target): 2 of 3 failed: exe[1-2]
+  target exe1: failed (target): the program panicked; this is a bug, please report it: "release {}"
+  target exe2: failed (target): {}: command exited 1\nthe program panicked; this is a bug, please report it: "release {}"
+  target exe3: ok
+`
+	if got := tree(); got != want {
+		t.Errorf("tree:\n%s\nwant:\n%s", got, want)
+	}
+	if !strings.Contains(log.String(), `panic while working on exe1: "release exe1"`) {
+		t.Errorf("the log has no stack for the release of exe1:\n%s", log.String())
+	}
+}
+
+// Work that ends its goroutine with runtime.Goexit, as t.FailNow does,
+// never returns: the item failed, whichever of the work, Acquire or the
+// release did it, and the release is still called.
+func TestMapFailsAnItemWhoseWorkCalledGoexit(t *testing.T) {
+	t.Parallel()
+
+	var released atomic.Int32
+	ctx, tree := progresstest.Watch(context.Background(), t)
+	outcomes := fanout.Map(ctx, nodes(4), fanout.Options[string]{
+		Step: "check", Limit: 1,
+		Acquire: func(_ context.Context, node string) (func(), error) {
+			switch node {
+			case "exe2":
+				runtime.Goexit()
+			case "exe3":
+				return runtime.Goexit, nil
+			}
+			return func() { released.Add(1) }, nil
+		},
+	}, func(_ context.Context, node string) (struct{}, error) {
+		if node == "exe1" {
+			runtime.Goexit()
+		}
+		return struct{}{}, nil
+	})
+	for i, o := range outcomes[:3] {
+		if o.Err == nil {
+			t.Errorf("exe%d = %+v, want it failed", i+1, o)
+		}
+	}
+	if !outcomes[0].Started || outcomes[1].Started || !outcomes[2].Started {
+		t.Errorf("outcomes %+v, want exe1 and exe3 started, exe2 not", outcomes)
+	}
+	if got := released.Load(); got != 2 {
+		t.Errorf("%d releases were called, want 2", got)
+	}
+	want := `step check total=4 limit=1 [fold]: failed (target): 3 of 4 failed: exe[1-3]
+  target exe4: ok
+  target exe[1-3]: failed (target): the work called runtime.Goexit instead of returning
+`
+	if got := tree(); got != want {
+		t.Errorf("tree:\n%s\nwant:\n%s", got, want)
+	}
 }

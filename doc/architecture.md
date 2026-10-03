@@ -112,8 +112,10 @@ keeps it without a line of the caller's.
   its limit at a time, and nothing started once the context has ended, so an
   interrupt stops every pool the same way. `Map` returns what each item came
   to in the order the items were given, whatever order they finished in, and
-  turns a panic in one item's work into that item's error, since `recover`
-  reaches only its own goroutine. `Batches` runs one batch after the other,
+  turns a panic in one item's work, or in what it acquired and released for
+  it, into that item's error, since `recover` reaches only its own
+  goroutine; work that calls `runtime.Goexit`, as `t.FailNow` does, fails
+  its item rather than pass for done. `Batches` runs one batch after the other,
   with a pause between them, and stops after one that failed.
 
 ## What a program fills in
