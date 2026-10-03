@@ -145,9 +145,9 @@ func Batches(ctx context.Context, nodes *nodeset.NodeSet, o BatchOptions, run fu
 	return out
 }
 
-// leftOut is what a batch the context left out ends with: canceled, since
-// it did not fail, whether the context was interrupted or ran out of time,
-// so that it counts as its Total.
+// leftOut is what a batch or a target the context left out, or cut short,
+// ends with: canceled, since it did not fail, whether the context was
+// interrupted or ran out of time, so that it counts as its Total.
 type leftOut struct{ error }
 
 // ProgressClass says that the batch was left out, not that it failed.

@@ -82,13 +82,14 @@ type Outcome[R any] struct {
 // announced, queued, before the first one runs; each is marked running when
 // it takes its place and ended before it gives the place up, so that a
 // display never counts more running than the limit; those never started
-// end canceled, so that the count reaches its total; and the step ends once
-// the last has, with what o.Summarize makes of the items that failed,
-// canceled when every one of them ended canceled, as an interrupt leaves a
-// pool. fn is called with the context
-// of its item's target, so that the calls it makes are reported under it.
-// An item that failed once the context had ended is reported canceled,
-// since the interrupt is what ended it, and its outcome keeps the error fn
+// end canceled, whether the context was interrupted or ran out of time, so
+// that the count reaches its total; and the step ends once the last has,
+// with what o.Summarize makes of the items that failed, canceled when every
+// one of them ended canceled, as an interrupt or a deadline leaves a pool.
+// fn is called with the context of its item's target, so that the calls it
+// makes are reported under it. An item that failed once the context had
+// ended is reported canceled, with the context's error, since the end of
+// the context is what ended it, and its outcome keeps the error fn
 // returned. An item fn left out on purpose, by returning an error of Skip,
 // ends skipped and is none of those that failed, and so does one
 // o.Acquire leaves out with an error of Skip. An item waiting for o.Acquire
@@ -131,7 +132,7 @@ func Map[T, R any](ctx context.Context, items []T, o Options[T], fn func(ctx con
 			return
 		}
 		if err != nil && ctxs[i].Err() != nil {
-			err = ctxs[i].Err()
+			err = leftOut{ctxs[i].Err()}
 		}
 		canceled[i] = o.endsCanceled(err)
 		spans[i].End(err)
@@ -144,8 +145,8 @@ func Map[T, R any](ctx context.Context, items []T, o Options[T], fn func(ctx con
 		// out, which it does only once ctx has ended.
 		if !out[i].Started && out[i].Err == nil {
 			out[i].Err = ctx.Err()
-			canceled[i] = o.endsCanceled(out[i].Err)
-			spans[i].End(out[i].Err)
+			canceled[i] = true
+			spans[i].End(leftOut{out[i].Err})
 		}
 		if out[i].Err != nil && !IsSkipped(out[i].Err) {
 			failed, errs = append(failed, names[i]), append(errs, out[i].Err)
@@ -172,8 +173,8 @@ func (o Options[T]) refused(ctx context.Context, span *progress.Span, err error)
 		return false
 	}
 	if cause := ctx.Err(); cause != nil {
-		span.End(cause)
-		return o.endsCanceled(cause)
+		span.End(leftOut{cause})
+		return true
 	}
 	span.End(err)
 	return o.endsCanceled(err)

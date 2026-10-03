@@ -496,3 +496,36 @@ func TestMapEndsAnItemAcquireSkippedSkipped(t *testing.T) {
 		t.Errorf("tree:\n%s\nwant:\n%s", got, want)
 	}
 }
+
+// A deadline ends a pool as an interrupt does: the item it came during and
+// those it left out end canceled, not failed, and so does the step.
+func TestMapEndsTheItemsADeadlineLeftOutCanceled(t *testing.T) {
+	t.Parallel()
+
+	synctest.Test(t, func(t *testing.T) {
+		ctx, tree := progresstest.Watch(context.Background(), t)
+		ctx, cancel := context.WithTimeout(ctx, 30*time.Millisecond)
+		defer cancel()
+		outcomes := fanout.Map(ctx, nodes(4), fanout.Options[string]{Step: "scan", Limit: 1},
+			func(ctx context.Context, _ string) (struct{}, error) {
+				select {
+				case <-ctx.Done():
+					return struct{}{}, ctx.Err()
+				case <-time.After(20 * time.Millisecond):
+					return struct{}{}, nil
+				}
+			})
+		for i, o := range outcomes[1:] {
+			if !errors.Is(o.Err, context.DeadlineExceeded) {
+				t.Errorf("exe%d = %+v, want the deadline", i+2, o)
+			}
+		}
+		want := `step scan total=4 limit=1 [fold]: canceled (canceled): 3 of 4 failed: exe[2-4]
+  target exe1: ok
+  target exe[2-4]: canceled (canceled): context deadline exceeded
+`
+		if got := tree(); got != want {
+			t.Errorf("tree:\n%s\nwant:\n%s", got, want)
+		}
+	})
+}
