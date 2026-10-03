@@ -116,15 +116,15 @@ releases before it expires.
 
 ## Withdrawing a release
 
-Never move or delete a tag you pushed as a release: the module proxy and
-the checksum database keep it regardless. There are two exceptions
+Never move or delete a tag you pushed as a release: the module proxy and the
+checksum database keep it regardless. There are two exceptions
 ([decision 10](decisions.md#10-a-daily-audit-holds-the-releases-to-their-record)).
 A tag that was not pushed as a release, such as one an intruder moved, or
 deleted and pushed again, is restored to the pinned tag object or the tag
-the proxy fetched, or deleted, as the audit below asks. A bad tag of a retracted version whose
-commit nothing records is deleted, even one you pushed as a release, as
-below. To withdraw a version, add a `retract` directive with the reason to
-`go.mod` and ship it in the next release:
+the proxy fetched, or deleted, as the audit below asks. A bad tag of a
+retracted version whose commit nothing records is deleted, even one you
+pushed as a release, as below. To withdraw a version, add a `retract`
+directive with the reason to `go.mod` and ship it in the next release:
 
 ```go
 retract v0.2.0 // Tagged from the wrong commit.
