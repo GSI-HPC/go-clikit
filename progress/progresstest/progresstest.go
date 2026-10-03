@@ -74,13 +74,27 @@ func (c *Capture) Events() []progress.Event {
 }
 
 // An Option sets up the Bus that Checked and Watch make.
-type Option func(*progress.BusOptions)
+type Option func(*config)
+
+// config is what the options set.
+type config struct {
+	classify func(error) progress.Class
+	sinks    []progress.Sink
+}
 
 // Classify has the Bus class an error that says no class of its own by
 // fallback, as progress.BusOptions.Classify does, so that the events carry the
 // classes the program's own Bus would give them.
 func Classify(fallback func(error) progress.Class) Option {
-	return func(o *progress.BusOptions) { o.Classify = fallback }
+	return func(c *config) { c.classify = fallback }
+}
+
+// Sinks adds sinks to the Bus, such as a display drawing on a
+// progresstest.Screen, which receive every event before the Capture does.
+// Each use adds to the sinks of the ones before it; the Capture is always
+// on the Bus, after all of them.
+func Sinks(s ...progress.Sink) Option {
+	return func(c *config) { c.sinks = append(c.sinks, s...) }
 }
 
 // Checked returns ctx with a Bus of its own, whose events a Capture keeps
@@ -115,12 +129,15 @@ func Watch(ctx context.Context, t testing.TB, opts ...Option) (context.Context, 
 	}
 }
 
-func newBus(c *Capture, opts []Option) *progress.Bus {
-	o := progress.BusOptions{Sinks: []progress.Sink{c}}
+func newBus(capture *Capture, opts []Option) *progress.Bus {
+	var c config
 	for _, opt := range opts {
-		opt(&o)
+		opt(&c)
 	}
-	return progress.NewBus(o)
+	return progress.NewBus(progress.BusOptions{
+		Sinks:    append(slices.Clone(c.sinks), capture),
+		Classify: c.classify,
+	})
 }
 
 // Tree draws the spans of the events kept so far, one line each, indented
