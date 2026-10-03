@@ -195,9 +195,37 @@ old="$(git rev-parse HEAD)"
 git commit -q --allow-empty -m 'with the release workflow'
 sign listed v1.0.0 -m 'release v1.0.0'
 git tag not-a-release "$old"
+# The module proxy is a stand-in for curl that logs the URL it is asked for
+# and answers with PROXY_STATUS and the file PROXY_LIST, or fails with
+# CURL_EXIT. The proxy lists no version unless a case says otherwise.
+mkdir "$scratch/proxy-bin"
+cat > "$scratch/proxy-bin/curl" << 'CURL'
+#!/usr/bin/env bash
+set -euo pipefail
+out=''
+while [ "$#" -gt 1 ]; do
+  if [ "$1" = '--output' ]; then
+    out="$2"
+    shift
+  fi
+  shift
+done
+echo "$1" >> "$CURL_LOG"
+if [ "${CURL_EXIT:-0}" -ne 0 ]; then
+  echo "curl: ($CURL_EXIT) could not connect" >&2
+  exit "$CURL_EXIT"
+fi
+cp "$PROXY_LIST" "$out"
+printf '%s' "$PROXY_STATUS"
+CURL
+chmod +x "$scratch/proxy-bin/curl"
+printf 'module github.com/Example-Org/kit\n\ngo 1.26.0\n' > "$scratch/audit.mod"
+: > "$scratch/proxy-list"
+export PROXY_LIST="$scratch/proxy-list" PROXY_STATUS=200 CURL_LOG="$scratch/curl.log"
 audit() {
-  ALLOWED_SIGNERS="$1" ALLOWED_PGP_KEYS="$2" GITHUB_OUTPUT="$scratch/output" \
-    "$scripts/audit-release-tags.sh"
+  PATH="$scratch/proxy-bin:$PATH" GO_MOD="$scratch/audit.mod" \
+    MODULE_PROXY=https://proxy.example.org ALLOWED_SIGNERS="$1" ALLOWED_PGP_KEYS="$2" \
+    GITHUB_OUTPUT="$scratch/output" "$scripts/audit-release-tags.sh"
 }
 expect 'an audit of signed release tags' pass 'all 1 release tag(s)' audit "$listed" ''
 expect 'an audit without key lists' fail 'RELEASE_ALLOWED_SIGNERS and RELEASE_ALLOWED_PGP_KEYS' audit '' ''
@@ -211,6 +239,29 @@ git tag v0.0.3 "$old"
 expect 'an audit finding a lightweight release tag' fail 'v0.0.3 is a lightweight tag' audit "$listed" ''
 git tag -d v0.0.3 > /dev/null
 expect 'an audit after the bad tags are gone' pass '' audit "$listed" ''
+# A tag deleted again after the module proxy fetched it is found in the
+# proxy's list of versions.
+: > "$CURL_LOG"
+printf 'v1.0.0\n' > "$PROXY_LIST"
+expect 'an audit of a version the module proxy serves with its tag' pass 'serves no other version' audit "$listed" ''
+want='https://proxy.example.org/github.com/!example-!org/kit/@v/list'
+if [ "$(cat "$CURL_LOG")" != "$want" ]; then
+  echo "FAIL the audit asked the module proxy for $(cat "$CURL_LOG") instead of $want"
+  failures=$((failures + 1))
+fi
+printf 'v1.0.0\r\n' > "$PROXY_LIST"
+expect 'an audit of a version list with CRLF line ends' pass '' audit "$listed" ''
+printf 'v0.0.4\nv1.0.0\n' > "$PROXY_LIST"
+expect 'an audit finding a version on the module proxy whose tag was deleted' fail \
+  'the module proxy serves v0.0.4, but there is no tag v0.0.4' audit "$listed" ''
+PROXY_STATUS=404 expect 'an audit of a module the proxy has not fetched' pass '' audit "$listed" ''
+PROXY_STATUS=410 expect 'an audit of a module the proxy refuses as gone' pass '' audit "$listed" ''
+PROXY_STATUS=500 expect 'an audit when the module proxy fails' fail 'answered 500' audit "$listed" ''
+CURL_EXIT=6 expect 'an audit when the module proxy cannot be reached' fail 'cannot fetch' audit "$listed" ''
+: > "$PROXY_LIST"
+printf 'go 1.26.0\n' > "$scratch/nomodule.mod"
+expect 'an audit with a go.mod naming no module' fail 'names no module' \
+  env GO_MOD="$scratch/nomodule.mod" "$scripts/audit-release-tags.sh"
 # A retired SSH key stays listed with valid-before, which keeps the releases
 # it signed and refuses a tag it signs later.
 retired="maintainer@example.org namespaces=\"git\",valid-before=\"20000101\" $(cat "$scratch/listed.pub")"
@@ -222,6 +273,10 @@ git init -q "$scratch/untagged"
 cd "$scratch/untagged"
 git commit -q --allow-empty -m 'first'
 expect 'an audit of a repository without release tags' pass 'no release tags' audit '' ''
+printf 'v0.1.0\n' > "$PROXY_LIST"
+expect 'an audit finding a version on the module proxy and no tags at all' fail \
+  '1 version(s) on the module proxy have no tag' audit '' ''
+: > "$PROXY_LIST"
 
 # The version: one the go command takes for this module, or none.
 printf 'module example.org/kit\n\ngo 1.26.0\n' > "$scratch/go.mod"
