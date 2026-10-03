@@ -131,6 +131,7 @@ so on in the order they first appear. The test that writes it compares what
 the log writes with it, line for line, and fails on any difference; another
 test sets every part of an `Event` and fails when one is neither logged nor
 left out on purpose, and a third fails when a value has no name in the log,
-or when a key or a listed value is on no line of the file. `go test ./progress -run TestTheEventLog
--update` rewrites the file, and the difference is then a change to the
-format, reviewed as one: it keeps version 1 only when it adds.
+or when a key or a listed value is on no line of the file.
+`go test ./progress -run TestTheEventLog -update` rewrites the file, and the
+difference is then a change to the format, reviewed as one: it keeps
+version 1 only when it adds.
