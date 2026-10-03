@@ -120,8 +120,8 @@ Never move or delete a tag you pushed as a release: the module proxy and
 the checksum database keep it regardless. There are two exceptions
 ([decision 10](decisions.md#10-a-daily-audit-holds-the-releases-to-their-record)).
 A tag that was not pushed as a release, such as one an intruder moved, or
-deleted and pushed again, is restored to the tag the proxy fetched, or
-deleted, as the audit below asks. A bad tag of a retracted version whose
+deleted and pushed again, is restored to the pinned tag object or the tag
+the proxy fetched, or deleted, as the audit below asks. A bad tag of a retracted version whose
 commit nothing records is deleted, even one you pushed as a release, as
 below. To withdraw a version, add a `retract` directive with the reason to
 `go.mod` and ship it in the next release:
@@ -146,10 +146,11 @@ It still fails a retracted version whose tag names another commit than the
 proxy serves, such as a tag that was moved, or deleted and pushed again,
 after the proxy fetched it, and a pinned release whose tag is not the
 pinned tag object, whatever commit it names: the tag then names content
-that nobody withdrew. Restore the tag the proxy fetched, or the pinned tag
-object, or delete the tag, which leaves a version without a tag. A bad tag whose version the proxy does not record a
-commit for is not acknowledged either, since nothing records which commit
-was withdrawn:
+that nobody withdrew. Restore the pinned tag object for a pinned release,
+or the tag the proxy fetched for one that is not pinned, or delete the
+tag, which leaves a version without a tag. A bad tag whose version the
+proxy does not record a commit for is not acknowledged either, since
+nothing records which commit was withdrawn:
 
 - if the proxy has not fetched the version, delete the tag, or, if the tag
   names the commit to withdraw, fetch the version through the proxy, which
