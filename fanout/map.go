@@ -46,9 +46,10 @@ type Options[T any] struct {
 	// code of its own. interrupted says that every item that failed ended
 	// canceled, which the end of ctx does whether it was interrupted or ran
 	// out of time, and an error Classify classes as canceled does as well.
-	// ctx.Err, or context.Cause, tells an interrupt from a deadline: errs
-	// holds the context's error only for the items the pool left out,
-	// since an item cut short keeps the error its work returned.
+	// ctx.Err, or context.Cause, tells an interrupt from a deadline: Map
+	// itself puts the context's error in errs only for the items the pool
+	// left out, since an item cut short keeps the error its work or
+	// Acquire returned, which is the context's only if they returned it.
 	Summarize func(n int, names []string, errs []error, interrupted bool) error
 	// Acquire, when it is set, takes what an item's work needs besides its
 	// place in the pool, such as a place on each host it goes to, and
