@@ -275,6 +275,8 @@ expect 'an audit of a pinned release after its key was removed' pass \
   'v0.9.0 is the tag object verified at its release' audit '' '' "$pinned"
 expect 'an audit of a pin list with a comment and blank lines' pass '' \
   audit '' '' "$(printf '# releases\n\n%s\n' "$pinned")"
+expect 'an audit of a pin list with indented comments and blank lines' pass '' \
+  audit '' '' "$(printf '  # old pins\n \t \n\t%s \r\n' "$pinned")"
 expect 'an audit of a pinned release with its key still listed' pass '' audit "$listed" '' "$pinned"
 expect 'an audit of a pinned release whose tag was moved' fail \
   'v0.9.0 is not the tag object verified at its release' \

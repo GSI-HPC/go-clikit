@@ -22,7 +22,8 @@
 #   ALLOWED_SIGNERS, ALLOWED_PGP_KEYS  as for verify-release-tag.sh
 #   VERIFIED_TAGS  the pinned releases, from the RELEASE_VERIFIED_TAGS
 #                  repository variable: one line each, the tag and the id
-#                  of its tag object; # starts a comment line
+#                  of its tag object; # starts a comment line, after
+#                  any blanks
 #   GO_MOD         the go.mod naming the module; go.mod if not set
 #   MODULE_PROXY   the module proxy; https://proxy.golang.org if not set
 
@@ -42,6 +43,9 @@ n=0
 while IFS= read -r line || [ -n "$line" ]; do
   n=$((n + 1))
   line="${line%$'\r'}"
+  # A blank line or a comment may be indented; read strips the blanks
+  # around a pin.
+  line="${line#"${line%%[![:space:]]*}"}"
   case "$line" in
     '' | '#'*) continue ;;
   esac

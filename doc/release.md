@@ -70,8 +70,8 @@ The audit checks a tag against today's keys unless the
 `RELEASE_VERIFIED_TAGS` repository variable pins it. A pin is one line: the
 tag and the id of the tag object the Release workflow verified when the tag
 was pushed, which the summary of the publishing job shows, and which
-`git rev-parse v0.2.0` prints as well. Lines that start with `#` are
-comments.
+`git rev-parse v0.2.0` prints as well. Blank lines are skipped, and a line
+whose first character other than a blank is `#` is a comment.
 
 ```
 v0.2.0 3f1c2a9d0e4b8c7f6a5d4e3c2b1a09f8e7d6c5b4
