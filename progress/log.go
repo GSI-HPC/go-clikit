@@ -62,11 +62,16 @@ const (
 // asks for them.
 //
 // The lines are written by a goroutine of the log's own, never under the
-// Bus's lock, in pieces of whole lines, so that the lines of runs appending
-// to one file at once do not cut into each other: once 64 KiB wait, as a
-// step, a batch or the command ends, and a second after a line came at the
-// latest, so that a log followed as it grows, or one of a run killed, falls
-// little behind. A write that fails stops the log, and so does a writer
+// Bus's lock, in pieces of whole lines of at most 64 KiB, a longer line on
+// its own, so that the lines of runs appending to one local file at once,
+// each opened with os.O_APPEND, do not cut into each other. That holds only
+// where a write is taken whole: a pipe takes one whole only up to PIPE_BUF
+// bytes, 4 KiB on Linux, and a file on NFS not at all when several
+// machines append to it, so runs that write there each need a file of
+// their own, or one writer that takes their lines whole. The lines are
+// written once 64 KiB wait, as a step, a batch or the command ends, and a
+// second after a line came at the latest, so that a log followed as it
+// grows, or one of a run killed, falls little behind. A write that fails stops the log, and so does a writer
 // that falls 8 MiB behind, a pipe whose reader has stopped: the log never
 // holds the work up. A log that falls behind still writes the lines it had
 // taken, and leaves out those that come after. Close writes what is left,

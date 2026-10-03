@@ -25,9 +25,13 @@ event:
 ```
 
 Several runs may append to one file, the commands of one CI job for
-instance, and may share one trace; `run` tells their lines apart, and the
-lines of runs written at once do not cut into each other, since each run
-writes whole lines.
+instance, and may share one trace; `run` tells their lines apart. Each run
+writes whole lines, in pieces of at most 64 KiB, a longer line on its own,
+so the lines of runs appending to one local file at once, each opening it
+for appending, do not cut into each other. That holds only where a write is
+taken whole: a pipe takes one whole only up to `PIPE_BUF` bytes, 4 KiB on
+Linux, and a file on NFS not at all when several machines append to it, so
+runs that write to a pipe or to NFS at once each need a file of their own.
 
 ## The first line
 
