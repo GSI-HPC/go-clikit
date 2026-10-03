@@ -287,12 +287,33 @@ func TestBatchesReportTheirWork(t *testing.T) {
 	})
 
 	// The interrupt comes as the pause is announced, before it starts.
-	inBubble(t, "an interrupt during a pause", func(t *testing.T) {
+	inBubble(t, "an interrupt as a pause is announced", func(t *testing.T) {
 		ctx, w := progresstest.Watch(context.Background(), t)
 		ctx, cancel := context.WithCancel(ctx)
 		s := &sender{}
 		o := s.options(2, 5*time.Second)
 		o.BeforePause = func(time.Duration) { cancel() }
+		fanout.Batches(ctx, set(t, "exe[1-6]"), o, s.run)
+		want := `step power on total=6 [fold]: canceled (canceled): context canceled
+  batch 1/3 node=exe[1-2] batch=1/3 total=2 limit=2: ok
+    target exe[1-2]: ok
+  batch 2/3 node=exe[3-4] batch=2/3 total=2 limit=2: canceled (canceled): context canceled
+  batch 3/3 node=exe[5-6] batch=3/3 total=2 limit=2: canceled (canceled): context canceled
+  wait stagger timeout=5s: canceled (canceled): context canceled
+`
+		if got := w.Finish(); got != want {
+			t.Errorf("tree:\n%s\nwant:\n%s", got, want)
+		}
+	})
+
+	// The interrupt comes a second into the pause, while Batches waits on
+	// its timer.
+	inBubble(t, "an interrupt during a pause", func(t *testing.T) {
+		ctx, w := progresstest.Watch(context.Background(), t)
+		ctx, cancel := context.WithCancel(ctx)
+		s := &sender{}
+		o := s.options(2, 5*time.Second)
+		o.BeforePause = func(time.Duration) { time.AfterFunc(time.Second, cancel) }
 		fanout.Batches(ctx, set(t, "exe[1-6]"), o, s.run)
 		want := `step power on total=6 [fold]: canceled (canceled): context canceled
   batch 1/3 node=exe[1-2] batch=1/3 total=2 limit=2: ok
