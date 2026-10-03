@@ -65,12 +65,12 @@ fetched long ago, so that version cannot be held to a commit: the audit and
 the publishing job report it as unverified, a warning, and pass, unless the
 `Time` in the `.info`, the time of the commit the proxy fetched, is not that
 of the commit the tag names, which fails. The tag of an unverified version
-is still verified like any other. A failed run of the job *Verify every release tag is
-signed* is the alarm: its log names the tag or the version. Investigate it
-as a compromise, and withdraw the version as below, which also clears the
-alarm for that version. GitHub disables
-scheduled workflows in a repository with no activity for 60 days; enable
-the workflow again when that happens.
+is still verified like any other. A failed run of the job *Verify every
+release tag is signed* is the alarm: its log names the tag or the version.
+Investigate it as a compromise, and withdraw the version as below, which
+clears the alarm for what the withdrawal answers. GitHub disables scheduled
+workflows in a repository with no activity for 60 days; enable the
+workflow again when that happens.
 
 The audit reads the proxy's list of the module's versions, not the feed at
 index.golang.org. The feed records every version the proxy has fetched, but
@@ -122,14 +122,29 @@ retract v0.2.0 // Tagged from the wrong commit.
 ```
 
 The retraction also acknowledges the alarm of the daily audit, which reads
-`go.mod` on `main`, so it takes effect as soon as it is merged. Whatever the
-audit finds wrong with a version that `go.mod` retracts on its own, a tag
-that is not signed, a tag that is gone, a version the proxy serves without
-a tag or from another commit, it reports as a warning and passes; any other
-version still fails it. A range such as `retract [v0.2.0, v0.2.3]`
-acknowledges none of its versions, so retract each version the audit names
-on a line of its own. Never pin a bad tag to silence the audit: a pin
-records a tag object that was verified.
+`go.mod` on `main`, so it takes effect as soon as it is merged. It
+acknowledges what it withdraws, the content the module proxy serves under
+the version, and nothing that happens to the tag later. For a version that
+`go.mod` retracts on its own, the audit reports as a warning, and passes:
+
+- a version the proxy serves without a tag, and a pinned release whose tag
+  is gone;
+- a tag that is not signed by a listed signer, or not the pinned tag
+  object, while the proxy says, as `Origin.Hash`, that it serves the
+  version from the commit the tag names.
+
+It still fails a retracted version whose tag names another commit than the
+proxy serves, such as a tag that was moved, or deleted and pushed again,
+after the proxy fetched it: the tag then names content that nobody withdrew.
+Restore the tag the proxy fetched, or delete the tag, which leaves a
+version without a tag. A bad tag that the proxy has not fetched, or whose
+`.info` names no commit, is not acknowledged either, since nothing records
+which commit was withdrawn: delete it, or fetch the version through the
+proxy, which records the commit, if the tag names the commit to withdraw.
+Any version that `go.mod` does not retract still fails the audit. A range
+such as `retract [v0.2.0, v0.2.3]` acknowledges none of its versions, so
+retract each version the audit names on a line of its own. Never pin a bad
+tag to silence the audit: a pin records a tag object that was verified.
 
 ## Setting up verification
 

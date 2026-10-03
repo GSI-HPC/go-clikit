@@ -25,8 +25,12 @@
 # without failing the releases it signed.
 #
 # A bad version can be withdrawn but never removed, so a version the go.mod
-# retracts on its own, not as part of a range, acknowledges the alarm: what
-# is wrong with it is a warning, and passes. Run in a checkout with all tags:
+# retracts on its own, not as part of a range, acknowledges the alarm for
+# what the retraction withdraws, the content the module proxy serves under
+# it: that its tag is gone, or is not signed while it names the commit the
+# proxy serves, is a warning, and passes. A tag that names another commit
+# than the proxy serves, pushed again or moved, still fails. Run in a
+# checkout with all tags:
 #
 #   ALLOWED_SIGNERS, ALLOWED_PGP_KEYS  as for verify-release-tag.sh
 #   VERIFIED_TAGS  the pinned releases, from the RELEASE_VERIFIED_TAGS
@@ -90,20 +94,45 @@ problem() {
   return 1
 }
 
-# check <version> <command...>: runs a check of a version, and fails as it
-# fails, unless go.mod retracts the version. A retraction is how a bad
-# version is withdrawn, and it acknowledges the alarm: the errors of the
-# check are then warnings, and it passes.
+# The versions the module proxy says it serves from the commit their tag
+# names: the record a retraction of a tagged version is held to.
+declare -A recorded=()
+
+# check <version> <what: gone|tag|proxy> <command...>: runs a check of a
+# version, and fails as it fails, unless go.mod retracts the version and the
+# retraction answers what the check found. A retraction is how a bad version
+# is withdrawn, and it acknowledges the alarm: the errors of the check are
+# then warnings, and it passes. It answers only what it withdraws, the
+# content the module proxy serves under the version:
+#
+#   gone   a version without a tag; it answers this, until a tag is pushed
+#          again, which is then held to the proxy
+#   tag    a tag that is not signed or pinned; it answers this while the
+#          proxy says it serves the version from the commit the tag names,
+#          and not once the tag is moved, or if nothing records the commit
+#   proxy  the proxy serving a tagged version from another commit than the
+#          tag names, or failing to answer for it; it never answers this,
+#          since the tag names content that nobody withdrew
 acknowledged=0
 check() {
-  local version="$1" out
-  shift
+  local version="$1" what="$2" out
+  shift 2
   if out="$("$@" 2>&1)"; then
     printf '%s\n' "$out"
     return 0
   fi
   if [ -z "${retracts[$version]+retracted}" ]; then
     printf '%s\n' "$out"
+    return 1
+  fi
+  if [ "$what" = proxy ]; then
+    printf '%s\n' "$out"
+    echo "::error::$go_mod retracts $version, which does not acknowledge this: the tag of a retracted version still has to name the commit the module proxy serves it from; see doc/release.md"
+    return 1
+  fi
+  if [ "$what" = tag ] && [ -z "${recorded[$version]+recorded}" ]; then
+    printf '%s\n' "$out"
+    echo "::error::$go_mod retracts $version, which does not acknowledge this: the module proxy does not say that it serves $version from the commit the tag names; see doc/release.md"
     return 1
   fi
   printf '%s\n' "$out" | sed 's/^::error::/::warning::/'
@@ -136,7 +165,7 @@ unverified=0
 while IFS= read -r version; do
   [ -n "$version" ] || continue
   if ! git rev-parse --verify --quiet "refs/tags/$version" > /dev/null; then
-    check "$version" problem "the module proxy serves $version, but there is no tag $version" ||
+    check "$version" gone problem "the module proxy serves $version, but there is no tag $version" ||
       untagged=$((untagged + 1))
     continue
   fi
@@ -145,16 +174,18 @@ while IFS= read -r version; do
     printf '%s\n' "$out"
     if grep -q '^::warning::' <<< "$out"; then
       unverified=$((unverified + 1))
+    else
+      recorded["$version"]=1
     fi
     continue
   fi
-  check "$version" reported "$out" || moved=$((moved + 1))
+  check "$version" proxy reported "$out" || moved=$((moved + 1))
 done <<< "$versions"
 
 gone=0
 for pin in "${!pins[@]}"; do
   if ! git rev-parse --verify --quiet "refs/tags/$pin" > /dev/null; then
-    check "$pin" problem "$pin is pinned, but there is no tag $pin" || gone=$((gone + 1))
+    check "$pin" gone problem "$pin is pinned, but there is no tag $pin" || gone=$((gone + 1))
   fi
 done
 
@@ -164,7 +195,7 @@ for tag in "${tags[@]}"; do
     if [ "$(git rev-parse --verify "refs/tags/$tag")" = "${pins[$tag]}" ]; then
       echo "::notice::$tag is the tag object verified at its release"
     else
-      check "$tag" problem "$tag is not the tag object verified at its release, ${pins[$tag]}" ||
+      check "$tag" tag problem "$tag is not the tag object verified at its release, ${pins[$tag]}" ||
         failed=$((failed + 1))
     fi
     continue
@@ -172,7 +203,7 @@ for tag in "${tags[@]}"; do
   # The commit a tag names is the one it is verified against; a tag that
   # names none fails in verify-release-tag.sh.
   commit="$(git rev-parse --verify --quiet "refs/tags/$tag^{commit}")" || commit="$tag"
-  check "$tag" env GITHUB_REF_NAME="$tag" GITHUB_SHA="$commit" GITHUB_OUTPUT='' "$verify" ||
+  check "$tag" tag env GITHUB_REF_NAME="$tag" GITHUB_SHA="$commit" GITHUB_OUTPUT='' "$verify" ||
     failed=$((failed + 1))
 done
 
