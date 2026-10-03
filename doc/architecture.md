@@ -162,8 +162,8 @@ The kit knows no program. What depends on one is a parameter or a hook:
 | The program's name, in the line that says a sink, a display or a pool's work panicked, and in the error a panic becomes | `progress.BusOptions.Program`, `display.TerminalOptions.Program`, `fanout.MapOptions.Program`, `fanout.Recovered` |
 | The program's name and version on the event log's first line | `progress.BusOptions.Program`, which the Bus hands the log in `progress.Run`, or `progress.LogOptions.Program` in its place; `progress.LogOptions.Version` |
 | The class of an error that says none of its own, such as the program's rule for its exit codes | `progress.BusOptions.Classify`, `fanout.MapOptions.Classify`, `progresstest.Classify` |
-| The error a pool's step ends with, such as the program's exit code on the kit's summary | `fanout.MapOptions.Summarize`, with `fanout.Failure` as the default |
-| The noun for the targets, such as "1 host" and "480 hosts"; Plain says "1 target" and "480 targets" without one | `display.PlainOptions.Noun`, `fanout.Failure` |
+| The error a pool's step ends with, such as the program's exit code on the kit's summary | `fanout.MapOptions.Summarize`, which is given a `fanout.Summary`, with `fanout.Failure` as the default |
+| The noun for the targets, such as "1 host" and "480 hosts"; Plain says "1 target" and "480 targets" without one | `display.PlainOptions.Noun`, `fanout.MapOptions.Noun`, `fanout.Failure` |
 | What a display names an item by, and what an item needs besides its place in the pool | `fanout.MapOptions.Describe`, which returns a `fanout.Item`, and `fanout.MapOptions.Acquire` |
 | The terminal's size, whether the process is in its foreground, whether its locale shows UTF-8, and the interrupt | `display.TerminalOptions`, the `ASCII` options, `display.TreeOptions.Interrupted` |
 | The trace another program handed on | `progress.BusOptions.Trace`, as `progress.ParseTraceContext` reads it from the values the program read from `TRACEPARENT` and `TRACESTATE` |

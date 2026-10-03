@@ -395,9 +395,9 @@ func TestMapTakesTheProgramsRules(t *testing.T) {
 	ctx, w := progresstest.Watch(context.Background(), t, progresstest.Classify(classify))
 	fanout.Map(ctx, nodes(2), fanout.MapOptions[string]{
 		Step: "stop", Limit: 1, Classify: classify,
-		Summarize: func(n int, names []string, errs []error, interrupted bool) error {
-			if n != 2 || len(names) != 1 || !errors.Is(errs[0], stopped) || !interrupted {
-				t.Errorf("Summarize(%d, %q, %v, %t)", n, names, errs, interrupted)
+		Summarize: func(s fanout.Summary) error {
+			if s.Total != 2 || len(s.Failed) != 1 || s.Failed[0].Name != "exe2" || !errors.Is(s.Failed[0].Err, stopped) || !s.Canceled {
+				t.Errorf("Summarize(%+v)", s)
 			}
 			return summary
 		},
@@ -414,6 +414,43 @@ func TestMapTakesTheProgramsRules(t *testing.T) {
 	if got := w.Finish(); got != want {
 		t.Errorf("tree:\n%s\nwant:\n%s", got, want)
 	}
+}
+
+// Without a Summarize of the program's, the step ends with Failure, which
+// names the items by Noun; a Summarize is called when nothing failed too,
+// with a Summary that is not canceled.
+func TestMapSummarizesTheItems(t *testing.T) {
+	t.Parallel()
+
+	t.Run("the noun", func(t *testing.T) {
+		t.Parallel()
+		ctx, w := progresstest.Watch(context.Background(), t)
+		fanout.Map(ctx, nodes(2), fanout.MapOptions[string]{Step: "stop", Limit: 1, Noun: "hosts"},
+			func(_ context.Context, node string) (struct{}, error) {
+				if node == "exe2" {
+					return struct{}{}, errors.New(node + ": stopped")
+				}
+				return struct{}{}, nil
+			})
+		want := `step stop total=2 limit=1 [fold]: failed (target): 1 of 2 hosts failed: exe2
+  target exe1: ok
+  target exe2: failed (target): {}: stopped
+`
+		if got := w.Finish(); got != want {
+			t.Errorf("tree:\n%s\nwant:\n%s", got, want)
+		}
+	})
+
+	t.Run("nothing failed", func(t *testing.T) {
+		t.Parallel()
+		var got []fanout.Summary
+		fanout.Map(context.Background(), nodes(2), fanout.MapOptions[string]{
+			Summarize: func(s fanout.Summary) error { got = append(got, s); return nil },
+		}, func(context.Context, string) (struct{}, error) { return struct{}{}, nil })
+		if len(got) != 1 || got[0].Total != 2 || got[0].Failed != nil || got[0].Canceled {
+			t.Errorf("Summarize was given %+v, want one Summary of 2 with none failed", got)
+		}
+	})
 }
 
 // ended reports whether the events hold the end of the target named name.
