@@ -47,8 +47,8 @@
 //
 // # Widths
 //
-// RuneWidth and Width approximate the columns a terminal gives text. East
-// Asian wide and fullwidth characters take two columns. Combining marks and
+// Width approximates the columns a terminal gives text. East Asian wide
+// and fullwidth characters take two columns. Combining marks and
 // format characters take none, save the soft hyphen, the prepended
 // concatenation marks such as U+0600, and the Ahom medial ra U+1171E (a
 // spacing mark since Unicode 16.0), which are drawn and take one column. The

@@ -187,7 +187,7 @@ const wideRest = rune(0)
 // half. A rune that fills the last column leaves the cursor on it, and the
 // next rune wraps.
 func (s *Screen) put(r rune) {
-	w := max(1, termtext.RuneWidth(r))
+	w := max(1, termtext.Width(string(r)))
 	if s.Width > 0 && (s.wrap || s.col+w > s.Width) {
 		s.row++
 		s.col = 0

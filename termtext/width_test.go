@@ -40,8 +40,8 @@ func TestTheWidthOfTextOnATerminal(t *testing.T) {
 func TestACombiningMarkThatIsWideTakesNoColumn(t *testing.T) {
 	t.Parallel()
 	for _, r := range []rune{0x302a, 0x302b, 0x302c, 0x302d} {
-		if got := termtext.RuneWidth(r); got != 0 {
-			t.Errorf("RuneWidth(%U) = %d, want 0", r, got)
+		if got := termtext.Width(string(r)); got != 0 {
+			t.Errorf("Width(%q) = %d, want 0", string(r), got)
 		}
 	}
 	if got := termtext.Width("\u3042\u302a"); got != 2 {
@@ -80,13 +80,13 @@ func TestAnEmojiPresentationSequenceTakesTwoColumns(t *testing.T) {
 func TestTheFormatCharactersATerminalDraws(t *testing.T) {
 	t.Parallel()
 	for _, r := range []rune{0x00ad, 0x0600, 0x0605, 0x06dd, 0x070f, 0x0890, 0x0891, 0x08e2, 0x110bd, 0x110cd} {
-		if got := termtext.RuneWidth(r); got != 1 {
-			t.Errorf("RuneWidth(%U) = %d, want 1", r, got)
+		if got := termtext.Width(string(r)); got != 1 {
+			t.Errorf("Width(%q) = %d, want 1", string(r), got)
 		}
 	}
 	for _, r := range []rune{0, 0x200b, 0x200d, 0xfeff, 0x2060, 0x180e, 0xe0041} {
-		if got := termtext.RuneWidth(r); got != 0 {
-			t.Errorf("RuneWidth(%U) = %d, want 0", r, got)
+		if got := termtext.Width(string(r)); got != 0 {
+			t.Errorf("Width(%q) = %d, want 0", string(r), got)
 		}
 	}
 	if got := termtext.Width(strings.Repeat("\u00ad", 200) + "ok"); got != 202 {
@@ -105,13 +105,13 @@ func TestCharactersWideSinceUnicode15(t *testing.T) {
 		0x1f7da, 0x1fa89, 0x1fabe, 0x1fac6, 0x1fac8, 0x1facc, 0x1fadc,
 		0x1fadf, 0x1fae9, 0x1faef, 0x1fafa,
 	} {
-		if got := termtext.RuneWidth(r); got != 2 {
-			t.Errorf("RuneWidth(%U) = %d, want 2", r, got)
+		if got := termtext.Width(string(r)); got != 2 {
+			t.Errorf("Width(%q) = %d, want 2", string(r), got)
 		}
 	}
 	for _, r := range []rune{0x2638, 0x2689, 0x1d357} {
-		if got := termtext.RuneWidth(r); got != 1 {
-			t.Errorf("RuneWidth(%U) = %d, want 1", r, got)
+		if got := termtext.Width(string(r)); got != 1 {
+			t.Errorf("Width(%q) = %d, want 1", string(r), got)
 		}
 	}
 }
@@ -120,8 +120,8 @@ func TestCharactersWideSinceUnicode15(t *testing.T) {
 // 18.0, the Ahom medial ra U+1171E, is drawn, and takes one column.
 func TestAMarkThatSpacesSinceUnicode15(t *testing.T) {
 	t.Parallel()
-	if got := termtext.RuneWidth(0x1171e); got != 1 {
-		t.Errorf("RuneWidth(U+1171E) = %d, want 1", got)
+	if got := termtext.Width("\U0001171e"); got != 1 {
+		t.Errorf("Width(U+1171E) = %d, want 1", got)
 	}
 	if got := termtext.Width("\U0001171e\U0001171d"); got != 1 {
 		t.Errorf("Width(U+1171E U+1171D) = %d, want 1", got)
@@ -170,7 +170,7 @@ func TestTruncate(t *testing.T) {
 // FuzzTruncate checks that Truncate returns a prefix of its input, cut on a
 // rune boundary, that fits in the columns given and is the longest that
 // does, and the input itself when that fits already. It holds Width to
-// bounds of its own too: no less than the RuneWidth of its runes added up,
+// bounds of its own too: no less than the Widths of its runes one by one added up,
 // and no more than that with one column for each U+FE0F.
 func FuzzTruncate(f *testing.F) {
 	for _, seed := range []string{
@@ -185,7 +185,7 @@ func FuzzTruncate(f *testing.F) {
 		}
 		low, selectors := 0, 0
 		for _, r := range in {
-			low += termtext.RuneWidth(r)
+			low += termtext.Width(string(r))
 			if r == 0xfe0f {
 				selectors++
 			}
