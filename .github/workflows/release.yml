@@ -5,20 +5,49 @@
 # pushed. This workflow refuses a tag that is not a signed statement by a
 # listed signer, and then publishes the GitHub release, its notes the body of
 # the tag message (doc/decisions.md, decision 4, and doc/release.md).
+#
+# A tag push runs this workflow as the tagged commit has it, so a tag on a
+# commit from before the workflow, or on one that changes it, verifies
+# nothing. The default branch therefore runs it on a schedule as well, and
+# then verifies every release tag there is.
 
 name: Release
 
 on:
   push:
     tags: ['v*']
+  schedule:
+    - cron: '23 5 * * *'
+  workflow_dispatch:
 
 # Read only, unless a job says otherwise: only the release job writes.
 permissions:
   contents: read
 
 jobs:
+  # From the default branch: a release tag that is not signed by a listed
+  # signer fails this job, whatever commit it names.
+  audit-tags:
+    name: Verify every release tag is signed
+    if: github.event_name != 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Refuse a release tag not signed by a listed signer
+        env:
+          ALLOWED_SIGNERS: ${{ vars.RELEASE_ALLOWED_SIGNERS }}
+          ALLOWED_PGP_KEYS: ${{ vars.RELEASE_ALLOWED_PGP_KEYS }}
+        run: .github/scripts/audit-release-tags.sh
+
+  # The jobs after this one need it, so on any event but a tag push they are
+  # skipped with it.
   verify-tag:
     name: Verify the tag is signed
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     outputs:
       object: ${{ steps.verify.outputs.object }}

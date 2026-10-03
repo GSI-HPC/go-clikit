@@ -183,6 +183,11 @@ unpublish it.
   tagged commit on both Go lines, fetches the version through
   proxy.golang.org, so that pkg.go.dev lists it, and publishes the GitHub
   release with the tag body as its notes.
+- A tag push runs the workflow of the tagged commit, which a tag on an
+  older commit, or on one that changes the workflow, escapes. The workflow
+  therefore also runs daily from `main` and verifies every `v*` tag against
+  the listed keys; its failure is the alarm. A key that signed a release
+  stays listed after it is retired, an SSH key with `valid-before`.
 - A tag is never moved or deleted. A broken release is withdrawn with a
   `retract` directive in `go.mod`, which ships in the next release.
 - The module stays at v0 while its API settles, and a v0 minor release may
@@ -205,6 +210,9 @@ verification.
 - An OpenPGP key is trusted as the variable holds it: an expired key stops
   verifying on its own, a revoked one only once the variable holds its
   revocation.
+- The daily audit holds every past release to today's keys, so retiring a
+  key takes care, and it finds a bad tag up to a day late. GitHub stops the
+  schedule of a repository idle for 60 days.
 
 ## 5. Progress and its displays are the kit's own
 

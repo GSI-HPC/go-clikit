@@ -4,9 +4,9 @@
 #
 # Tests the scripts of the release workflow against tags made in a scratch
 # repository, one case per way a tag has been shown to pass that should not:
-# verify-release-tag.sh, check-release-version.sh and publish-release.sh.
-# The release workflow runs only on a tag push, so this is where its steps
-# are tested.
+# verify-release-tag.sh, audit-release-tags.sh, check-release-version.sh and
+# publish-release.sh. The release workflow runs only on a tag push and on its
+# schedule, so this is where its steps are tested.
 #
 # Needs git, ssh-keygen and gpg. Run from anywhere:
 #
@@ -184,6 +184,44 @@ expect() {
     echo "ok   $name"
   fi
 }
+
+# The audit, from the default branch, of every release tag in the repository:
+# a tag on a commit whose release workflow verifies nothing, or that has none,
+# is found all the same.
+git init -q "$scratch/audit"
+cd "$scratch/audit"
+git commit -q --allow-empty -m 'before the release workflow'
+old="$(git rev-parse HEAD)"
+git commit -q --allow-empty -m 'with the release workflow'
+sign listed v1.0.0 -m 'release v1.0.0'
+git tag not-a-release "$old"
+audit() {
+  ALLOWED_SIGNERS="$1" ALLOWED_PGP_KEYS="$2" GITHUB_OUTPUT="$scratch/output" \
+    "$scripts/audit-release-tags.sh"
+}
+expect 'an audit of signed release tags' pass 'all 1 release tag(s)' audit "$listed" ''
+expect 'an audit without key lists' fail 'RELEASE_ALLOWED_SIGNERS and RELEASE_ALLOWED_PGP_KEYS' audit '' ''
+git tag -a v0.0.1 -m 'release v0.0.1' "$old"
+expect 'an audit finding an unsigned tag on an older commit' fail 'v0.0.1 is not signed by a key' audit "$listed" ''
+git tag -d v0.0.1 > /dev/null
+sign unlisted v0.0.2 -m 'release v0.0.2' "$old"
+expect 'an audit finding a tag by an unlisted signer' fail '1 of 2 release tag(s)' audit "$listed" ''
+git tag -d v0.0.2 > /dev/null
+git tag v0.0.3 "$old"
+expect 'an audit finding a lightweight release tag' fail 'v0.0.3 is a lightweight tag' audit "$listed" ''
+git tag -d v0.0.3 > /dev/null
+expect 'an audit after the bad tags are gone' pass '' audit "$listed" ''
+# A retired SSH key stays listed with valid-before, which keeps the releases
+# it signed and refuses a tag it signs later.
+retired="maintainer@example.org namespaces=\"git\",valid-before=\"20000101\" $(cat "$scratch/listed.pub")"
+expect 'an audit of a tag signed after its key was retired' fail 'v1.0.0 is not signed by a key' audit "$retired" ''
+GIT_COMMITTER_DATE='1999-06-01T00:00:00Z' sign listed v0.9.0 -m 'release v0.9.0' "$old"
+git tag -d v1.0.0 > /dev/null
+expect 'an audit of a tag signed before its key was retired' pass '' audit "$retired" ''
+git init -q "$scratch/untagged"
+cd "$scratch/untagged"
+git commit -q --allow-empty -m 'first'
+expect 'an audit of a repository without release tags' pass 'no release tags' audit '' ''
 
 # The version: one the go command takes for this module, or none.
 printf 'module example.org/kit\n\ngo 1.26.0\n' > "$scratch/go.mod"
