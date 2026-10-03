@@ -516,11 +516,42 @@ func failureText(s *treeSpan, e progress.Event) string {
 	if e.Err != "" {
 		// The host first, since it usually holds the node's name.
 		names := []string{e.Host, e.Node, s.name}
-		text += ": " + ownNames(addresses.ReplaceAllStringFunc(e.Err, func(a string) string {
-			return address(a, names)
-		}), names...)
+		text += ": " + ownNames(e.Err, names)
 	}
 	return text
+}
+
+// ownNames reads each of names in text as {} where it stands as a name of
+// its own, with no letter or digit right before or after it, and every
+// address as address reads it: a target named "e" leaves "timeout" as it
+// is, and "exe1" leaves "exe10" but reads "exe1-bmc" as "{}-bmc".
+// Where two names start at the same place the first given is read, and
+// where a name and an address do, the longer: a target named
+// "bmc-10.0.0.7" reads "bmc-10.0.0.7:623" as "{}:623", and one named
+// "10.0.0.7" reads "10.0.0.7:443" as "{}:443". An address that starts
+// inside a name read as {} is not read again.
+func ownNames(text string, names []string) string {
+	found := addresses.FindAllStringIndex(text, -1)
+	var b strings.Builder
+	for i := 0; i < len(text); {
+		for len(found) > 0 && found[0][0] < i {
+			found = found[1:]
+		}
+		n := ownNameAt(text, i, names)
+		if len(found) > 0 && found[0][0] == i && found[0][1]-i > n {
+			b.WriteString(address(text[i:found[0][1]], names))
+			i = found[0][1]
+			continue
+		}
+		if n > 0 {
+			b.WriteString("{}")
+			i += n
+			continue
+		}
+		b.WriteByte(text[i])
+		i++
+	}
+	return b.String()
 }
 
 // address reads the address a as {}, but for its port where it is one of
@@ -533,29 +564,10 @@ func address(a string, names []string) string {
 	} else if i := strings.IndexByte(a, ':'); i >= 0 {
 		host, port = a[:i], a[i:]
 	}
-	if slices.Contains(names, strings.Trim(host, "[]")) {
-		return ownNames(host, names...) + port
+	if name := strings.Trim(host, "[]"); slices.Contains(names, name) {
+		return strings.Replace(host, name, "{}", 1) + port
 	}
 	return "{}"
-}
-
-// ownNames reads each of names in text as {} where it stands as a name of
-// its own, with no letter or digit right before or after it: a target
-// named "e" leaves "timeout" as it is, and "exe1" leaves "exe10" but reads
-// "exe1-bmc" as "{}-bmc".
-// Where two names start at the same place the first given is read.
-func ownNames(text string, names ...string) string {
-	var b strings.Builder
-	for i := 0; i < len(text); {
-		if n := ownNameAt(text, i, names); n > 0 {
-			b.WriteString("{}")
-			i += n
-			continue
-		}
-		b.WriteByte(text[i])
-		i++
-	}
-	return b.String()
 }
 
 // ownNameAt returns the length of the first of names that stands as a
