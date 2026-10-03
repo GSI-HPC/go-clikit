@@ -535,7 +535,7 @@ type panicky struct {
 	lines, begin bool
 }
 
-func (p *panicky) Begin(progress.TraceContext) {
+func (p *panicky) Begin(progress.Run) {
 	if p.begin {
 		panic("the log could not begin")
 	}

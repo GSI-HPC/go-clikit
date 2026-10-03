@@ -870,3 +870,29 @@ func TestTheEventLogNamesTheProgram(t *testing.T) {
 		t.Errorf("the first line is %s, want the program before the version", first)
 	}
 }
+
+// A log told no program takes the Bus's, and one told its own keeps it,
+// so that a program that names itself once, on the Bus, finds its name in
+// the log.
+func TestTheEventLogTakesTheProgramFromTheBus(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct{ name, log, bus, want string }{
+		{"from the bus", "", "sind", `"program":"sind"`},
+		{"the log's own", "clusterctl", "sind", `"program":"clusterctl"`},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			var out bytes.Buffer
+			log := progress.NewLog(&out, progress.LogOptions{Run: "0123456789abcdef", Program: tc.log})
+			bus := progress.NewBus(progress.BusOptions{Program: tc.bus, Sinks: []progress.Sink{log}})
+			bus.Close()
+			if err := log.Close(); err != nil {
+				t.Fatalf("closing the log: %v", err)
+			}
+			first, _, _ := strings.Cut(out.String(), "\n")
+			if !strings.HasSuffix(first, ","+tc.want+"}") {
+				t.Errorf("the first line is %s, want %s", first, tc.want)
+			}
+		})
+	}
+}

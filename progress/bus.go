@@ -33,8 +33,9 @@ type BusOptions struct {
 	// end's diagnostics; nil is the process's standard error.
 	PanicLog io.Writer
 	// Program names the program in the line that says a sink panicked,
-	// "prog: …", so that it is not read as a line of the work's;
-	// empty leaves the name out.
+	// "prog: …", so that it is not read as a line of the work's, and
+	// on the first line of an event log that names none of its own (see
+	// Run); empty leaves the name out.
 	Program string
 	// Classify is the fallback of the classes End gives the errors of
 	// spans, asked for an error that none of Classify's first three rules
@@ -163,12 +164,12 @@ func (b *Bus) Classify(err error) Class {
 	return Classify(err, b.classify)
 }
 
-// begin tells the sinks that record the trace which one it is, and removes
+// begin tells the sinks that record the run which one it is, and removes
 // one that panics. b.mu is held.
 func (b *Bus) begin() {
 	for _, e := range b.sinks {
 		ts, ok := e.sink.(TraceSink)
-		if ok && !e.dead.Load() && !b.safely(func() { ts.Begin(b.trace) }) {
+		if ok && !e.dead.Load() && !b.safely(func() { ts.Begin(Run{Trace: b.trace, Program: b.program}) }) {
 			b.kill(e)
 		}
 	}

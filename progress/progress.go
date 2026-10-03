@@ -411,12 +411,22 @@ type LineSink interface {
 	WantsLines() bool
 }
 
-// TraceSink is a Sink that records the trace its events belong to, as an
+// Run is what a Bus tells a TraceSink about the run its events belong to.
+// Fields may be added in a minor release.
+type Run struct {
+	// Trace is the trace the run's spans belong to, and where it came
+	// from: BusOptions.Trace, or a trace drawn at random.
+	Trace TraceContext
+	// Program names the program, BusOptions.Program.
+	Program string
+}
+
+// TraceSink is a Sink that records the run its events belong to, as an
 // event log does. The Bus tells it once, when it is made, before any
 // event.
 type TraceSink interface {
-	// Begin receives the trace the Bus's events belong to.
-	Begin(TraceContext)
+	// Begin receives the run the Bus's events belong to.
+	Begin(Run)
 }
 
 // Suspender is a Sink that draws on the terminal, and takes itself off it
