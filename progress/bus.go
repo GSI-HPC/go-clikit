@@ -51,8 +51,12 @@ type Options struct {
 // each sink sees the same order.
 type Bus struct {
 	// suspending keeps one caller's Suspend or Resume calls to the sinks
-	// from interleaving with another's.
+	// from interleaving with another's, and guards holds.
 	suspending sync.Mutex
+	// holds are the displays sent a Suspend that returned, in the order
+	// they were first sent one, with the number not yet resumed: those of
+	// a display taken off the Bus since are owed it all the same.
+	holds []*hold
 
 	mu    sync.Mutex
 	sinks []Sink
@@ -128,9 +132,10 @@ func (b *Bus) begin() {
 }
 
 // Close ends every span still open as canceled, "not finished", the
-// innermost first, and resumes a display still suspended. Nothing is sent
-// after Close; the sinks are not closed, which is for whoever made them to
-// do once Close has returned. Closing a closed Bus does nothing.
+// innermost first, and resumes a display still suspended, one taken off
+// the Bus for panicking since too. Nothing is sent after Close; the sinks
+// are not closed, which is for whoever made them to do once Close has
+// returned. Closing a closed Bus does nothing.
 func (b *Bus) Close() {
 	b.suspending.Lock()
 	defer b.suspending.Unlock()
@@ -148,10 +153,9 @@ func (b *Bus) Close() {
 	}
 	b.suspended = 0
 	b.closed = true
-	sus := b.suspenders()
 	b.mu.Unlock()
-	for range resumes {
-		b.callAll(sus, Suspender.Resume)
+	for depth := resumes - 1; depth >= 0; depth-- {
+		b.release(depth)
 	}
 }
 
@@ -426,8 +430,9 @@ func (s *Span) event(t Type) Event {
 
 // Suspend takes every display off the terminal, for a question to be asked
 // there, and returns once they are all off. Calling the function it returns
-// puts them back; calling that again does nothing. Suspensions may nest,
-// and without a Bus in ctx nothing happens.
+// puts them back, a display taken off the Bus in between for panicking
+// too; calling that again does nothing. Suspensions may nest, and without
+// a Bus in ctx nothing happens.
 func Suspend(ctx context.Context) (resume func()) {
 	b, s := from(ctx)
 	if b == nil {
@@ -456,7 +461,13 @@ func (b *Bus) suspend(id SpanID) bool {
 	b.emit(Event{Type: TypeSuspend, Span: id})
 	sus := b.suspenders()
 	b.mu.Unlock()
-	b.callAll(sus, Suspender.Suspend)
+	for _, x := range sus {
+		if b.safely(x.Suspend) {
+			b.hold(x)
+		} else {
+			b.drop(x)
+		}
+	}
 	return true
 }
 
@@ -471,9 +482,9 @@ func (b *Bus) resume(id SpanID) {
 	}
 	b.suspended--
 	b.emit(Event{Type: TypeResume, Span: id})
-	sus := b.suspenders()
+	depth := b.suspended
 	b.mu.Unlock()
-	b.callAll(sus, Suspender.Resume)
+	b.release(depth)
 }
 
 // suspenders returns the sinks that draw on the terminal. b.mu is held.
@@ -487,16 +498,47 @@ func (b *Bus) suspenders() []Suspender {
 	return out
 }
 
-// callAll calls call for each of sus, outside b.mu, and removes one that
-// panics.
-func (b *Bus) callAll(sus []Suspender, call func(Suspender)) {
-	for _, x := range sus {
-		if !b.safely(func() { call(x) }) {
-			b.mu.Lock()
-			b.remove(x.(Sink))
-			b.mu.Unlock()
+// hold is a display sent n Suspends not yet resumed.
+type hold struct {
+	display Suspender
+	n       int
+}
+
+// hold counts a Suspend that x returned from. b.suspending is held.
+func (b *Bus) hold(x Suspender) {
+	for _, h := range b.holds {
+		if h.display == x {
+			h.n++
+			return
 		}
 	}
+	b.holds = append(b.holds, &hold{display: x, n: 1})
+}
+
+// release resumes every display that holds more suspensions than the depth
+// the Bus is left suspended at, outside b.mu, whether or not it is still
+// on the Bus: one taken off for panicking while suspended would otherwise
+// keep the terminal from its own output. A display that panics when
+// resumed is taken off and called no more. b.suspending is held.
+func (b *Bus) release(depth int) {
+	for _, h := range b.holds {
+		if h.n <= depth {
+			continue
+		}
+		h.n--
+		if !b.safely(h.display.Resume) {
+			b.drop(h.display)
+			h.n = 0
+		}
+	}
+	b.holds = slices.DeleteFunc(b.holds, func(h *hold) bool { return h.n == 0 })
+}
+
+// drop takes the display x off the Bus. b.mu is not held.
+func (b *Bus) drop(x Suspender) {
+	b.mu.Lock()
+	b.remove(x.(Sink))
+	b.mu.Unlock()
 }
 
 // emit numbers e and hands it to every sink. b.mu is held.

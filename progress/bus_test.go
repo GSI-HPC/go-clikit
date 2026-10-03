@@ -751,6 +751,108 @@ func TestADisplayThatPanicsWhenSuspendedIsRemoved(t *testing.T) {
 	}
 }
 
+// fragile is a Suspender that records its calls, and panics on the events
+// it is sent once it is broken, or when resumed if told to.
+type fragile struct {
+	mu            sync.Mutex
+	broken, fails bool
+	calls         []string
+}
+
+func (f *fragile) Handle(progress.Event) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.broken {
+		panic("drawing went wrong")
+	}
+}
+
+func (f *fragile) Suspend() { f.record("suspend") }
+
+func (f *fragile) Resume() {
+	f.record("resume")
+	if f.fails {
+		panic("the terminal went away")
+	}
+}
+
+func (f *fragile) record(call string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.calls = append(f.calls, call)
+}
+
+func (f *fragile) Break() {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.broken = true
+}
+
+func (f *fragile) Calls() string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return strings.Join(f.calls, " ")
+}
+
+// A display taken off the Bus for panicking while it is suspended is still
+// put back, once for each suspension it was sent, when that suspension
+// ends, by its resume or by Close; a display that panics when resumed is
+// called no more.
+func TestADisplayRemovedWhileSuspendedIsResumed(t *testing.T) {
+	t.Parallel()
+
+	// Removed under one suspension, and resumed by it.
+	display := &fragile{}
+	ctx, _, _ := watched(t, progress.Options{Sinks: []progress.Sink{display}, PanicLog: io.Discard})
+	resume := progress.Suspend(ctx)
+	display.Break()
+	progress.Start(ctx, progress.KindCall, "ssh")
+	resume()
+	if got := display.Calls(); got != "suspend resume" {
+		t.Errorf("the display removed while suspended saw %q, want suspend resume", got)
+	}
+
+	// Removed between two nested suspensions: the inner one, which it was
+	// never sent, does not resume it, and the outer one does.
+	display = &fragile{}
+	ctx, _, _ = watched(t, progress.Options{Sinks: []progress.Sink{display}, PanicLog: io.Discard})
+	outer := progress.Suspend(ctx)
+	display.Break()
+	progress.Start(ctx, progress.KindCall, "ssh")
+	inner := progress.Suspend(ctx)
+	inner()
+	if got := display.Calls(); got != "suspend" {
+		t.Errorf("after the inner resume the display saw %q, want suspend", got)
+	}
+	outer()
+	if got := display.Calls(); got != "suspend resume" {
+		t.Errorf("after the outer resume the display saw %q, want suspend resume", got)
+	}
+
+	// Removed while suspended twice, and resumed by Close.
+	display = &fragile{}
+	ctx, bus, _ := watched(t, progress.Options{Sinks: []progress.Sink{display}, PanicLog: io.Discard})
+	progress.Suspend(ctx)
+	progress.Suspend(ctx)
+	display.Break()
+	progress.Start(ctx, progress.KindCall, "ssh")
+	bus.Close()
+	if got := display.Calls(); got != "suspend suspend resume resume" {
+		t.Errorf("the display Close resumed saw %q, want two suspends and two resumes", got)
+	}
+
+	// Panics when resumed: called no more.
+	display = &fragile{fails: true}
+	ctx, bus, _ = watched(t, progress.Options{Sinks: []progress.Sink{display}, PanicLog: io.Discard})
+	first := progress.Suspend(ctx)
+	progress.Suspend(ctx)
+	first()
+	bus.Close()
+	if got := display.Calls(); got != "suspend suspend resume" {
+		t.Errorf("the display that panicked when resumed saw %q, want two suspends and one resume", got)
+	}
+}
+
 func equal(a, b []string) bool {
 	return strings.Join(a, "\n") == strings.Join(b, "\n")
 }

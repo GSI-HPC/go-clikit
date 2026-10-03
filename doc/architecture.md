@@ -97,7 +97,8 @@ keeps it without a line of the caller's.
 - **The terminal is lent.** `progress.Suspend` calls every sink that is a
   `Suspender` outside the lock, and returns once each display is off the
   terminal, so that a question can be asked there; the function it returns
-  puts them back. Suspensions nest.
+  puts them back, even a display taken off the Bus for panicking in
+  between. Suspensions nest.
 - **One order for the terminal.** The command's own writes go through
   `Terminal.Writer`, which takes the display's region off first and lets it
   back only once a line has ended, so a question that waits for its answer is
