@@ -76,7 +76,8 @@ const (
 // whose reader has stopped: the log never holds the work up. A log that
 // falls behind still writes the lines it had taken, and leaves out those
 // that come after. Close writes what is left, waiting five seconds at
-// most, and says why the log stops short when it does.
+// most, and says why the log stops short when it does; Done says when the
+// writer is no longer written to.
 type Log struct {
 	w   io.Writer
 	o   LogOptions
@@ -89,6 +90,9 @@ type Log struct {
 	pending []byte
 	err     error
 	closed  bool
+	// abandoned says Close stopped waiting: the goroutine that writes
+	// starts no write after it.
+	abandoned bool
 
 	wake          chan struct{}
 	stop, stopped chan struct{}
@@ -330,6 +334,9 @@ func (l *Log) drain() {
 				n = bytes.IndexByte(lines, '\n') + 1
 			}
 		}
+		if l.isAbandoned() {
+			return
+		}
 		if _, err := l.w.Write(lines[:n]); err != nil {
 			l.mu.Lock()
 			if l.err == nil {
@@ -343,10 +350,23 @@ func (l *Log) drain() {
 	}
 }
 
+// isAbandoned reports whether Close has stopped waiting for the writes.
+func (l *Log) isAbandoned() bool {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.abandoned
+}
+
 // Close writes what is left of the log, once the Bus is closed, waiting
 // CloseWait at most, and returns the first error the log met: nothing
-// after it was written. The writer is not closed; that is for whoever
-// opened it to do. Closing a closed Log only says so again.
+// after it was written. Closing a closed Log only says so again.
+//
+// The writer is not closed; that is for whoever opened it to do, once
+// Close has returned nil. When the time runs out, no write is started
+// after Close returns, but one already under way cannot be stopped: Close
+// returns an error that says so, and Done is closed once that write has
+// returned, which a writer that is not safe to close during a write, such
+// as a bufio.Writer or a gzip.Writer, waits for.
 func (l *Log) Close() error {
 	l.mu.Lock()
 	if !l.closed {
@@ -358,8 +378,9 @@ func (l *Log) Close() error {
 	case <-l.stopped:
 	case <-time.After(l.o.CloseWait):
 		l.mu.Lock()
+		l.abandoned = true
 		if l.err == nil {
-			l.err = fmt.Errorf("the last lines were not written within %s", l.o.CloseWait)
+			l.err = fmt.Errorf("the last lines were not written within %s, and a write to the log may still be under way", l.o.CloseWait)
 		}
 		l.mu.Unlock()
 	}
@@ -367,3 +388,7 @@ func (l *Log) Close() error {
 	defer l.mu.Unlock()
 	return l.err
 }
+
+// Done returns a channel that is closed once the log has stopped writing
+// for good: after Close, once its last write has returned.
+func (l *Log) Done() <-chan struct{} { return l.stopped }

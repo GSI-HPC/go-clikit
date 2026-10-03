@@ -793,6 +793,67 @@ func TestALogThatCannotFinishSaysSo(t *testing.T) {
 	}
 }
 
+// counted is a writer whose first write waits until it is released, and
+// which counts the writes it is given.
+type counted struct {
+	release chan struct{}
+	mu      sync.Mutex
+	writes  int
+}
+
+func (c *counted) Write(p []byte) (int, error) {
+	c.mu.Lock()
+	c.writes++
+	first := c.writes == 1
+	c.mu.Unlock()
+	if first {
+		<-c.release
+	}
+	return len(p), nil
+}
+
+func (c *counted) Writes() int {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.writes
+}
+
+// Once Close has given up waiting, the log starts no write: only the one
+// under way when the time ran out goes on, and Done says when it is over,
+// so that the writer can then be closed.
+func TestALogStartsNoWriteOnceCloseHasGivenUp(t *testing.T) {
+	t.Parallel()
+	w := &counted{release: make(chan struct{})}
+	log := progress.NewLog(w, progress.LogOptions{FlushEvery: time.Hour, CloseWait: 20 * time.Millisecond})
+	bus := progress.NewBus(progress.Options{Sinks: []progress.Sink{log}})
+	ctx := progress.WithBus(context.Background(), bus)
+	// Well over the 64 KiB at which the log writes, so that the first write
+	// is under way and more lines wait behind it.
+	for i := range 2000 {
+		_, s := progress.Start(ctx, progress.KindCall, fmt.Sprintf("ssh %d", i))
+		s.End(nil)
+	}
+	bus.Close()
+	err := log.Close()
+	if err == nil || !strings.Contains(err.Error(), "may still be under way") {
+		t.Errorf("Close = %v, want it to say a write may still be under way", err)
+	}
+	select {
+	case <-log.Done():
+		t.Fatal("Done was closed while a write was under way")
+	default:
+	}
+	close(w.release)
+	select {
+	case <-log.Done():
+	case <-time.After(5 * time.Second):
+		t.Fatal("Done was not closed once the write had returned")
+	}
+	if n := w.Writes(); n != 1 {
+		t.Errorf("the log made %d writes, want only the one under way when Close gave up", n)
+	}
+}
+
 // The first line names the program that wrote the log when the log was
 // told it, and leaves the key out otherwise, as the fixture shows.
 func TestTheEventLogNamesTheProgram(t *testing.T) {
