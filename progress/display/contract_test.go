@@ -20,6 +20,26 @@ import (
 	"github.com/GSI-HPC/go-nodeset"
 )
 
+// lifecycle is the life every display lives, as the package comment gives
+// it: a sink of the Bus, suspended around a question, started, drawn on
+// demand and closed. The assertions below hold the displays to it at
+// compile time; the package exports no such interface.
+type lifecycle interface {
+	progress.Sink
+	progress.Suspender
+	Start()
+	Draw()
+	Close()
+}
+
+var (
+	_ lifecycle         = (*display.Tree)(nil)
+	_ lifecycle         = (*display.Counter)(nil)
+	_ lifecycle         = (*display.Plain)(nil)
+	_ progress.LineSink = (*display.Tree)(nil)
+	_ progress.Sink     = (*display.Summary)(nil)
+)
+
 // The tests in this file hold a display to what it promises the command it
 // shares the terminal with, as a program sees it: a command runs its work
 // in a pool, writes its output and its questions through the Terminal, and

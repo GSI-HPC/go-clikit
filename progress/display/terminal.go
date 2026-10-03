@@ -26,6 +26,19 @@
 // Lines writers, which hold them, whole lines only, while a question is
 // asked or the command has a line open, so that none lands inside the
 // question, and write them above the region once they may.
+//
+// The tree, the counter and plain lines live the same life. NewTree,
+// NewCounter or NewPlain makes the display on a Terminal of its own, a
+// Terminal carrying one display, and Start begins its drawing, on a
+// goroutine of its own. The program puts it on the Bus as a sink, and the
+// Bus delivers Handle for each event, and Suspend and Resume around a
+// question, through progress.Suspend. Once the command has ended, the
+// program closes the Bus, and then the display, whose Close stops the
+// drawing, takes the region off and writes what the display left. Draw
+// draws a frame on demand, as a test does on a clock it moves, in place of
+// the drawing Start begins. The Summary is a sink alone, with nothing to
+// start or close, whose Line the program writes once the display is
+// closed.
 package display
 
 import (
