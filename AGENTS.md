@@ -33,17 +33,18 @@ minor release (see Compatibility).
   `width.go`, display widths and `Truncate`.
 - `progress/`: `progress.go`, the vocabulary (kinds, states, classes,
   flags, `Fields`, `Event`, the sink interfaces and the options); `bus.go`,
-  the `Bus`, spans and `Suspend`; `classify.go`; `lines.go`, `Tee` and the
-  lines of output; `sanitize.go`; `tally.go`; `log.go`, the event log;
-  `trace.go`, the W3C trace context. `testdata/log-v1.jsonl` is the golden
-  event log.
+  the `Bus`, spans and `Suspend`; `classify.go`, `Classify`, `ErrSkipped`
+  and `Skip`; `lines.go`, `Tee` and the lines of output; `sanitize.go`;
+  `tally.go`; `log.go`, the event log; `trace.go`, the W3C trace context.
+  `testdata/log-v1.jsonl` is the golden event log.
 - `progress/display/`: `terminal.go`, the `Terminal` and its writers;
   `tree.go`, `counter.go`, `plain.go` and `summary.go`, one display each.
   `contract_test.go` holds the displays to their promises on a `Screen`.
 - `progress/progresstest/`: `progresstest.go`, `Capture`, `Check`,
   `Watch`, `Watcher` and `Tree`; `screen.go`, `Screen`.
-- `fanout/`: `each.go`, `Each` and the package comment; `map.go`, `Map`
-  and `Failure`; `batches.go`; `recover.go`, `Recovered`.
+- `fanout/`: `each.go`, `Each` and the package comment; `map.go`, `Map`,
+  `MapOptions`, `Item`, `Outcome`, `Summary` and `Failure`; `batches.go`;
+  `recover.go`, `Recovered` and `PanicError`.
 - Every package has an `example_test.go`. Failing fuzz inputs go under the
   package's `testdata/fuzz/`.
 - `doc/`: `README.md` maps the documentation; `architecture.md` says how
@@ -99,8 +100,9 @@ go-test-coverage: `go install github.com/vladopajic/go-test-coverage/v2@latest`.
   behind hooks such as `Classify`.
 - Interfaces beyond the Go API: the six span kinds, the JSONL event log
   (version 1: keys may be added, never renamed or removed), the text the
-  displays draw, which consumers compare in their tests, and the rules
-  `progresstest.Check` enforces (decision 15). Changing any of them is a
+  displays draw, which consumers compare in their tests (the runes
+  `termtext` escapes may grow in a minor release, decision 14), and the
+  rules `progresstest.Check` enforces (decision 15). Changing any of them is a
   breaking change; a new or stricter `Check` rule is one too.
 - A library that reports spans costs nothing without a Bus: no allocation
   on that path, which a benchmark or `testing.AllocsPerRun` keeps honest.
