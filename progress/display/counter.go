@@ -4,6 +4,7 @@
 package display
 
 import (
+	"cmp"
 	"fmt"
 	"strings"
 	"sync"
@@ -28,7 +29,9 @@ const (
 //
 // Steps under way side by side each get a segment of their own, split by
 // " | ". While no counted step is under way the line names the innermost
-// step that is, or the command. Hidden steps are not shown.
+// step that is, or the command. Hidden steps are not shown. A step with no
+// name, as a pool given none reports its targets under, goes by the name
+// of the nearest step above it that has one, or of the command.
 //
 // A Counter is a progress.Sink and a progress.Suspender. Its methods are
 // safe for concurrent use.
@@ -40,9 +43,13 @@ type Counter struct {
 
 	mu    sync.Mutex
 	tally progress.Tally
-	// named are the open steps and the command, the newest last, which the
-	// line names when no counted step is under way.
+	// named are the open steps that have a name and the command, the
+	// newest last, which the line names when no counted step is under way.
 	named []named
+	// labels are what the line calls each open span other than a target:
+	// its name for a step or the command that has one, otherwise the
+	// label of the span above it.
+	labels map[progress.SpanID]string
 
 	stop, stopped chan struct{}
 	closing       sync.Once
@@ -125,15 +132,25 @@ func (c *Counter) Handle(e progress.Event) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.tally.Add(e)
-	if e.Kind != progress.KindCommand && e.Kind != progress.KindStep {
+	if e.Kind == progress.KindTarget {
 		return
 	}
+	titled := (e.Kind == progress.KindCommand || e.Kind == progress.KindStep) && e.Name != ""
 	switch e.Type {
 	case progress.TypeStart:
-		if e.Flags&progress.Hidden == 0 {
+		if c.labels == nil {
+			c.labels = map[progress.SpanID]string{}
+		}
+		label := c.labels[e.Parent]
+		if titled {
+			label = e.Name
+		}
+		c.labels[e.Span] = label
+		if titled && e.Flags&progress.Hidden == 0 {
 			c.named = append(c.named, named{e.Span, e.Name})
 		}
 	case progress.TypeEnd:
+		delete(c.labels, e.Span)
 		for i, n := range c.named {
 			if n.span == e.Span {
 				c.named = append(c.named[:i], c.named[i+1:]...)
@@ -154,6 +171,8 @@ func (c *Counter) line(now time.Time) string {
 	var segments []string
 	for _, root := range c.tally.Roots() {
 		if root.Flags&progress.Hidden == 0 {
+			// A step with no name is called by the span above it.
+			root.Name = cmp.Or(root.Name, c.labels[root.Span])
 			segments = append(segments, segment(root, c.g.sep))
 		}
 	}
@@ -167,9 +186,13 @@ func (c *Counter) line(now time.Time) string {
 	return line + elapsed(now.Sub(c.start))
 }
 
-// segment says how far one counted step has got, its parts split by sep.
+// segment says how far one counted step has got, its parts split by sep,
+// after its name when it has one.
 func segment(n progress.Count, sep string) string {
-	parts := []string{n.Name}
+	var parts []string
+	if n.Name != "" {
+		parts = append(parts, n.Name)
+	}
 	if n.Batch != "" {
 		parts = append(parts, "batch "+n.Batch)
 	}

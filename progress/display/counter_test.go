@@ -327,6 +327,60 @@ func TestTheCounterNamesTheStepUnderWay(t *testing.T) {
 	check(t, f.frames(), "provision reinstall · 0:01", "configuring the network boot · 0:02")
 }
 
+// A step with no name, as a pool given none reports its targets under, is
+// named by the nearest step above it that has a name, through a call, or
+// by the command.
+func TestTheCounterNamesAStepWithNoNameByTheSpanAboveIt(t *testing.T) {
+	t.Parallel()
+	f := newFixture(t, "exec", nil)
+	f.draw(time.Second)
+	fanout.Map(f.ctx, []string{"exe1", "exe2"}, fanout.Options[string]{Limit: 1},
+		func(context.Context, string) (struct{}, error) {
+			f.draw(time.Second)
+			return struct{}{}, nil
+		})
+	disarm, disarming := progress.Start(f.ctx, progress.KindStep, "disarming")
+	ssh, call := progress.Start(disarm, progress.KindCall, "ssh")
+	unnamed, step := progress.Start(ssh, progress.KindStep, "")
+	f.draw(time.Second)
+	fanout.Map(unnamed, []string{"exe1"}, fanout.Options[string]{},
+		func(context.Context, string) (struct{}, error) {
+			f.draw(time.Second)
+			return struct{}{}, nil
+		})
+	step.End(nil)
+	call.End(nil)
+	disarming.End(nil)
+	check(t, f.frames(),
+		"exec · 0:01",
+		"exec · 0/2 · 1 running · 1 queued · 0:02",
+		"exec · 1/2 · 1 running · 0:03",
+		"disarming · 0:04",
+		"disarming · 0/1 · 1 running · 0:05",
+	)
+}
+
+// A step with no name that no span above names says only how far it has
+// got.
+func TestTheCounterOfAStepWithNothingToNameIt(t *testing.T) {
+	t.Parallel()
+	s := &screen{}
+	c := &clock{now: time.Date(2026, 9, 26, 12, 0, 0, 0, time.UTC)}
+	counter := display.NewCounter(display.NewTerminal(s, nil), display.CounterOptions{Now: c.Now})
+	bus := progress.NewBus(progress.Options{Sinks: []progress.Sink{counter}, Now: c.Now})
+	fanout.Map(progress.WithBus(context.Background(), bus), []string{"exe1"}, fanout.Options[string]{},
+		func(context.Context, string) (struct{}, error) {
+			c.Add(time.Second)
+			counter.Draw()
+			return struct{}{}, nil
+		})
+	bus.Close()
+	counter.Close()
+	if got, want := s.String(), "\n<erase>0/1 · 1 running · 0:01\n<erase>"; got != want {
+		t.Errorf("screen %q, want %q", got, want)
+	}
+}
+
 // Whatever the command writes takes the line off first, and it is drawn
 // again only once what was written ended a line: a question waiting for its
 // answer is never drawn over.
