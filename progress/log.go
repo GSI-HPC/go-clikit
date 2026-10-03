@@ -114,12 +114,6 @@ type LogOptions struct {
 	// Run names the run on every line; empty draws 16 hexadecimal digits
 	// at random.
 	Run string
-	// FlushEvery is how long a line is kept at most before it is written;
-	// zero is a second.
-	FlushEvery time.Duration
-	// CloseWait is how long Close waits for what is left to be written;
-	// zero is five seconds.
-	CloseWait time.Duration
 }
 
 // NewLog returns a Log that writes to w, and starts the goroutine that
@@ -132,12 +126,6 @@ func NewLog(w io.Writer, o LogOptions) *Log {
 		// crypto/rand never fails; it ends the process when it cannot.
 		_, _ = rand.Read(run[:])
 		l.run = hex.EncodeToString(run[:])
-	}
-	if l.o.FlushEvery <= 0 {
-		l.o.FlushEvery = logFlushEvery
-	}
-	if l.o.CloseWait <= 0 {
-		l.o.CloseWait = logCloseWait
 	}
 	l.enc = json.NewEncoder(&l.line)
 	// What is escaped for HTML is nothing a log needs escaped.
@@ -310,7 +298,7 @@ func (l *Log) due() {
 // writeOut writes the lines kept as they fall due, until Close.
 func (l *Log) writeOut() {
 	defer close(l.stopped)
-	tick := time.NewTicker(l.o.FlushEvery)
+	tick := time.NewTicker(logFlushEvery)
 	defer tick.Stop()
 	for {
 		select {
@@ -363,7 +351,7 @@ func (l *Log) isAbandoned() bool {
 }
 
 // Close writes what is left of the log, once the Bus is closed, waiting
-// CloseWait at most, and returns the first error the log met: nothing
+// five seconds at most, and returns the first error the log met: nothing
 // after it was written. Closing a closed Log only says so again.
 //
 // The writer is not closed; that is for whoever opened it to do, once
@@ -381,11 +369,11 @@ func (l *Log) Close() error {
 	l.mu.Unlock()
 	select {
 	case <-l.stopped:
-	case <-time.After(l.o.CloseWait):
+	case <-time.After(logCloseWait):
 		l.mu.Lock()
 		l.abandoned = true
 		if l.err == nil {
-			l.err = fmt.Errorf("the last lines were not written within %s, and a write to the log may still be under way", l.o.CloseWait)
+			l.err = fmt.Errorf("the last lines were not written within %s, and a write to the log may still be under way", logCloseWait)
 		}
 		l.mu.Unlock()
 	}
