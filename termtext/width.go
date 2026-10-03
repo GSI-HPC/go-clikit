@@ -17,6 +17,11 @@ import (
 // such as a zero-width joiner; and one for everything else. The soft hyphen
 // U+00AD and the prepended concatenation marks, such as U+0600, format but
 // are drawn, and take one column.
+//
+// The East Asian Widths are those of golang.org/x/text, with the characters
+// that later versions of Unicode, up to 18.0, made wide added. A character
+// assigned after that takes one column, as does a combining mark newer than
+// the Unicode tables of Go.
 func RuneWidth(r rune) int {
 	switch {
 	case r == 0:
@@ -25,6 +30,8 @@ func RuneWidth(r rune) int {
 		return 1
 	case unicode.In(r, unicode.Mn, unicode.Me, unicode.Cf):
 		return 0
+	case unicode.Is(wideSinceUnicode15, r):
+		return 2
 	}
 	switch width.LookupRune(r).Kind() {
 	case width.EastAsianWide, width.EastAsianFullwidth:
@@ -85,5 +92,47 @@ var prependedConcatenationMarks = &unicode.RangeTable{
 	R32: []unicode.Range32{
 		{Lo: 0x110bd, Hi: 0x110bd, Stride: 1},
 		{Lo: 0x110cd, Hi: 0x110cd, Stride: 1},
+	},
+}
+
+// wideSinceUnicode15 are the characters whose East Asian Width is wide in
+// Unicode 18.0 but not in the Unicode 15.0 tables of golang.org/x/text:
+// characters assigned since, such as the emoji U+1FAE9, and a few that
+// became wide, such as the trigrams U+2630 to U+2637.
+var wideSinceUnicode15 = &unicode.RangeTable{
+	R16: []unicode.Range16{
+		{Lo: 0x2630, Hi: 0x2637, Stride: 1},
+		{Lo: 0x268a, Hi: 0x268f, Stride: 1},
+		{Lo: 0x2ffc, Hi: 0x2fff, Stride: 1},
+		{Lo: 0x31e4, Hi: 0x31e5, Stride: 1},
+		{Lo: 0x31ef, Hi: 0x31ef, Stride: 1},
+		{Lo: 0x4dc0, Hi: 0x4dff, Stride: 1},
+	},
+	R32: []unicode.Range32{
+		{Lo: 0x16ff2, Hi: 0x16ff6, Stride: 1},
+		{Lo: 0x187f8, Hi: 0x187ff, Stride: 1},
+		{Lo: 0x18cd6, Hi: 0x18cda, Stride: 1},
+		{Lo: 0x18cff, Hi: 0x18cff, Stride: 1},
+		{Lo: 0x18d09, Hi: 0x18d20, Stride: 1},
+		{Lo: 0x18d80, Hi: 0x18df2, Stride: 1},
+		{Lo: 0x18e00, Hi: 0x19191, Stride: 1},
+		{Lo: 0x191a0, Hi: 0x191d2, Stride: 1},
+		{Lo: 0x1b123, Hi: 0x1b128, Stride: 1},
+		{Lo: 0x1b168, Hi: 0x1b168, Stride: 1},
+		{Lo: 0x1d300, Hi: 0x1d356, Stride: 1},
+		{Lo: 0x1d360, Hi: 0x1d376, Stride: 1},
+		{Lo: 0x1f1ae, Hi: 0x1f1ae, Stride: 1},
+		{Lo: 0x1f6d8, Hi: 0x1f6d9, Stride: 1},
+		{Lo: 0x1f7da, Hi: 0x1f7da, Stride: 1},
+		{Lo: 0x1fa89, Hi: 0x1fa8f, Stride: 1},
+		{Lo: 0x1fabe, Hi: 0x1fabe, Stride: 1},
+		{Lo: 0x1fac6, Hi: 0x1fac6, Stride: 1},
+		{Lo: 0x1fac8, Hi: 0x1fac8, Stride: 1},
+		{Lo: 0x1facc, Hi: 0x1facd, Stride: 1},
+		{Lo: 0x1fadc, Hi: 0x1fadd, Stride: 1},
+		{Lo: 0x1fadf, Hi: 0x1fadf, Stride: 1},
+		{Lo: 0x1fae9, Hi: 0x1faeb, Stride: 1},
+		{Lo: 0x1faef, Hi: 0x1faef, Stride: 1},
+		{Lo: 0x1faf9, Hi: 0x1fafa, Stride: 1},
 	},
 }

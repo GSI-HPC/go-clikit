@@ -54,6 +54,28 @@ func TestTheFormatCharactersATerminalDraws(t *testing.T) {
 	}
 }
 
+// Characters that became wide after the Unicode version golang.org/x/text
+// knows, such as the emoji of Unicode 16, take two columns too.
+func TestCharactersWideSinceUnicode15(t *testing.T) {
+	t.Parallel()
+	for _, r := range []rune{
+		0x2630, 0x2637, 0x268a, 0x2ffc, 0x31e4, 0x31ef, 0x4dc0, 0x4dff,
+		0x16ff2, 0x187f8, 0x18cd6, 0x18cff, 0x18d09, 0x18d80, 0x18e00,
+		0x191d2, 0x1b123, 0x1b168, 0x1d300, 0x1d376, 0x1f1ae, 0x1f6d8,
+		0x1f7da, 0x1fa89, 0x1fabe, 0x1fac6, 0x1fac8, 0x1facc, 0x1fadc,
+		0x1fadf, 0x1fae9, 0x1faef, 0x1fafa,
+	} {
+		if got := termtext.RuneWidth(r); got != 2 {
+			t.Errorf("RuneWidth(%U) = %d, want 2", r, got)
+		}
+	}
+	for _, r := range []rune{0x2638, 0x2689, 0x1d357} {
+		if got := termtext.RuneWidth(r); got != 1 {
+			t.Errorf("RuneWidth(%U) = %d, want 1", r, got)
+		}
+	}
+}
+
 // Truncate never lets text reach past the columns given, and leaves out a
 // wide character whole rather than split it.
 func TestTruncate(t *testing.T) {
@@ -75,6 +97,7 @@ func TestTruncate(t *testing.T) {
 		{"失败", 1, ""},
 		{"e\u0301e\u0301", 1, "e\u0301"},
 		{"\u00ad\u00ad\u00adok", 2, "\u00ad\u00ad"},
+		{"\U0001FAE9\U0001FAE9", 3, "\U0001FAE9"},
 	} {
 		got := termtext.Truncate(tc.text, tc.cols)
 		if got != tc.want {
