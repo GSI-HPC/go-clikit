@@ -12,12 +12,13 @@ edited: a later one supersedes it, and the earlier one's status names it.
 | [1](#1-apache-20-and-gsi-holds-the-copyright) | Apache-2.0, and GSI holds the copyright | accepted |
 | [2](#2-the-go-line-is-the-oldest-go-release-still-supported) | The go line is the oldest Go release still supported | accepted |
 | [3](#3-what-the-kit-may-require) | What the kit may require | accepted |
-| [4](#4-a-release-is-a-signed-tag) | A release is a signed tag | accepted |
+| [4](#4-a-release-is-a-signed-tag) | A release is a signed tag | accepted, superseded in part by [10](#10-a-daily-audit-holds-the-releases-to-their-record) |
 | [5](#5-progress-and-its-displays-are-the-kits-own) | Progress and its displays are the kit's own | accepted |
 | [6](#6-the-pools-are-the-kits-own) | The pools are the kit's own | accepted |
 | [7](#7-escapes-are-for-a-reader-not-for-decoding) | Escapes are for a reader, not for decoding | accepted |
 | [8](#8-widths-err-wide-and-follow-unicode-180) | Widths err wide, and follow Unicode 18.0 | accepted |
 | [9](#9-the-region-comes-off-one-line-a-row) | The region comes off one line a row | accepted |
+| [10](#10-a-daily-audit-holds-the-releases-to-their-record) | A daily audit holds the releases to their record | accepted |
 
 ## 1. Apache-2.0, and GSI holds the copyright
 
@@ -161,7 +162,8 @@ takes a record here before it is required.
 
 ## 4. A release is a signed tag
 
-Status: accepted
+Status: accepted, superseded in part by
+[decision 10](#10-a-daily-audit-holds-the-releases-to-their-record)
 
 ### Context
 
@@ -181,28 +183,11 @@ unpublish it.
   `RELEASE_ALLOWED_SIGNERS` (SSH) or `RELEASE_ALLOWED_PGP_KEYS` (OpenPGP)
   repository variable signed under the name it was pushed as, and a tag the
   go command would not accept as a version of this module. It tests the
-  tagged commit on both Go lines, fetches the version through
-  proxy.golang.org, so that pkg.go.dev lists it, and publishes the GitHub
-  release with the tag body as its notes.
-- A tag push runs the workflow of the tagged commit, which a tag on an
-  older commit, or on one that changes the workflow, escapes. The workflow
-  therefore also runs daily from `main` and verifies every `v*` tag against
-  the listed keys, and that every version proxy.golang.org lists for the
-  module has a tag and is served from the commit that tag names, which
-  finds a tag deleted again after the proxy fetched it, and one pushed again
-  on another commit; its failure is the alarm. The publishing job holds the
-  version the proxy fetched to the verified commit as well.
-- A published release is pinned in the `RELEASE_VERIFIED_TAGS` repository
-  variable, its tag and the id of the tag object verified when it was
-  pushed, and the audit holds a pinned tag to that object instead of to
-  today's keys. A key is retired by pinning its releases and removing it,
-  never by `valid-before`, which git checks against the date in the tag,
-  a date the signer writes.
+  tagged commit on both Go lines, publishes the GitHub release with the tag
+  body as its notes, and fetches the version through proxy.golang.org, so
+  that pkg.go.dev lists it.
 - A tag is never moved or deleted. A broken release is withdrawn with a
-  `retract` directive in `go.mod`, which ships in the next release. A
-  version retracted on its own line acknowledges the alarm: the audit
-  reports what is wrong with it as a warning, so that it fails again only
-  for a version nobody has dealt with.
+  `retract` directive in `go.mod`, which ships in the next release.
 - The module stays at v0 while its API settles, and a v0 minor release may
   break it; the release notes say how. A new package arrives in a minor
   release. v1.0.0 is a decision of its own, once programs have used the kit
@@ -214,20 +199,15 @@ verification.
 ### Costs
 
 - The workflow cannot stop the module proxy from serving a tag it refused.
-  Its failure is the alarm, and retraction is the remedy. The audit detects
-  and does not prevent: a tag ruleset that lets only the maintainers create
-  `v*` tags, and nobody delete them, is what keeps others from pushing one.
+  Its failure is the alarm, and retraction is the remedy; a tag ruleset that
+  lets only the maintainers create `v*` tags is what keeps others from
+  pushing one.
 - The signing key becomes part of the release process. Two formats are
   accepted, so that a maintainer signs with the key they already use; the
   verification and its tests cover both.
 - An OpenPGP key is trusted as the variable holds it: an expired key stops
-  verifying on its own, the tags it signed earlier included, a revoked one
-  only once the variable holds its revocation.
-- Every release is pinned by hand after it is published; until it is, the
-  audit holds it to today's keys, and an unpinned release fails the audit
-  once its key expires or is removed. The audit finds a bad tag up to a day
-  late, and relies on proxy.golang.org's list of versions for a tag deleted
-  in between. GitHub stops the schedule of a repository idle for 60 days.
+  verifying on its own, a revoked one only once the variable holds its
+  revocation.
 
 ## 5. Progress and its displays are the kit's own
 
@@ -467,3 +447,93 @@ above the region.
 - On a reflowing terminal made narrower under a drawn region, the first
   lines of each row wider than the new width stay on the terminal, above
   the next frame and the command's output, until they scroll away.
+
+## 10. A daily audit holds the releases to their record
+
+Status: accepted
+
+### Context
+
+Decision 4 has the Release workflow verify a tag when it is pushed. A tag
+push runs the workflow as the tagged commit has it, so a tag on a commit
+from before the workflow, or on one that changes it, verifies nothing. The
+module proxy keeps what it fetched first under a version: a tag pushed,
+fetched through the proxy and deleted again leaves the version served
+without a tag, and a tag deleted and pushed again on another commit, even
+a signed one, leaves the proxy serving the first. The keys change as well:
+an OpenPGP key that expires stops verifying the tags it signed, and a key
+that is retired or leaked has to be removed without failing the releases
+it signed.
+
+A bad version cannot be removed from the proxy, only withdrawn with a
+`retract` directive, so an alarm that goes on failing for a version that
+has been withdrawn would hide the next one. Withdrawing a version answers
+for the content the proxy serves under it, though, not for whatever its
+tag names later.
+
+### Decision
+
+- The Release workflow also runs every day from `main`, and by hand, and
+  then verifies every `v*` tag against the listed keys. It reads the
+  versions proxy.golang.org lists for the module, and fails for each that
+  has no tag, and for each whose `.info` names, as `Origin.Hash`, another
+  commit than its tag. A version whose `.info` has no `Origin`, which the
+  proxy leaves out for a version it fetched long ago, is unverified, a
+  warning, unless the `Time` in it is not the committer date of the commit
+  the tag names, which fails. When the list cannot be read, the audit
+  verifies the tags all the same, and fails. Its failure is the alarm.
+- The publishing job fetches the version through the proxy, checks that
+  the proxy serves it from the verified commit, and only then publishes
+  the GitHub release, so that no release is published for a version the
+  proxy refused or serves from another commit. Run again, it leaves a
+  release an earlier attempt published as it is.
+- A published release is pinned in the `RELEASE_VERIFIED_TAGS` repository
+  variable: its tag and the id of the tag object verified when it was
+  pushed. The audit holds a pinned tag to that object instead of to
+  today's keys, and fails once the tag names another object or is gone.
+- A key is retired by pinning the releases it signed and then removing it;
+  a key that may have leaked is removed at once, and only the releases
+  known to be genuine are pinned. A key is never retired with
+  `valid-before`, which git checks against the date in the tag, a date
+  the signer writes.
+- A version that `go.mod` retracts on a line of its own, not as part of a
+  range, acknowledges the alarm for what the retraction withdraws, the
+  content the proxy serves under it. The audit then reports as a warning,
+  and passes, only a missing tag, a version the proxy lists without one or
+  a pinned release whose tag is gone, and a tag that is neither pinned nor
+  signed while the proxy records, as `Origin.Hash`, that it serves the
+  version from the commit the tag names. It still fails a retracted
+  version whose tag names another commit than the proxy records, moved or
+  deleted and pushed again; a pinned tag that is not its pinned object,
+  whatever commit it names; and a bad tag whose version the proxy records
+  no commit for, since nothing then says which commit was withdrawn.
+- A tag pushed as a release is still never moved or deleted, with two
+  exceptions. A tag that was not pushed as a release, such as one an
+  intruder moved, or deleted and pushed again, is restored to what the
+  proxy fetched or deleted. A bad tag of a retracted version whose commit
+  nothing records is deleted, even one pushed as a release, since the
+  retraction can acknowledge only a version without a tag then.
+
+`doc/release.md` says how the audit is read, and how a release is pinned
+and withdrawn.
+
+### Costs
+
+- The audit detects and does not prevent: it finds a bad tag up to a day
+  late. What keeps others from pushing or deleting a `v*` tag is a tag
+  ruleset that lets only the maintainers create one and nobody delete it.
+- It relies on proxy.golang.org's list of versions for a tag deleted
+  between two runs, and on the proxy's `Origin` for the commit a version
+  is served from. For a version without `Origin` the time check is only a
+  consistency check: a commit made with the same committer date passes it.
+- Every release is pinned by hand once it is published; until it is, the
+  audit holds it to today's keys, and an unpinned release fails once its
+  key expires or is removed.
+- GitHub stops the schedule of a repository with no activity for 60 days,
+  and the workflow has to be enabled again by hand.
+- A version is acknowledged one line at a time, so a range of bad versions
+  is retracted version by version. A retracted version's tag that is
+  deleted is gone from the repository for good; the proxy, the checksum
+  database and the `retract` line are then its only record.
+- What a retraction acknowledges stays in every run of the audit as a
+  warning.
