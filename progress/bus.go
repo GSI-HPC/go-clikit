@@ -13,6 +13,7 @@ import (
 	"runtime/debug"
 	"slices"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -59,11 +60,11 @@ type Bus struct {
 	// the same.
 	holds []*hold
 
-	mu    sync.Mutex
-	sinks []Sink
-	// liners are the sinks that asked for lines, and lines says there
-	// are any.
-	liners   []Sink
+	mu sync.Mutex
+	// sinks are the sinks on the Bus, one entry for each time a sink is
+	// listed in Options.Sinks, and lines says that one of them asked for
+	// lines.
+	sinks    []*entry
 	lines    bool
 	now      func() time.Time
 	panicLog io.Writer
@@ -80,10 +81,22 @@ type Bus struct {
 	closed    bool
 }
 
+// entry is one listing of a sink on a Bus. The Bus tells sinks apart by
+// their entries, never by comparing the sinks themselves, which panics for
+// a sink of a type that cannot be compared, such as a func type or a struct
+// value holding a slice.
+type entry struct {
+	sink Sink
+	// lines says the sink asked for lines.
+	lines bool
+	// dead says the sink has been taken off the Bus; it is set under b.mu
+	// and read outside it, while the displays are suspended or resumed.
+	dead atomic.Bool
+}
+
 // NewBus returns a Bus that sends its events to o.Sinks.
 func NewBus(o Options) *Bus {
 	b := &Bus{
-		sinks:    slices.Clone(o.Sinks),
 		now:      o.Now,
 		panicLog: o.PanicLog,
 		program:  o.Program,
@@ -106,10 +119,13 @@ func NewBus(o Options) *Bus {
 	var base [8]byte
 	_, _ = rand.Read(base[:])
 	b.base = binary.BigEndian.Uint64(base[:])
+	for _, sink := range o.Sinks {
+		b.sinks = append(b.sinks, &entry{sink: sink})
+	}
 	b.mu.Lock()
+	defer b.mu.Unlock()
 	b.begin()
 	b.ask()
-	b.mu.Unlock()
 	return b
 }
 
@@ -123,13 +139,13 @@ func (b *Bus) TraceContext() TraceContext { return b.trace }
 // begin tells the sinks that record the trace which one it is, and removes
 // one that panics. b.mu is held.
 func (b *Bus) begin() {
-	for i := 0; i < len(b.sinks); i++ {
-		ts, ok := b.sinks[i].(TraceSink)
-		if ok && !b.safely(func() { ts.Begin(b.trace) }) {
-			b.sinks = slices.Delete(b.sinks, i, i+1)
-			i--
+	for _, e := range b.sinks {
+		ts, ok := e.sink.(TraceSink)
+		if ok && !e.dead.Load() && !b.safely(func() { ts.Begin(b.trace) }) {
+			b.kill(e)
 		}
 	}
+	b.compact()
 }
 
 // Close ends every span still open as canceled, "not finished", the
@@ -140,24 +156,33 @@ func (b *Bus) begin() {
 func (b *Bus) Close() {
 	b.suspending.Lock()
 	defer b.suspending.Unlock()
-	b.mu.Lock()
-	if b.closed {
-		b.mu.Unlock()
+	resumes, ok := b.close()
+	if !ok {
 		return
+	}
+	for depth := resumes - 1; depth >= 0; depth-- {
+		b.release(depth)
+	}
+}
+
+// close ends the spans still open and marks the Bus closed, and returns
+// how many suspensions it ended, or false when the Bus was closed already.
+func (b *Bus) close() (resumes int, ok bool) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if b.closed {
+		return 0, false
 	}
 	for b.last != nil {
 		b.last.end(StatusCanceled, ClassCanceled, notFinished, nil)
 	}
-	resumes := b.suspended
+	resumes = b.suspended
 	for range resumes {
 		b.emit(Event{Type: TypeResume})
 	}
 	b.suspended = 0
 	b.closed = true
-	b.mu.Unlock()
-	for depth := resumes - 1; depth >= 0; depth-- {
-		b.release(depth)
-	}
+	return resumes, true
 }
 
 // notFinished is the error of a span ended because its parent or the Bus
@@ -453,138 +478,152 @@ func Suspend(ctx context.Context) (resume func()) {
 func (b *Bus) suspend(id SpanID) bool {
 	b.suspending.Lock()
 	defer b.suspending.Unlock()
-	b.mu.Lock()
-	if b.closed {
-		b.mu.Unlock()
+	depth, sus, ok := b.enterSuspension(id)
+	if !ok {
 		return false
 	}
-	b.suspended++
-	depth := b.suspended
-	b.emit(Event{Type: TypeSuspend, Span: id})
-	sus := b.suspenders()
-	b.mu.Unlock()
-	for _, x := range sus {
-		if b.safely(x.Suspend) {
-			b.hold(x, depth)
+	for _, e := range sus {
+		// A display listed again, whose Suspend just panicked, is off.
+		if e.dead.Load() {
+			continue
+		}
+		if b.safely(e.sink.(Suspender).Suspend) {
+			b.hold(e, depth)
 		} else {
-			b.drop(x)
+			b.drop(e)
 		}
 	}
 	return true
 }
 
+// enterSuspension counts one suspension more and sends its event, and
+// returns its depth and the displays to suspend, or false when the Bus is
+// closed.
+func (b *Bus) enterSuspension(id SpanID) (depth int, sus []*entry, ok bool) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if b.closed {
+		return 0, nil, false
+	}
+	b.emit(Event{Type: TypeSuspend, Span: id})
+	b.suspended++
+	return b.suspended, b.suspenders(), true
+}
+
 func (b *Bus) resume(id SpanID) {
 	b.suspending.Lock()
 	defer b.suspending.Unlock()
-	b.mu.Lock()
-	// Close has resumed whatever it found suspended.
-	if b.closed || b.suspended == 0 {
-		b.mu.Unlock()
-		return
+	if depth, ok := b.leaveSuspension(id); ok {
+		b.release(depth)
 	}
-	b.suspended--
+}
+
+// leaveSuspension counts one suspension less and sends its event, and
+// returns the depth left, or false when there is none to leave: Close has
+// resumed whatever it found suspended.
+func (b *Bus) leaveSuspension(id SpanID) (depth int, ok bool) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if b.closed || b.suspended == 0 {
+		return 0, false
+	}
 	b.emit(Event{Type: TypeResume, Span: id})
-	depth := b.suspended
-	b.mu.Unlock()
-	b.release(depth)
+	b.suspended--
+	return b.suspended, true
 }
 
 // suspenders returns the sinks that draw on the terminal. b.mu is held.
-func (b *Bus) suspenders() []Suspender {
-	var out []Suspender
-	for _, s := range b.sinks {
-		if x, ok := s.(Suspender); ok {
-			out = append(out, x)
+func (b *Bus) suspenders() []*entry {
+	var out []*entry
+	for _, e := range b.sinks {
+		if _, ok := e.sink.(Suspender); ok {
+			out = append(out, e)
 		}
 	}
 	return out
 }
 
-// hold is a display sent Suspends not yet resumed, with how many it was
-// sent at each depth of suspension, the outermost first: a display listed
-// more than once in Options.Sinks is sent one for each time it is listed.
+// hold is a display sent Suspends not yet resumed, with the depth of
+// suspension each was sent at, the outermost first. A display listed more
+// than once in Options.Sinks has a hold for each time it is listed, and is
+// sent a Suspend and a Resume for each.
 type hold struct {
-	display Suspender
-	levels  []level
+	display *entry
+	depths  []int
 }
 
-// level is the n Suspends a display returned from at one depth.
-type level struct {
-	depth, n int
-}
-
-// hold counts a Suspend that x returned from at depth. b.suspending is
-// held.
-func (b *Bus) hold(x Suspender, depth int) {
-	i := slices.IndexFunc(b.holds, func(h *hold) bool { return same(h.display, x) })
+// hold records a Suspend that the display e returned from at depth.
+// b.suspending is held.
+func (b *Bus) hold(e *entry, depth int) {
+	i := slices.IndexFunc(b.holds, func(h *hold) bool { return h.display == e })
 	if i < 0 {
-		b.holds = append(b.holds, &hold{display: x})
+		b.holds = append(b.holds, &hold{display: e})
 		i = len(b.holds) - 1
 	}
-	h := b.holds[i]
-	if last := len(h.levels) - 1; last >= 0 && h.levels[last].depth == depth {
-		h.levels[last].n++
-		return
-	}
-	h.levels = append(h.levels, level{depth: depth, n: 1})
+	b.holds[i].depths = append(b.holds[i].depths, depth)
 }
 
-// same reports whether a and b are the same display. A display of a type
-// that cannot be compared, such as a struct value holding a slice, is
-// never the same as another, itself included, so that each Suspend it
-// returns from is held, and resumed, on its own rather than make == panic
-// in the caller of Suspend.
-func same(a, b Suspender) (eq bool) {
-	defer func() {
-		if recover() != nil {
-			eq = false
-		}
-	}()
-	return a == b
-}
-
-// release resumes every display sent Suspends deeper than the depth the
-// Bus is left suspended at, once for each, outside b.mu, whether or not it
-// is still on the Bus: one taken off for panicking while suspended would
-// otherwise keep the terminal from its own output. A display that panics
-// when resumed is taken off and called no more. b.suspending is held.
+// release resumes every display sent a Suspend deeper than the depth the
+// Bus is left suspended at, outside b.mu, whether or not it is still on the
+// Bus: one taken off for panicking while suspended would otherwise keep the
+// terminal from its own output. A display that panics when resumed is taken
+// off and called no more, under any of its listings. b.suspending is held.
 func (b *Bus) release(depth int) {
 	for _, h := range b.holds {
-		last := len(h.levels) - 1
-		if h.levels[last].depth <= depth {
+		last := len(h.depths) - 1
+		// A display that panicked when resumed under another listing is
+		// called no more.
+		if last < 0 || h.depths[last] <= depth {
 			continue
 		}
-		n := h.levels[last].n
-		h.levels = h.levels[:last]
-		for range n {
-			if !b.safely(h.display.Resume) {
-				b.drop(h.display)
-				h.levels = nil
-				break
+		h.depths = h.depths[:last]
+		if !b.safely(h.display.sink.(Suspender).Resume) {
+			for _, gone := range b.drop(h.display) {
+				b.forget(gone)
 			}
 		}
 	}
-	b.holds = slices.DeleteFunc(b.holds, func(h *hold) bool { return len(h.levels) == 0 })
+	b.holds = slices.DeleteFunc(b.holds, func(h *hold) bool { return len(h.depths) == 0 })
 }
 
-// drop takes the display x off the Bus. b.mu is not held.
-func (b *Bus) drop(x Suspender) {
-	b.mu.Lock()
-	b.remove(x.(Sink))
-	b.mu.Unlock()
-}
-
-// emit numbers e and hands it to every sink. b.mu is held.
-func (b *Bus) emit(e Event) {
-	b.seq++
-	e.Seq = b.seq
-	e.Time = b.now()
-	for i := 0; i < len(b.sinks); i++ {
-		sink := b.sinks[i]
-		if !b.safely(func() { sink.Handle(e) }) {
-			b.remove(sink)
-			i--
+// forget drops the Suspends still held for the display e. b.suspending is
+// held.
+func (b *Bus) forget(e *entry) {
+	for _, h := range b.holds {
+		if h.display == e {
+			h.depths = nil
 		}
+	}
+}
+
+// drop takes the display e off the Bus, with its other listings, and
+// returns them all. b.mu is not held.
+func (b *Bus) drop(e *entry) []*entry {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	gone := b.kill(e)
+	b.compact()
+	return gone
+}
+
+// emit numbers ev and hands it to every sink. The clock is read first, so
+// that one that panics leaves no number used. b.mu is held.
+func (b *Bus) emit(ev Event) {
+	ev.Time = b.now()
+	b.seq++
+	ev.Seq = b.seq
+	removed := false
+	for _, e := range b.sinks {
+		if e.dead.Load() {
+			continue
+		}
+		if !b.safely(func() { e.sink.Handle(ev) }) {
+			b.kill(e)
+			removed = true
+		}
+	}
+	if removed {
+		b.compact()
 	}
 }
 
@@ -608,30 +647,55 @@ func (b *Bus) safely(f func()) (ok bool) {
 	return true
 }
 
-// remove takes sink off the Bus. b.mu is held.
-func (b *Bus) remove(sink Sink) {
-	b.sinks = slices.DeleteFunc(b.sinks, func(s Sink) bool { return s == sink })
-	b.liners = slices.DeleteFunc(b.liners, func(s Sink) bool { return s == sink })
-	b.lines = len(b.liners) > 0
+// kill marks the sink of e as taken off the Bus, with every other listing
+// of the same sink, and returns them all; compact then removes them. A
+// sink of a type that cannot be compared is known by its entry alone.
+// b.mu is held.
+func (b *Bus) kill(e *entry) []*entry {
+	gone := []*entry{e}
+	e.dead.Store(true)
+	for _, o := range b.sinks {
+		if o != e && sameSink(o.sink, e.sink) {
+			o.dead.Store(true)
+			gone = append(gone, o)
+		}
+	}
+	return gone
+}
+
+// sameSink reports whether a and b are the same sink, and false for sinks
+// of a type that cannot be compared, rather than panic.
+func sameSink(a, b Sink) (same bool) {
+	defer func() {
+		if recover() != nil {
+			same = false
+		}
+	}()
+	return a == b
+}
+
+// compact removes the sinks taken off the Bus. b.mu is held.
+func (b *Bus) compact() {
+	b.sinks = slices.DeleteFunc(b.sinks, func(e *entry) bool { return e.dead.Load() })
+	b.lines = slices.ContainsFunc(b.sinks, func(e *entry) bool { return e.lines })
 }
 
 // ask asks each sink once whether it wants the lines, and removes one that
 // panics. b.mu is held.
 func (b *Bus) ask() {
-	for i := 0; i < len(b.sinks); i++ {
-		ls, ok := b.sinks[i].(LineSink)
-		if !ok {
+	for _, e := range b.sinks {
+		ls, ok := e.sink.(LineSink)
+		if !ok || e.dead.Load() {
 			continue
 		}
 		want := false
 		if !b.safely(func() { want = ls.WantsLines() }) {
-			b.sinks = slices.Delete(b.sinks, i, i+1)
-			i--
-		} else if want {
-			b.liners = append(b.liners, b.sinks[i])
+			b.kill(e)
+		} else {
+			e.lines = want
 		}
 	}
-	b.lines = len(b.liners) > 0
+	b.compact()
 }
 
 // sanitizeFields makes the text fields of f that differ from those of prev

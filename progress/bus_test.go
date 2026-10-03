@@ -11,6 +11,7 @@ import (
 	"io"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -575,9 +576,21 @@ func TestASinkThatPanicsIsRemoved(t *testing.T) {
 		t.Errorf("the panic log reads %q, want the panic and its stack", log.String())
 	}
 
+	// A sink listed twice that panics is taken off under both listings,
+	// and is not sent the event again under the second.
+	twice := &panicky{n: 1}
+	tctx, tbus, _ := watched(t, progress.Options{Sinks: []progress.Sink{twice, twice}, PanicLog: io.Discard})
+	_, span := progress.Start(tctx, progress.KindCall, "ssh")
+	span.End(nil)
+	tbus.Close()
+	if twice.seen != 1 {
+		t.Errorf("the sink listed twice was sent %d events, want 1", twice.seen)
+	}
+
 	// A sink that panics when asked for lines asks for none.
 	lines := progress.NewBus(progress.Options{Sinks: []progress.Sink{&panicky{lines: true}}, PanicLog: io.Discard})
-	lctx, span := progress.Start(progress.WithBus(context.Background(), lines), progress.KindCall, "ssh", progress.WithFlags(progress.ShowLines))
+	var lctx context.Context
+	lctx, span = progress.Start(progress.WithBus(context.Background(), lines), progress.KindCall, "ssh", progress.WithFlags(progress.ShowLines))
 	var buf bytes.Buffer
 	if w := progress.Tee(lctx, &buf, progress.Stdout, nil); w != &buf {
 		t.Errorf("Tee = %T, want the writer itself", w)
@@ -748,6 +761,16 @@ func TestADisplayThatPanicsWhenSuspendedIsRemoved(t *testing.T) {
 	bus.Close()
 	if got := display.Calls(); got != "suspend" {
 		t.Errorf("the display saw %q, want one suspend and then nothing", got)
+	}
+
+	// Listed twice, it is taken off under both listings at once.
+	display = &terminal{t: t, panic: true}
+	ctx, bus, _ = watched(t, progress.Options{Sinks: []progress.Sink{display, display}, PanicLog: io.Discard})
+	display.ctx = ctx
+	progress.Suspend(ctx)()
+	bus.Close()
+	if got := display.Calls(); got != "suspend" {
+		t.Errorf("the display listed twice saw %q, want one suspend and then nothing", got)
 	}
 }
 
@@ -924,6 +947,116 @@ func TestADisplayThatCannotBeComparedIsSuspended(t *testing.T) {
 	if got := strings.Join(two, " "); got != want {
 		t.Errorf("the second display saw %q, want %q", got, want)
 	}
+}
+
+// sinkFunc is a sink of a func type, which cannot be compared.
+type sinkFunc func(progress.Event)
+
+func (f sinkFunc) Handle(e progress.Event) { f(e) }
+
+// mapDisplay is a display of a map type, which cannot be compared, that
+// panics on the events of the type it is told, and when suspended if told
+// to.
+type mapDisplay map[string]bool
+
+func (m mapDisplay) Handle(e progress.Event) {
+	if m[e.Type.String()] {
+		panic("drawing went wrong")
+	}
+}
+
+func (m mapDisplay) Suspend() {
+	if m["Suspend"] {
+		panic("the terminal went away")
+	}
+}
+
+func (mapDisplay) Resume() {}
+
+// unblocked fails unless a span can be started and ended on ctx's Bus
+// from another goroutine, as it cannot while the Bus lock is held.
+func unblocked(ctx context.Context, t *testing.T, what string) {
+	t.Helper()
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		_, span := progress.Start(ctx, progress.KindCall, "ssh")
+		span.End(nil)
+	}()
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatalf("%s: the Bus stayed locked", what)
+	}
+}
+
+// A sink of a type that cannot be compared is taken off the Bus when it
+// panics like any other, without a panic in the caller and without leaving
+// the Bus locked, whichever call it panics in.
+func TestASinkThatCannotBeComparedIsRemoved(t *testing.T) {
+	t.Parallel()
+
+	// A func sink that panics on its first event, beside another of the
+	// same type, which stays.
+	seen, kept := 0, 0
+	var f sinkFunc = func(progress.Event) {
+		seen++
+		panic("drawing went wrong")
+	}
+	var g sinkFunc = func(progress.Event) { kept++ }
+	ctx, bus, capture := watched(t, progress.Options{Sinks: []progress.Sink{f, g}, PanicLog: io.Discard})
+	_, span := progress.Start(ctx, progress.KindCall, "ssh")
+	span.End(nil)
+	unblocked(ctx, t, "after a func sink panicked")
+	bus.Close()
+	if seen != 1 {
+		t.Errorf("the func sink was sent %d events, want 1", seen)
+	}
+	if n := len(capture.Events()); n != 4 || kept != 4 {
+		t.Errorf("the other sinks were sent %d and %d events, want 4 each", n, kept)
+	}
+
+	// A display that panics on the event of a suspension, which is sent
+	// with the Bus locked, and one that panics when suspended.
+	for _, m := range []mapDisplay{{"suspend": true}, {"Suspend": true}} {
+		ctx, bus, _ := watched(t, progress.Options{Sinks: []progress.Sink{m}, PanicLog: io.Discard})
+		resume := progress.Suspend(ctx)
+		unblocked(ctx, t, fmt.Sprintf("after %v", m))
+		resume()
+		unblocked(ctx, t, fmt.Sprintf("after the resume of %v", m))
+		bus.Close()
+	}
+}
+
+// A clock that panics while a suspension is sent panics in the caller of
+// Suspend, but leaves the Bus unlocked.
+func TestAClockThatPanicsLeavesTheBusUnlocked(t *testing.T) {
+	t.Parallel()
+
+	var broken atomic.Bool
+	now := func() time.Time {
+		if broken.CompareAndSwap(true, false) {
+			panic("no time")
+		}
+		return time.Unix(0, 0)
+	}
+	ctx, bus, _ := watched(t, progress.Options{Now: now})
+	broken.Store(true)
+	func() {
+		defer func() {
+			if recover() == nil {
+				t.Error("Suspend did not panic with the clock")
+			}
+		}()
+		progress.Suspend(ctx)
+	}()
+	unblocked(ctx, t, "after the clock panicked")
+	broken.Store(true)
+	func() {
+		defer func() { _ = recover() }()
+		bus.Close()
+	}()
+	unblocked(ctx, t, "after the clock panicked in Close")
 }
 
 func equal(a, b []string) bool {
