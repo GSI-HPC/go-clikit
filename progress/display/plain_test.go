@@ -119,7 +119,7 @@ bmc power off: failed in 18s: 4 ok, 2 failed
 }
 
 // onBMC describes a node by its service processor.
-func onBMC(node string) (string, string, string) { return node, node + ".mgmt", "" }
+func onBMC(node string) fanout.Item { return fanout.Item{Node: node, Host: node + ".mgmt"} }
 
 // A power-on in batches: each batch starts and ends, with the pause before
 // the next; the whole step says where it stands; a batch left out after

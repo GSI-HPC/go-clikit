@@ -38,7 +38,7 @@ func (unreachable) ProgressClass() progress.Class { return progress.ClassTranspo
 func (e unreachable) Unwrap() error { return e.error }
 
 // onBMC describes a node by its service processor.
-func onBMC(node string) (string, string, string) { return node, node + ".mgmt.example.org", "" }
+func onBMC(node string) fanout.Item { return fanout.Item{Node: node, Host: node + ".mgmt.example.org"} }
 
 func TestMapKeepsTheOrderOfTheItems(t *testing.T) {
 	t.Parallel()
@@ -220,6 +220,23 @@ func TestMapReportsItsWork(t *testing.T) {
     call redfish method=POST path=/redfish/v1/Systems/1: failed (transport): {}: connection refused
   target exe[1-2,4-5]: ok
     call redfish method=POST path=/redfish/v1/Systems/1: ok
+`
+	if got := w.Finish(); got != want {
+		t.Errorf("tree:\n%s\nwant:\n%s", got, want)
+	}
+}
+
+// An Item without a Node names its target as fmt.Sprint prints the item,
+// and keeps the rest of what Describe said.
+func TestMapNamesAnItemWithoutANodeAsItPrints(t *testing.T) {
+	t.Parallel()
+
+	ctx, w := progresstest.Watch(context.Background(), t)
+	fanout.Map(ctx, []int{7}, fanout.MapOptions[int]{Step: "scan",
+		Describe: func(int) fanout.Item { return fanout.Item{Role: "head"} }},
+		func(context.Context, int) (struct{}, error) { return struct{}{}, nil })
+	want := `step scan total=1 limit=16 [fold]: ok
+  target 7 role=head: ok
 `
 	if got := w.Finish(); got != want {
 		t.Errorf("tree:\n%s\nwant:\n%s", got, want)

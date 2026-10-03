@@ -48,6 +48,35 @@ func ExampleMap() {
 	//   target exe[01-02,04]: ok
 }
 
+// Describe says what a display names an item by: the node its target is
+// named after, the host the work goes to and the item's role. An Item
+// without a Node names the item as fmt.Sprint prints it.
+func ExampleMapOptions_describe() {
+	type machine struct {
+		name, role string
+	}
+	capture := &progresstest.Capture{}
+	bus := progress.NewBus(progress.BusOptions{Sinks: []progress.Sink{capture}})
+	ctx := progress.WithBus(context.Background(), bus)
+
+	machines := []machine{{"exe01", "compute"}, {"mds01", "storage"}}
+	fanout.Map(ctx, machines, fanout.MapOptions[machine]{
+		Step: "reset",
+		Describe: func(m machine) fanout.Item {
+			return fanout.Item{Node: m.name, Host: m.name + "-bmc", Role: m.role}
+		},
+	}, func(context.Context, machine) (struct{}, error) { return struct{}{}, nil })
+	bus.Close()
+	for _, ev := range capture.Events() {
+		if ev.Kind == progress.KindTarget && ev.Type == progress.TypeStart {
+			fmt.Println(ev.Name, ev.Host, ev.Role)
+		}
+	}
+	// Output:
+	// exe01 exe01-bmc compute
+	// mds01 mds01-bmc storage
+}
+
 // Each is the one bounded loop the pools run on: once ctx ends, no
 // further call is started.
 func ExampleEach() {

@@ -25,10 +25,9 @@ type MapOptions[T any] struct {
 	// Limit is how many items are worked on at once; below one is
 	// DefaultLimit.
 	Limit int
-	// Describe says what a display names an item by: the node, or
-	// whatever else the item is, the host the work goes to and its role.
-	// Nil names an item the way fmt.Sprint prints it.
-	Describe func(T) (node, host, role string)
+	// Describe says what a display names an item by, as an Item. Nil, or
+	// an Item with no Node, names an item the way fmt.Sprint prints it.
+	Describe func(T) Item
 	// PanicLog receives the stack of a panic in the work, in Acquire or
 	// in the release it gave, the front end's diagnostics; nil is the
 	// process's standard error.
@@ -71,6 +70,22 @@ type MapOptions[T any] struct {
 	// the context had ended by then and the error is not a panic; and
 	// with the error otherwise.
 	Acquire func(ctx context.Context, item T) (release func(), err error)
+}
+
+// Item is what MapOptions.Describe says of an item: what its target is
+// named by, and the attributes of progress.Fields a display shows of it.
+type Item struct {
+	// Node names the item's target, as its span's name and as
+	// progress.Fields.Node, and is the name the summary of the items that
+	// failed gives it: the node, or whatever else the item is. Empty is
+	// the item as fmt.Sprint prints it.
+	Node string
+	// Host is the address the work goes to, such as the node's service
+	// processor, as progress.Fields.Host; empty says none.
+	Host string
+	// Role is the host role of the item, as progress.Fields.Role; empty
+	// says none.
+	Role string
 }
 
 // Outcome is what the work for one item came to.
@@ -148,10 +163,10 @@ func Map[T, R any](ctx context.Context, items []T, o MapOptions[T], fn func(ctx 
 	ctxs := make([]context.Context, len(items))
 	spans := make([]*progress.Span, len(items))
 	for i, item := range items {
-		node, host, role := o.describe(item)
-		names[i] = node
-		ctxs[i], spans[i] = progress.Start(stepCtx, progress.KindTarget, node, progress.Queued(),
-			progress.Node(node), progress.Host(host), progress.Role(role))
+		d := o.describe(item)
+		names[i] = d.Node
+		ctxs[i], spans[i] = progress.Start(stepCtx, progress.KindTarget, d.Node, progress.Queued(),
+			progress.Node(d.Node), progress.Host(d.Host), progress.Role(d.Role))
 	}
 
 	out := make([]Outcome[R], len(items))
@@ -257,11 +272,15 @@ func (o MapOptions[T]) endsCanceled(err error) bool {
 }
 
 // describe says what a display names an item by.
-func (o MapOptions[T]) describe(item T) (node, host, role string) {
-	if o.Describe == nil {
-		return fmt.Sprint(item), "", ""
+func (o MapOptions[T]) describe(item T) Item {
+	var d Item
+	if o.Describe != nil {
+		d = o.Describe(item)
 	}
-	return o.Describe(item)
+	if d.Node == "" {
+		d.Node = fmt.Sprint(item)
+	}
+	return d
 }
 
 // acquire takes what an item's work needs besides its place in the pool.
