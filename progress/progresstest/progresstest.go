@@ -132,10 +132,11 @@ func newBus(c *Capture, opts []Option) *progress.Bus {
 // Nothing in it depends on how concurrent work was scheduled. Targets that
 // read the same once their own node and host are written {} are folded into
 // one line naming them as a node set, or listing them when a name is no
-// node or is given twice, as a target that ran twice is; siblings are sorted by what they
-// read, with numbers in their numeric order and those that differ only in
-// leading zeros, as x01 and x1, byte by byte; and neither ids, times nor
-// lines of output are drawn. A span not ended reads as its state.
+// node or appears twice, as it does for a target that ran twice; siblings
+// are sorted by what they read, with numbers in their numeric order and
+// those that differ only in leading zeros, as x01 and x1, byte by byte; and
+// neither ids, times nor lines of output are drawn. A span not ended reads
+// as its state.
 //
 // Tests compare trees whole, so the format is kept: a field is drawn only
 // when it has a value, and a field added to progress.Fields is drawn after
