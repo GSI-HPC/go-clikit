@@ -186,7 +186,9 @@ unpublish it.
 - A tag push runs the workflow of the tagged commit, which a tag on an
   older commit, or on one that changes the workflow, escapes. The workflow
   therefore also runs daily from `main` and verifies every `v*` tag against
-  the listed keys; its failure is the alarm. A key that signed a release
+  the listed keys, and that every version proxy.golang.org lists for the
+  module has a tag, which finds a tag deleted again after the proxy fetched
+  it; its failure is the alarm. A key that signed a release
   stays listed after it is retired, an SSH key with `valid-before`.
 - A tag is never moved or deleted. A broken release is withdrawn with a
   `retract` directive in `go.mod`, which ships in the next release.
@@ -201,9 +203,9 @@ verification.
 ### Costs
 
 - The workflow cannot stop the module proxy from serving a tag it refused.
-  Its failure is the alarm, and retraction is the remedy; a tag ruleset that
-  lets only the maintainers create `v*` tags is what keeps others from
-  pushing one.
+  Its failure is the alarm, and retraction is the remedy. The audit detects
+  and does not prevent: a tag ruleset that lets only the maintainers create
+  `v*` tags, and nobody delete them, is what keeps others from pushing one.
 - The signing key becomes part of the release process. Two formats are
   accepted, so that a maintainer signs with the key they already use; the
   verification and its tests cover both.

@@ -9,7 +9,8 @@
 # A tag push runs this workflow as the tagged commit has it, so a tag on a
 # commit from before the workflow, or on one that changes it, verifies
 # nothing. The default branch therefore runs it on a schedule as well, and
-# then verifies every release tag there is.
+# then verifies every release tag there is, and that the module proxy serves
+# no version without one.
 
 name: Release
 
@@ -26,7 +27,8 @@ permissions:
 
 jobs:
   # From the default branch: a release tag that is not signed by a listed
-  # signer fails this job, whatever commit it names.
+  # signer fails this job, whatever commit it names, and so does a version on
+  # the module proxy whose tag is gone.
   audit-tags:
     name: Verify every release tag is signed
     if: github.event_name != 'push'
