@@ -135,3 +135,10 @@ or when a key or a listed value is on no line of the file.
 `go test ./progress -run TestTheEventLog -update` rewrites the file, and the
 difference is then a change to the format, reviewed as one: it keeps
 version 1 only when it adds.
+
+The file is changed only by adding to it. Its first 48 lines, the trace and
+47 events of a command `exec`, are those version 1 was first released with,
+and a test fails when they are not, byte for byte. What the file has said
+since, a value of `cache` and a `dropped` count among them, comes after
+them, from a second command, `status`, run on the same Bus once `exec` has
+ended, so its events go on from seq 48 and its spans from `#18`.
