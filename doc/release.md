@@ -59,8 +59,13 @@ one that has no tag. The proxy also keeps the content it fetched first: a
 tag deleted and pushed again under the same name on another commit, even a
 signed one, leaves the proxy serving the first commit. So the audit also
 fails for each version whose `.info` on the proxy names, as `Origin.Hash`,
-another commit than its tag, or none; the publishing job checks the same
-before it publishes. A failed run of the job *Verify every release tag is
+another commit than its tag; the publishing job checks the same before it
+publishes. The proxy leaves `Origin` out of the `.info` of a version it
+fetched long ago, so that version cannot be held to a commit: the audit and
+the publishing job report it as unverified, a warning, and pass, unless the
+`Time` in the `.info`, the time of the commit the proxy fetched, is not that
+of the commit the tag names, which fails. The tag of an unverified version
+is still verified like any other. A failed run of the job *Verify every release tag is
 signed* is the alarm: its log names the tag or the version. Investigate it
 as a compromise, and withdraw the version as below, which also clears the
 alarm for that version. GitHub disables

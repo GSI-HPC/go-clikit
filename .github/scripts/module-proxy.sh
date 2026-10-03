@@ -8,12 +8,17 @@
 #                                      one a line, and none for a module it
 #                                      has never fetched
 #   module-proxy.sh check <v> <commit> fails unless the proxy serves version
-#                                      <v> from the commit <commit>
+#                                      <v> from the commit <commit>, or
+#                                      passes with a warning if it does not
+#                                      say which commit it serves <v> from
 #
 # The proxy names the commit it fetched a version from as Origin.Hash in the
 # version's .info, and goes on serving that content whatever the tag names
-# later. A version it serves from another commit than its tag names, or
-# without saying which, is refused. Reads:
+# later. A version it serves from another commit than its tag names is
+# refused. The proxy leaves Origin out for a version it fetched long ago:
+# such a version is unverified, which is a warning, unless the time of the
+# commit in the .info is not that of <commit>, which git reads from the
+# checkout. Reads:
 #
 #   GO_MOD        the go.mod naming the module; go.mod if not set
 #   MODULE_PROXY  the module proxy; https://proxy.golang.org if not set
@@ -73,9 +78,25 @@ case "${1:-}" in
     url="$base/$(escape "$version").info"
     get "$url"
     [ "$status" = 200 ] || fail "$url answered $status"
-    served="$(jq -r '.Origin.Hash // empty | strings' "$body" 2> /dev/null)" || served=''
+    jq -e 'type == "object"' "$body" > /dev/null 2>&1 || fail "$url is not a JSON object"
+    served="$(jq -r '.Origin.Hash? // empty | strings' "$body")"
+    if [ -z "$served" ]; then
+      # The proxy leaves Origin out of the .info of a version it fetched
+      # long ago, and that version cannot be held to a commit. The time of
+      # the commit it was fetched from is still there, as the go command
+      # writes it, and refuses a tag that names a commit of another time.
+      time="$(jq -r '.Time? // empty | strings' "$body")"
+      committed="$(TZ=UTC git show -s --format=%cd --date=format-local:%Y-%m-%dT%H:%M:%SZ \
+        "$commit^{commit}" 2> /dev/null)" ||
+        fail "cannot read the commit $commit that the tag $version names"
+      if [ -n "$time" ] && [ "$time" != "$committed" ]; then
+        fail "the module proxy serves $version from a commit of $time, but the tag $version names $commit, of $committed"
+      fi
+      echo "::warning::the module proxy does not say which commit it serves $version from, so it cannot be held to $commit; the time it gives is ${time:-none}, that of $commit is $committed"
+      exit 0
+    fi
     if ! [[ "$served" =~ ^([0-9a-f]{40}|[0-9a-f]{64})$ ]]; then
-      fail "the module proxy does not say which commit it serves $version from"
+      fail "the module proxy names $served as the commit it serves $version from, which is no commit"
     fi
     if [ "$served" != "$commit" ]; then
       fail "the module proxy serves $version from commit $served, but the tag $version names $commit"

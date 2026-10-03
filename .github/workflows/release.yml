@@ -143,7 +143,9 @@ jobs:
 
       # The proxy keeps the content it fetched first under a version, and the
       # fetch above returns it without complaint; so a tag pushed, fetched and
-      # deleted before this one leaves the proxy serving another commit.
+      # deleted before this one leaves the proxy serving another commit. A
+      # .info that names no commit, as for a version fetched long ago, is a
+      # warning, unless the time of its commit is not that of the tagged one.
       - name: Refuse a version the module proxy serves from another commit
         env:
           TAG: ${{ github.ref_name }}
