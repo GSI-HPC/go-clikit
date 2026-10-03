@@ -65,11 +65,13 @@ while IFS= read -r tag; do
 done < <(git for-each-ref --format='%(refname:strip=2)' 'refs/tags/v*')
 
 # The versions the module proxy serves: each has a tag, and the proxy serves
-# it from the commit its tag names. A failure to read the list leaves the
-# audit undone, and fails it.
+# it from the commit its tag names. A failure to read the list leaves that
+# part of the audit undone, and fails it once the tags are verified.
+unread=0
 if ! versions="$("$module_proxy" list)"; then
   printf '%s\n' "$versions"
-  exit 1
+  versions=''
+  unread=1
 fi
 
 untagged=0
@@ -95,7 +97,8 @@ for pin in "${!pins[@]}"; do
   fi
 done
 
-if [ "${#tags[@]}" -eq 0 ] && [ "$untagged" -eq 0 ] && [ "$moved" -eq 0 ] && [ "$gone" -eq 0 ]; then
+if [ "${#tags[@]}" -eq 0 ] && [ "$untagged" -eq 0 ] && [ "$moved" -eq 0 ] && [ "$gone" -eq 0 ] &&
+  [ "$unread" -eq 0 ]; then
   echo "::notice::no release tags to verify"
   exit 0
 fi
@@ -131,7 +134,11 @@ fi
 if [ "$gone" -ne 0 ]; then
   echo "::error::$gone pinned release(s) have no tag; see doc/release.md"
 fi
-if [ "$failed" -ne 0 ] || [ "$untagged" -ne 0 ] || [ "$moved" -ne 0 ] || [ "$gone" -ne 0 ]; then
+if [ "$unread" -ne 0 ]; then
+  echo "::error::the versions the module proxy serves are unchecked, since its list could not be read"
+fi
+if [ "$failed" -ne 0 ] || [ "$untagged" -ne 0 ] || [ "$moved" -ne 0 ] || [ "$gone" -ne 0 ] ||
+  [ "$unread" -ne 0 ]; then
   exit 1
 fi
 echo "::notice::all ${#tags[@]} release tag(s) are pinned or signed by a listed signer, and the module proxy serves no other version or commit"
