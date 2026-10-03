@@ -177,6 +177,23 @@ func ExampleClassify() {
 	// target
 }
 
+// Work left out on purpose returns an error of Skip, which a span ends
+// skipped rather than failed, whatever the program's rule for classes
+// says, and which errors.Is tells from a failure.
+func ExampleSkip() {
+	bus := progress.NewBus(progress.BusOptions{Sinks: []progress.Sink{printer{}}})
+	ctx := progress.WithBus(context.Background(), bus)
+	_, target := progress.Start(ctx, progress.KindTarget, "exe01")
+	err := fmt.Errorf("exe01: %w", progress.Skip("in maintenance"))
+	target.End(err)
+	bus.Close()
+	fmt.Println(errors.Is(err, progress.ErrSkipped))
+	// Output:
+	// 1 start target "exe01" running
+	// 2 end target "exe01" ended skipped (none): exe01: in maintenance
+	// true
+}
+
 // Sanitize makes a line of output fit to show: a carriage return is
 // applied as a terminal would, and what is left escaped and cut.
 func ExampleSanitize() {

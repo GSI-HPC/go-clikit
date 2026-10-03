@@ -63,6 +63,13 @@ A command makes a `Bus` with its sinks, puts it in its context with
 a run, an update, a line of output or an end, is one `Event` of plain data,
 numbered by `Seq`, and handed to every sink in that one order.
 
+`Span.End` takes the error the work ended with. A nil error ends the span
+ok; an error that is `progress.ErrSkipped`, as `errors.Is` tells, such as
+one `progress.Skip` returns, ends it skipped, work left out on purpose,
+before any rule for classes is asked, so that a program's rule cannot turn
+a skip into a failure; any other error ends it failed or canceled, as
+`progress.Classify` tells. `Span.Skip` is `End` with a skip.
+
 Without a Bus in the context, `Start` returns the context as it is and a nil
 `*Span`, whose methods do nothing. The path allocates nothing, which two tests
 hold it to, so a library reports its work at no cost when no command is

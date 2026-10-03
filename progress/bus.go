@@ -7,6 +7,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -155,8 +156,8 @@ func (b *Bus) PanicLog() io.Writer {
 }
 
 // Classify tells why work failed from err as End does for the spans of
-// the Bus: Classify with BusOptions.Classify as the fallback. A nil Bus
-// has no fallback.
+// the Bus that it does not end skipped: Classify with
+// BusOptions.Classify as the fallback. A nil Bus has no fallback.
 func (b *Bus) Classify(err error) Class {
 	if b == nil {
 		return Classify(err, nil)
@@ -365,9 +366,12 @@ func (s *Span) Update(opts ...Option) {
 	b.emit(s.event(TypeUpdate))
 }
 
-// End ends a span with the outcome of its work: ok for a nil error,
+// End ends a span with the outcome of its work: ok for a nil error;
+// skipped, with no class, for an error that is ErrSkipped as errors.Is
+// tells, such as one Skip returns, before Classify is asked, so that no
+// rule of a program's turns work left out on purpose into a failure; and
 // otherwise failed or canceled as Classify tells from err, with the
-// Bus's BusOptions.Classify as its fallback, and err's text becomes the
+// Bus's BusOptions.Classify as its fallback. err's text becomes the
 // span's one-line Err. The options set the fields that are known only at
 // the end, such as Exit. Only the first End or Skip of a span
 // counts. Spans started under it that are still open end first, as
@@ -379,10 +383,13 @@ func (s *Span) End(err error, opts ...Option) {
 	b := s.bus
 	status, class, text := StatusOK, ClassNone, ""
 	if err != nil {
-		class = Classify(err, b.classify)
-		status = StatusFailed
-		if class == ClassCanceled {
-			status = StatusCanceled
+		status = StatusSkipped
+		if !errors.Is(err, ErrSkipped) {
+			class = Classify(err, b.classify)
+			status = StatusFailed
+			if class == ClassCanceled {
+				status = StatusCanceled
+			}
 		}
 		text = Sanitize(err.Error(), MaxErr)
 	}
@@ -396,8 +403,8 @@ func (s *Span) End(err error, opts ...Option) {
 
 // Skip ends a queued or running span as skipped, with reason as its Err:
 // work left out on purpose, such as a batch after one that failed or a
-// call a dry run only recorded. It is the span's End, and like End only
-// counts the first time.
+// call a dry run only recorded. It is End(Skip(reason)), without the
+// error, and like End only counts the first time.
 func (s *Span) Skip(reason string) {
 	if s == nil {
 		return

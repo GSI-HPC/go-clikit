@@ -1088,6 +1088,55 @@ func TestEndClassesByTheFallbackOfTheBus(t *testing.T) {
 	}
 }
 
+// End ends a span whose error is a skip skipped, with no class and the
+// error's text, before the program's fallback is asked, so that its rule
+// cannot turn work left out on purpose into a failure; Span.Skip ends it
+// the same way.
+func TestEndOfASkipEndsSkipped(t *testing.T) {
+	t.Parallel()
+
+	failing := func(error) progress.Class { return progress.ClassTransport }
+	for _, tc := range []struct {
+		name string
+		end  func(*progress.Span)
+		want string
+	}{
+		{"Skip", func(s *progress.Span) { s.End(progress.Skip("dry run")) }, "dry run"},
+		{"a wrapped skip", func(s *progress.Span) {
+			s.End(fmt.Errorf("exe0001: %w", progress.Skip("unreachable")), progress.Exit(0))
+		}, "exe0001: unreachable"},
+		{"ErrSkipped", func(s *progress.Span) { s.End(progress.ErrSkipped) }, "skipped"},
+		{"Span.Skip", func(s *progress.Span) { s.Skip("dry run") }, "dry run"},
+	} {
+		ctx, bus, capture := watched(t, progress.BusOptions{Classify: failing})
+		_, span := progress.Start(ctx, progress.KindTarget, "exe0001")
+		tc.end(span)
+		bus.Close()
+		events := capture.Events()
+		end := events[len(events)-1]
+		if end.Status != progress.StatusSkipped || end.Class != progress.ClassNone || end.Err != tc.want {
+			t.Errorf("%s: the span ended %s, %s, %q; want skipped, none, %q", tc.name, end.Status, end.Class, end.Err, tc.want)
+		}
+	}
+}
+
+// The error Skip returns says its reason, and errors.Is finds ErrSkipped
+// in it, and in an error that wraps it; other errors are no skip.
+func TestSkipIsErrSkipped(t *testing.T) {
+	t.Parallel()
+
+	err := progress.Skip("nothing to push")
+	if err.Error() != "nothing to push" || !errors.Is(err, progress.ErrSkipped) {
+		t.Errorf("Skip = %q, errors.Is ErrSkipped %v; want %q, true", err, errors.Is(err, progress.ErrSkipped), "nothing to push")
+	}
+	if !errors.Is(fmt.Errorf("exe01: %w", err), progress.ErrSkipped) {
+		t.Error("a wrapped skip is not ErrSkipped")
+	}
+	if errors.Is(errUnreachable, progress.ErrSkipped) || errors.Is(err, errUnreachable) {
+		t.Error("an error other than a skip is ErrSkipped, or a skip is another error")
+	}
+}
+
 // The line that says a sink panicked names the program, when the Bus was
 // told its name, so that it is not read as a line of the work's.
 func TestThePanicLogNamesTheProgram(t *testing.T) {
