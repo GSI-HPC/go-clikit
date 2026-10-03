@@ -42,8 +42,8 @@ minor release (see Compatibility).
   `contract_test.go` holds the displays to their promises on a `Screen`.
 - `progress/progresstest/`: `progresstest.go`, `Capture`, `Check`,
   `Checked`, `Watch` and `Tree`; `screen.go`, `Screen`.
-- `fanout/`: `each.go`, `Each` and the package comment; `map.go`, `Map`,
-  `Failure` and `Skip`; `batches.go`; `recover.go`, `Recovered`.
+- `fanout/`: `each.go`, `Each` and the package comment; `map.go`, `Map`
+  and `Failure`; `batches.go`; `recover.go`, `Recovered`.
 - Every package has an `example_test.go`. Failing fuzz inputs go under the
   package's `testdata/fuzz/`.
 - `doc/`: `README.md` maps the documentation; `architecture.md` says how

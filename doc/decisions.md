@@ -20,6 +20,7 @@ edited: a later one supersedes it, and the earlier one's status names it.
 | [9](#9-the-region-comes-off-one-line-a-row) | The region comes off one line a row | accepted |
 | [10](#10-a-daily-audit-holds-the-releases-to-their-record) | A daily audit holds the releases to their record | accepted |
 | [11](#11-a-deadline-ends-a-pools-items-as-an-interrupt-does) | A deadline ends a pool's items as an interrupt does | accepted |
+| [13](#13-the-skip-error-lives-in-progress) | The skip error lives in progress | accepted |
 
 ## 1. Apache-2.0, and GSI holds the copyright
 
@@ -592,3 +593,49 @@ own time.
   which may be a timeout of its own, while its target ends canceled.
 - An item whose work fails for a reason of its own just as the context
   ends is counted as cut short, not as failed.
+
+## 13. The skip error lives in progress
+
+Status: accepted
+
+### Context
+
+`fanout.Skip` made the error of an item left out on purpose, and
+`fanout.IsSkipped` told it from a failure. Only `Map` knew the error, though:
+`Span.End` ended a span with it failed, so code that ended its own spans had
+to set the error and call `Span.Skip` as well, and a program's rule for
+classes could turn it into a failure. Commands passed the error on beyond
+`Map` too, in results of their own. `Batches` ended a batch whose run
+returned it failed, stopped the run, and ended the batches after it as not
+tried, "an earlier batch failed", although nothing had failed.
+`IsSkipped(err) bool` is the style of `os.IsNotExist`, which Go has moved
+away from for `errors.Is` and a sentinel.
+
+### Decision
+
+- `progress` holds the error: `ErrSkipped`, and `Skip(reason)`, an error
+  whose text is the reason and in which `errors.Is` finds `ErrSkipped`.
+- `Span.End` ends a span whose error is `ErrSkipped`, as `errors.Is` tells,
+  skipped, with no class and the error's text, before `Classify` or the
+  Bus's fallback is asked, so that no program's rule turns a skip into a
+  failure. `Span.Skip(reason)` is `End(Skip(reason))`.
+- `fanout.Skip` and `fanout.IsSkipped` are gone, without aliases; the pools
+  test `errors.Is(err, progress.ErrSkipped)`.
+- A batch whose run returns a skip ends skipped and does not stop
+  `Batches`, which ends its step ok when nothing else failed.
+- `fanout.ErrNotTried` stays a distinct error, no skip: a batch not tried
+  ends skipped on a display, but the error says that a failure left it
+  out, and a command that counts failures by `errors.Is(err,
+  progress.ErrSkipped)` still counts it.
+
+### Costs
+
+- `Span.End` behaves otherwise for an error that is `ErrSkipped`, which an
+  error opts into; one that wraps `ErrSkipped` by accident ends skipped.
+- An item whose skip is wrapped, `fmt.Errorf("exe01: %w", progress.Skip(r))`,
+  ends with the whole text as its Err, not the reason alone as before.
+- `Bus.Classify` and `progress.Classify` know nothing of skips; only `End`
+  tells them apart, so code that classes an error itself asks
+  `errors.Is` first.
+- Programs that called `fanout.Skip` or `fanout.IsSkipped` change, each
+  call mechanically.

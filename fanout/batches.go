@@ -43,29 +43,34 @@ type Batch struct {
 	Nodes *nodeset.NodeSet
 	// Started says whether the batch was run.
 	Started bool
-	// Err is what running the batch returned. For a batch that was not
-	// run it is the context's error when the context had ended by its
-	// turn, whether an earlier batch failed or not, and ErrNotTried when
-	// an earlier batch failed.
+	// Err is what running the batch returned, a skip included. For a
+	// batch that was not run it is the context's error when the context
+	// had ended by its turn, whether an earlier batch failed or not, and
+	// ErrNotTried when an earlier batch failed.
 	Err error
 }
 
 // ErrNotTried is the error of a batch left out because an earlier one
-// failed.
+// failed. The batch's span ends skipped, but the error is no skip:
+// errors.Is does not find progress.ErrSkipped in it, since it says that
+// work was left out because of a failure, not on purpose, and a command
+// that counts the work that failed counts it.
 var ErrNotTried = errors.New("not tried: an earlier batch failed")
 
 // Batches runs a set of nodes in batches, one after the other, and returns
 // every batch in order with how it ended. A batch is run by calling run,
 // which returns once the work for every node of the batch has returned;
 // the next is run once o.Pause has passed after that. A batch whose run
-// returns an error stops the run: the batches after it are not tried. An
-// interrupt stops it too, at the next pause or, without one, before the
-// next batch; the batch under way when it came is left to stop by itself,
-// as a pool does, and the first batch is always run, so that the work for
-// each of its nodes reports how the interrupt found it. The batches an
-// interrupt, or the end of ctx, leaves out are left out for that, even
-// after one that failed: the failure of a batch the interrupt cut short is
-// no reason of its own. Before and
+// returns an error stops the run: the batches after it are not tried. A
+// skip, an error that is progress.ErrSkipped as errors.Is tells, such as
+// one progress.Skip returns, is no failure, though: the batch ends skipped
+// and the run goes on. An interrupt stops the run too, at the next pause
+// or, without one, before the next batch; the batch under way when it
+// came is left to stop by itself, as a pool does, and the first batch is
+// always run, so that the work for each of its nodes reports how the
+// interrupt found it. The batches an interrupt, or the end of ctx, leaves
+// out are left out for that, even after one that failed: the failure of a
+// batch the interrupt cut short is no reason of its own. Before and
 // BeforePause are called on the calling goroutine, for the notes a command
 // prints.
 //
@@ -74,14 +79,15 @@ var ErrNotTried = errors.New("not tried: an earlier batch failed")
 // queued before the first is run. run is called with the context of its
 // batch's span, which is marked running first, and reports the work for
 // each node of the batch as a target under it, queued before the first
-// runs, as Map does; the batch ends with run's error. Each pause is a
-// wait, "stagger". A batch not tried ends skipped, and one the context
-// ended before ends canceled, whether it was interrupted or ran out of
-// time, and either counts as its Total, so that the step's count reaches
-// its own. The step ends with what ended the run: the error of the batch
-// that failed, or else the context's, or else the last batch's. It and a
-// wait the context ended keep the context's error as it is, so a deadline
-// ends them failed, as timeouts, and an interrupt canceled.
+// runs, as Map does; the batch ends with run's error, skipped for a skip.
+// Each pause is a wait, "stagger". A batch not tried ends skipped, and one
+// the context ended before ends canceled, whether it was interrupted or
+// ran out of time, and either counts as its Total, so that the step's
+// count reaches its own. The step ends with what ended the run: the error
+// of the batch that failed, or else the context's, or else nil, however
+// many batches skipped. It and a wait the context ended keep the
+// context's error as it is, so a deadline ends them failed, as timeouts,
+// and an interrupt canceled.
 func Batches(ctx context.Context, nodes *nodeset.NodeSet, o BatchOptions, run func(ctx context.Context, batch *nodeset.NodeSet) error) []Batch {
 	parts := 1
 	if n := nodes.Len(); o.Size > 0 && n > o.Size {
@@ -111,7 +117,7 @@ func Batches(ctx context.Context, nodes *nodeset.NodeSet, o BatchOptions, run fu
 	}
 
 	// err is what ended the run: the error of the batch that failed, or
-	// the context's, or that of the last batch.
+	// the context's, or nil.
 	var err error
 	for i, chunk := range chunks {
 		if i > 0 {
@@ -140,9 +146,12 @@ func Batches(ctx context.Context, nodes *nodeset.NodeSet, o BatchOptions, run fu
 			o.Before(i, len(chunks), chunk)
 		}
 		spans[i].Run()
-		err = run(ctxs[i], chunk)
-		out[i].Started, out[i].Err = true, err
-		spans[i].End(err)
+		ran := run(ctxs[i], chunk)
+		out[i].Started, out[i].Err = true, ran
+		spans[i].End(ran)
+		if !errors.Is(ran, progress.ErrSkipped) {
+			err = ran
+		}
 	}
 	step.End(err)
 	return out

@@ -97,18 +97,18 @@ func ExampleFailure() {
 	// true target
 }
 
-// Skip leaves an item out on purpose: its target ends skipped, and it is
-// not counted among those that failed.
-func ExampleSkip() {
+// A skip, an error of progress.Skip, leaves an item out on purpose: its
+// target ends skipped, and it is not counted among those that failed.
+func ExampleMap_skip() {
 	outcomes := fanout.Map(context.Background(), []string{"exe01", "exe02"}, fanout.MapOptions[string]{Step: "push"},
 		func(_ context.Context, node string) (struct{}, error) {
 			if node == "exe02" {
-				return struct{}{}, fanout.Skip("nothing to push")
+				return struct{}{}, progress.Skip("nothing to push")
 			}
 			return struct{}{}, nil
 		})
 	for _, o := range outcomes {
-		fmt.Println(o.Err, fanout.IsSkipped(o.Err))
+		fmt.Println(o.Err, errors.Is(o.Err, progress.ErrSkipped))
 	}
 	// Output:
 	// <nil> false

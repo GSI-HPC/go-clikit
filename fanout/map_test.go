@@ -287,16 +287,16 @@ func TestMapEndsAnItemLeftOutSkipped(t *testing.T) {
 		func(_ context.Context, node string) (struct{}, error) {
 			switch node {
 			case "exe2":
-				return struct{}{}, fanout.Skip("the node could not be reached")
+				return struct{}{}, progress.Skip("the node could not be reached")
 			case "exe3":
 				return struct{}{}, errors.New("exe3: command exited 1")
 			}
 			return struct{}{}, nil
 		})
-	if err := outcomes[1].Err; !fanout.IsSkipped(err) || err.Error() != "the node could not be reached" {
+	if err := outcomes[1].Err; !errors.Is(err, progress.ErrSkipped) || err.Error() != "the node could not be reached" {
 		t.Errorf("the outcome of exe2 is %+v, want it skipped with the reason", outcomes[1])
 	}
-	if fanout.IsSkipped(outcomes[2].Err) {
+	if errors.Is(outcomes[2].Err, progress.ErrSkipped) {
 		t.Errorf("the failure of exe3 reads as skipped: %v", outcomes[2].Err)
 	}
 	want := `step write /etc/munge/munge.key total=3 limit=2 [fold]: failed (target): 1 of 3 failed: exe3
@@ -472,8 +472,8 @@ func TestMapEndsAnItemRefusedAfterTheInterruptCanceled(t *testing.T) {
 	}
 }
 
-// An item Acquire leaves out on purpose, with an error of Skip, ends
-// skipped, as one its work leaves out does, and is no failure of the step.
+// An item Acquire leaves out on purpose, with a skip, ends skipped, as one
+// its work leaves out does, and is no failure of the step.
 func TestMapEndsAnItemAcquireSkippedSkipped(t *testing.T) {
 	t.Parallel()
 
@@ -482,12 +482,12 @@ func TestMapEndsAnItemAcquireSkippedSkipped(t *testing.T) {
 		Step: "check", Limit: 2,
 		Acquire: func(_ context.Context, node string) (func(), error) {
 			if node == "exe1" {
-				return nil, fanout.Skip("dry run")
+				return nil, progress.Skip("dry run")
 			}
 			return nil, nil
 		},
 	}, func(context.Context, string) (struct{}, error) { return struct{}{}, nil })
-	if o := outcomes[0]; o.Started || !fanout.IsSkipped(o.Err) {
+	if o := outcomes[0]; o.Started || !errors.Is(o.Err, progress.ErrSkipped) {
 		t.Errorf("exe1 = %+v, want it never started and skipped", o)
 	}
 	want := `step check total=2 limit=2 [fold]: ok
@@ -577,9 +577,9 @@ func TestMapTurnsAPanicInAReleaseIntoThatItemsFailure(t *testing.T) {
 	}
 }
 
-// A panic in the release fails the item whatever the work returned: an
-// error of Skip does not leave the item out, and an error of a context that
-// has ended does not end it canceled.
+// A panic in the release fails the item whatever the work returned: a skip
+// does not leave the item out, and an error of a context that has ended
+// does not end it canceled.
 func TestMapFailsAnItemWhoseReleasePanickedWhateverTheWorkReturned(t *testing.T) {
 	t.Parallel()
 
@@ -593,13 +593,13 @@ func TestMapFailsAnItemWhoseReleasePanickedWhateverTheWorkReturned(t *testing.T)
 		},
 	}, func(ctx context.Context, node string) (struct{}, error) {
 		if node == "exe1" {
-			return struct{}{}, fanout.Skip("dry run")
+			return struct{}{}, progress.Skip("dry run")
 		}
 		cancel()
 		return struct{}{}, ctx.Err()
 	})
 	var p *fanout.PanicError
-	if o := outcomes[0]; fanout.IsSkipped(o.Err) || !errors.As(o.Err, &p) || p.Value != "release exe1" {
+	if o := outcomes[0]; errors.Is(o.Err, progress.ErrSkipped) || !errors.As(o.Err, &p) || p.Value != "release exe1" {
 		t.Errorf("exe1 = %+v, want the panic of its release, not skipped", o)
 	}
 	if o := outcomes[1]; !errors.Is(o.Err, context.Canceled) || !errors.As(o.Err, &p) || p.Value != "release exe2" {

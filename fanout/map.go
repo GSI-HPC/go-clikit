@@ -65,10 +65,11 @@ type MapOptions[T any] struct {
 	// stays queued until it returns. An error it returns, or a panic in
 	// it, is the item's, whose work is then never started and whose
 	// release, if it returned one, is not called. The item's target ends
-	// then, before the place is given up: skipped for an error of Skip,
-	// which leaves the item out on purpose, as one fn returns does;
-	// canceled, with the context's error, when the context had ended by
-	// then and the error is not a panic; and with the error otherwise.
+	// then, before the place is given up: skipped for a skip, an error
+	// that is progress.ErrSkipped, which leaves the item out on purpose,
+	// as one fn returns does; canceled, with the context's error, when
+	// the context had ended by then and the error is not a panic; and
+	// with the error otherwise.
 	Acquire func(ctx context.Context, item T) (release func(), err error)
 }
 
@@ -81,8 +82,8 @@ type Outcome[R any] struct {
 	// Err is the error the work returned, which it keeps when the end of
 	// the context ends the item's target canceled, or the one a panic in
 	// it became; a panic in the release MapOptions.Acquire gave is joined to
-	// the error the work returned, or replaces it when that was nil or an
-	// error of Skip. When fn, MapOptions.Acquire or the release ended its
+	// the error the work returned, or replaces it when that was nil or a
+	// skip. When fn, MapOptions.Acquire or the release ended its
 	// goroutine with runtime.Goexit rather than return, as t.FailNow does,
 	// it is an error that says which of them did, joined to a panic in the
 	// release and to the error the work returned, as a panic in the
@@ -125,13 +126,15 @@ type Outcome[R any] struct {
 // The end of ctx ends an item canceled, not failed, whether ctx was
 // interrupted or ran out of time: one the pool left out, and one that
 // o.Acquire refused, or whose work returned an error, once ctx had ended,
-// with an error other than of Skip, since the end of ctx is what ended it.
+// with an error other than a skip, since the end of ctx is what ended it.
 // Its target ends with the context's error, and its outcome keeps the
 // error fn or o.Acquire returned. A panic or a call of runtime.Goexit is
 // a bug, though, and fails its item even once ctx has ended, and a panic
-// in the release fails it whatever fn returned, an error of Skip
-// included. An item fn left out on purpose, by returning an error of
-// Skip, ends skipped and is none of those that failed. An item waiting
+// in the release fails it whatever fn returned, a skip included. An item
+// fn left out on purpose, by returning a skip, an error that is
+// progress.ErrSkipped as errors.Is tells, such as one progress.Skip
+// returns, ends skipped, with the error's text as its Err, and is none of
+// those that failed. An item waiting
 // for o.Acquire is not yet running, and one it refused ends at once, as
 // MapOptions.Acquire says.
 func Map[T, R any](ctx context.Context, items []T, o MapOptions[T], fn func(ctx context.Context, item T) (R, error)) []Outcome[R] {
@@ -194,8 +197,8 @@ func Map[T, R any](ctx context.Context, items []T, o MapOptions[T], fn func(ctx 
 		}
 		err = e.err
 		out[i].Err = err
-		if reason, ok := skipReason(err); ok {
-			spans[i].Skip(reason)
+		if errors.Is(err, progress.ErrSkipped) {
+			spans[i].End(err)
 			return
 		}
 		if err != nil && !e.panicked && ctxs[i].Err() != nil {
@@ -215,7 +218,7 @@ func Map[T, R any](ctx context.Context, items []T, o MapOptions[T], fn func(ctx 
 			canceled[i] = true
 			spans[i].End(leftOut{out[i].Err})
 		}
-		if out[i].Err != nil && !IsSkipped(out[i].Err) {
+		if out[i].Err != nil && !errors.Is(out[i].Err, progress.ErrSkipped) {
 			failed, errs = append(failed, names[i]), append(errs, out[i].Err)
 			interrupted = interrupted && canceled[i]
 		}
@@ -232,12 +235,12 @@ func Map[T, R any](ctx context.Context, items []T, o MapOptions[T], fn func(ctx 
 
 // refused ends the target of an item o.Acquire refused with err, before
 // the item gives its place in the pool up, and reports whether it ended
-// canceled: skipped for an error of Skip, as one never started when ctx
+// canceled: skipped for a skip, as one never started when ctx
 // had ended by then, unless err is a panic in o.Acquire, as panicked says,
 // and with err otherwise.
 func (o MapOptions[T]) refused(ctx context.Context, span *progress.Span, err error, panicked bool) bool {
-	if reason, ok := skipReason(err); ok {
-		span.Skip(reason)
+	if errors.Is(err, progress.ErrSkipped) {
+		span.End(err)
 		return false
 	}
 	if cause := ctx.Err(); cause != nil && !panicked {
@@ -252,35 +255,6 @@ func (o MapOptions[T]) refused(ctx context.Context, span *progress.Span, err err
 func (o MapOptions[T]) endsCanceled(err error) bool {
 	return err != nil && progress.Classify(err, o.Classify) == progress.ClassCanceled
 }
-
-// Skip returns the error of work that leaves its item out on purpose:
-// returned by fn, Map ends the item's target skipped, with reason as what
-// it says, and does not count the item among those that failed. A command
-// can record it too, such as for the work it no longer tries on a node it
-// could not reach, so that IsSkipped tells that work from the work that
-// failed.
-func Skip(reason string) error { return &skipped{reason: reason} }
-
-// IsSkipped reports whether err says that an item was left out on purpose.
-func IsSkipped(err error) bool {
-	_, ok := skipReason(err)
-	return ok
-}
-
-// skipReason returns the reason of the error of Skip in err's chain, if
-// there is one.
-func skipReason(err error) (string, bool) {
-	var skip *skipped
-	if errors.As(err, &skip) {
-		return skip.reason, true
-	}
-	return "", false
-}
-
-// skipped is the error of an item left out on purpose.
-type skipped struct{ reason string }
-
-func (s *skipped) Error() string { return s.reason }
 
 // describe says what a display names an item by.
 func (o MapOptions[T]) describe(item T) (node, host, role string) {
@@ -361,12 +335,12 @@ func call[T, R any](ctx context.Context, log io.Writer, program, name string, it
 // failure is what an item comes to whose release broke with cause, a panic
 // or a call of runtime.Goexit, after fn returned err, or whose worker cause
 // ended before fn returned, when err is nil: as its outcome, cause joined to
-// err, or cause alone when err is nil or an error of Skip; and as what its
+// err, or cause alone when err is nil or a skip; and as what its
 // target ends with, an error with the text of the outcome but only cause in
 // its chain, so that the target is classed as cause is and not as err,
 // which may be the context's.
 func failure(err, cause error) (outcome, end error) {
-	if err == nil || IsSkipped(err) {
+	if err == nil || errors.Is(err, progress.ErrSkipped) {
 		return cause, cause
 	}
 	outcome = errors.Join(err, cause)
