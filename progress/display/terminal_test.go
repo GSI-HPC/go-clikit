@@ -13,8 +13,10 @@ import (
 	"testing/synctest"
 	"time"
 
+	"github.com/GSI-HPC/go-clikit/progress"
 	"github.com/GSI-HPC/go-clikit/progress/display"
 	"github.com/GSI-HPC/go-clikit/progress/progresstest"
+	"github.com/GSI-HPC/go-clikit/termtext"
 )
 
 // terminalFixture is a counter on a Screen, drawn from a clock two seconds
@@ -401,5 +403,56 @@ func TestALongLineInSmallWritesCostsLittle(t *testing.T) {
 	b := []byte("x")
 	if n := testing.AllocsPerRun(1000, func() { _, _ = diag.Write(b) }); n != 0 {
 		t.Errorf("a byte added to a line of 4 KiB allocates %v times, want 0", n)
+	}
+}
+
+// A terminal made narrower reflows a row of the region drawn wider than it
+// now is onto more than one line; the region is taken off whole all the
+// same, every line of every row.
+func TestTheRegionComesOffWholeAfterTheTerminalNarrows(t *testing.T) {
+	t.Parallel()
+	var mu sync.Mutex
+	width := 120
+	setWidth := func(w int) {
+		mu.Lock()
+		defer mu.Unlock()
+		width = w
+	}
+	var out strings.Builder
+	term := display.NewTerminal(&out, func() (int, int, error) {
+		mu.Lock()
+		defer mu.Unlock()
+		return width, 24, nil
+	})
+	c := &clock{now: time.Date(2026, 9, 26, 12, 0, 0, 0, time.UTC)}
+	counter := display.NewCounter(term, display.CounterOptions{Now: c.Now})
+	defer counter.Close()
+	counter.Handle(progress.Event{Type: progress.TypeStart, Kind: progress.KindCommand, Span: 1, Name: strings.Repeat("s", 100)})
+	c.Add(2 * time.Second)
+	counter.Draw()
+	row := strings.TrimPrefix(out.String(), "\r\x1b[2K")
+	if w := termtext.Width(row); w <= 80 || w >= 120 {
+		t.Fatalf("the row drawn, %q, is %d columns wide, want between 80 and 120", row, w)
+	}
+	lines := (termtext.Width(row) + 39) / 40
+	want := "\r\x1b[2K" + strings.Repeat("\x1b[1A\x1b[2K", lines-1)
+
+	setWidth(40)
+	out.Reset()
+	_, _ = io.WriteString(term.Writer(io.Discard), "output\n")
+	if got := out.String(); got != want {
+		t.Errorf("the region is taken off with %q, want %q", got, want)
+	}
+
+	// A frame drawn over the region takes it off the same way.
+	setWidth(120)
+	c.Add(time.Second)
+	counter.Draw()
+	setWidth(40)
+	out.Reset()
+	c.Add(time.Second)
+	counter.Draw()
+	if got := out.String(); !strings.HasPrefix(got, want) || strings.Count(got, "\x1b[1A") != lines-1 {
+		t.Errorf("the next frame is drawn with %q, want it to begin %q", got, want)
 	}
 }
