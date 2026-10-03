@@ -137,8 +137,8 @@ keeps it without a line of the caller's.
   work, or in what it acquired and released for it, into that item's
   error, since `recover` reaches only its own goroutine; `Each` and
   `Batches` recover nothing, and a panic in a batch goes up the goroutine
-  that called `Batches`. Work, an acquire or a release that calls `runtime.Goexit`, as
-  `t.FailNow` does, fails its item with an error that says which of them
+  that called `Batches`. Work, an acquire or a release that calls
+  `runtime.Goexit`, as `t.FailNow` does, fails its item with an error that says which of them
   did, rather than pass for done, and loses nothing else that broke the
   item. The end of the context, an interrupt or a deadline alike, ends the
   items it left out, and those whose acquire or work then gave up with an
@@ -177,11 +177,13 @@ The kit knows no program. What depends on one is a parameter or a hook:
 
 A Bus hands on what it was told: `Bus.Program`, `Bus.PanicLog` and
 `Bus.Classify` answer for the Bus that `progress.BusFrom` finds in a
-context, and for a nil Bus with the defaults, so that a library that runs
-work of its own names the program, writes its panics and classes its errors
-as the Bus does. `fanout.Map` takes them so: its own `Program`, `PanicLog`
-and `Classify` override the Bus's, and without a Bus or an option of its
-own it falls back to "the program", standard error and `ClassTarget`. The
+context, so that a library that runs work of its own names the program,
+writes its panics and classes its errors as the Bus does. A nil Bus
+answers "", nil and `progress.Classify` without a fallback; the defaults
+are the caller's. `fanout.Map` takes them so: its own `Program`,
+`PanicLog` and `Classify` override the Bus's, and without a Bus or an
+option of its own it falls back to "the program", standard error and
+`ClassTarget`. The
 rule that tells an item canceled is the one that classes its target, so
 the step and its targets agree (decision 12).
 
