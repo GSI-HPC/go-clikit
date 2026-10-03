@@ -12,11 +12,11 @@ follow.
 
 ## How the kit came to be
 
-The packages were written for [clusterctl](https://github.com/GSI-HPC/clusterctl),
-a command-line tool that administers HPC clusters and works on hundreds of
-hosts at a time, to show how far such a command has got. They were written
-in its `internal/` tree, where clusterctl's records of the decisions behind
-them still are:
+The packages were written for
+[clusterctl](https://github.com/GSI-HPC/clusterctl), a command-line tool
+that administers HPC clusters and works on hundreds of hosts at a time, to
+show how far such a command has got. They were written in its `internal/`
+tree, where clusterctl's records of the decisions behind them still are:
 [ADR 0021](https://github.com/GSI-HPC/clusterctl/blob/v0.4.0/doc/adr/0021-progress-as-our-own-events.md)
 on reporting progress as events of its own, and
 [ADR 0022](https://github.com/GSI-HPC/clusterctl/blob/v0.4.0/doc/adr/0022-bounded-pools-and-power-batches.md)
@@ -123,15 +123,17 @@ keeps it without a line of the caller's.
   item. The end of the context, an interrupt or a deadline alike, ends the
   items it left out, and those whose acquire or work then gave up with an
   error other than a skip, canceled, with the context's error, while each
-  outcome keeps the error it was given, so only the context tells an
-  interrupt from a deadline. A panic or a call of `runtime.Goexit` is a
-  bug, and fails its item even once the context has ended. An item its acquire
-  refused ends at once, before it gives its place up, as every target
-  does. What an item acquired is released before its target ends, so that
-  a panic in the release is the target's failure; the next item can so
-  take it and run before that target has ended. `Batches` runs one batch
-  after the other, with a pause between them, and stops after one that
-  failed.
+  outcome keeps the error it was given. Both end in the same class, so the
+  class does not tell an interrupt from a deadline; the error text in the
+  event log does, `context canceled` or `context deadline exceeded`, as
+  does the error of an item the pool left out, and the context itself. A
+  panic or a call of `runtime.Goexit` is a bug, and fails its item even
+  once the context has ended. An item its acquire refused ends at once,
+  before it gives its place up, as every target does. What an item
+  acquired is released before its target ends, so that a panic in the
+  release is the target's failure; the next item can so take it and run
+  before that target has ended. `Batches` runs one batch after the other,
+  with a pause between them, and stops after one that failed.
 
 ## What a program fills in
 
