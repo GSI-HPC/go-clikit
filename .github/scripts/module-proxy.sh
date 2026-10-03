@@ -18,7 +18,10 @@
 # refused. The proxy leaves Origin out for a version it fetched long ago:
 # such a version is unverified, which is a warning, unless the time of the
 # commit in the .info is not that of <commit>, which git reads from the
-# checkout. Reads:
+# checkout. That time is the committer date, which whoever makes a commit
+# chooses: it refuses a tag moved to another commit of the history, but a
+# commit made with the same date passes it, so it is a consistency check,
+# and the signature of the tag is what holds it to a commit. Reads:
 #
 #   GO_MOD        the go.mod naming the module; go.mod if not set
 #   MODULE_PROXY  the module proxy; https://proxy.golang.org if not set
@@ -85,6 +88,8 @@ case "${1:-}" in
       # long ago, and that version cannot be held to a commit. The time of
       # the commit it was fetched from is still there, as the go command
       # writes it, and refuses a tag that names a commit of another time.
+      # The committer chooses that time, so a commit made to match it
+      # passes: the warning says the version is unverified, not verified.
       time="$(jq -r '.Time? // empty | strings' "$body")"
       committed="$(TZ=UTC git show -s --format=%cd --date=format-local:%Y-%m-%dT%H:%M:%SZ \
         "$commit^{commit}" 2> /dev/null)" ||

@@ -64,8 +64,11 @@ publishes. The proxy leaves `Origin` out of the `.info` of a version it
 fetched long ago, so that version cannot be held to a commit: the audit and
 the publishing job report it as unverified, a warning, and pass, unless the
 `Time` in the `.info`, the time of the commit the proxy fetched, is not that
-of the commit the tag names, which fails. The tag of an unverified version
-is still verified like any other. A failed run of the job *Verify every
+of the commit the tag names, which fails. That time is the committer date,
+which whoever makes a commit chooses, so it catches a tag moved to another
+commit of the history but not a commit made to match it: it is a
+consistency check, not a proof. The tag of an unverified version is still
+verified like any other, and its signature is what holds it to a commit. A failed run of the job *Verify every
 release tag is signed* is the alarm: its log names the tag or the version.
 Investigate it as a compromise, and withdraw the version as below, which
 clears the alarm for what the withdrawal answers. GitHub disables scheduled
