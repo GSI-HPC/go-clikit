@@ -10,6 +10,8 @@ import (
 	"os"
 	"runtime/debug"
 	"sync"
+
+	"github.com/GSI-HPC/go-clikit/progress"
 )
 
 // panicLogMu keeps the stacks of panics in workers running side by side
@@ -21,7 +23,8 @@ var panicLogMu sync.Mutex
 // process's standard error when log is nil. It is called as
 // Recovered(log, program, name, recover()) in a function deferred by the
 // goroutine doing the work, and returns a *PanicError, or nil when nothing
-// panicked. program
+// panicked. The target is named by text from elsewhere, so the line shows
+// it through progress.Sanitize, its control characters as escapes. program
 // names the program, in front of the line in the log, as "prog: ",
 // and in the error, which asks for the bug to be reported; empty leaves the
 // name out of the line and calls it "the program" in the error.
@@ -43,7 +46,7 @@ func Recovered(log io.Writer, program, target string, v any) error {
 	panicked := fmt.Sprint(v)
 	panicLogMu.Lock()
 	// The log is a courtesy; a write that fails changes nothing.
-	_, _ = fmt.Fprintf(log, "%spanic while working on %s: %q\n%s", prefix, target, panicked, debug.Stack())
+	_, _ = fmt.Fprintf(log, "%spanic while working on %s: %q\n%s", prefix, progress.Sanitize(target, 0), panicked, debug.Stack())
 	panicLogMu.Unlock()
 	return &PanicError{Program: program, Value: panicked}
 }

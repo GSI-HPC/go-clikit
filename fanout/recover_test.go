@@ -35,3 +35,17 @@ func TestRecoveredWritesToStandardErrorWithoutALog(t *testing.T) {
 		t.Error("Recovered returned an error when nothing panicked")
 	}
 }
+
+// A target is named by text from elsewhere, so the line that names it shows
+// its control characters as escapes rather than writing them to the
+// terminal.
+func TestRecoveredEscapesTheTarget(t *testing.T) {
+	t.Parallel()
+
+	var log strings.Builder
+	_ = fanout.Recovered(&log, "prog", "evil\x1b]0;pwned\x07\x1b[2J\nnext", "boom")
+	line, _, _ := strings.Cut(log.String(), "\n")
+	if want := `prog: panic while working on evil\x1b]0;pwned\x07\x1b[2J\nnext: "boom"`; line != want {
+		t.Errorf("the log's first line reads %q, want %q", line, want)
+	}
+}
