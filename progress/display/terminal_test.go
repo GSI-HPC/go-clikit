@@ -598,3 +598,37 @@ func TestTheRegionComesOffByItsRowsAfterTheTerminalNarrows(t *testing.T) {
 		t.Errorf("the next frame is drawn with %q, want it to begin %q and move up no line", got, want)
 	}
 }
+
+// A Terminal carries one display: making a second on it panics, whichever
+// displays the two are, and so does making one after the first has been
+// closed.
+func TestATerminalCarriesOneDisplay(t *testing.T) {
+	t.Parallel()
+	type closer interface{ Close() }
+	makers := map[string]func(*display.Terminal) closer{
+		"tree":    func(term *display.Terminal) closer { return display.NewTree(term, display.TreeOptions{}) },
+		"counter": func(term *display.Terminal) closer { return display.NewCounter(term, display.CounterOptions{}) },
+		"plain":   func(term *display.Terminal) closer { return display.NewPlain(term, display.PlainOptions{}) },
+	}
+	for first, makeFirst := range makers {
+		for second, makeSecond := range makers {
+			for _, closed := range []bool{false, true} {
+				t.Run(fmt.Sprintf("%s then %s, closed %t", first, second, closed), func(t *testing.T) {
+					t.Parallel()
+					term := display.NewTerminal(io.Discard, display.TerminalOptions{})
+					d := makeFirst(term)
+					defer d.Close()
+					if closed {
+						d.Close()
+					}
+					defer func() {
+						if recover() == nil {
+							t.Errorf("a second display was made on the Terminal")
+						}
+					}()
+					makeSecond(term)
+				})
+			}
+		}
+	}
+}
