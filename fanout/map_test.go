@@ -654,8 +654,8 @@ func TestMapFailsAnItemThatPanickedAfterTheContextEnded(t *testing.T) {
 }
 
 // Work that ends its goroutine with runtime.Goexit, as t.FailNow does,
-// never returns: the item failed, whichever of the work, Acquire or the
-// release did it, and the release is still called.
+// never returns: the item failed, with an error that names which of the
+// work, Acquire or the release did it, and the release is still called.
 func TestMapFailsAnItemWhoseWorkCalledGoexit(t *testing.T) {
 	t.Parallel()
 
@@ -690,8 +690,51 @@ func TestMapFailsAnItemWhoseWorkCalledGoexit(t *testing.T) {
 		t.Errorf("%d releases were called, want 2", got)
 	}
 	want := `step check total=4 limit=1 [fold]: failed (target): 3 of 4 failed: exe[1-3]
+  target exe1: failed (target): the work called runtime.Goexit instead of returning
+  target exe2: failed (target): acquiring what the work needs called runtime.Goexit instead of returning
+  target exe3: failed (target): releasing what the work needed called runtime.Goexit instead of returning
   target exe4: ok
-  target exe[1-3]: failed (target): the work called runtime.Goexit instead of returning
+`
+	if got := tree(); got != want {
+		t.Errorf("tree:\n%s\nwant:\n%s", got, want)
+	}
+}
+
+// A call of runtime.Goexit loses nothing else that broke the item: a panic
+// in the release after the work called it, and the error the work returned
+// before the release called it, are in the outcome and on the target, which
+// is classed as the call is, not as the context's end.
+func TestMapKeepsWhatBrokeAnItemBesidesAGoexit(t *testing.T) {
+	t.Parallel()
+
+	cause, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	ctx, tree := progresstest.Watch(cause, t)
+	outcomes := fanout.Map(ctx, nodes(2), fanout.Options[string]{
+		Step: "check", Limit: 1, PanicLog: io.Discard,
+		Acquire: func(_ context.Context, node string) (func(), error) {
+			if node == "exe1" {
+				return func() { panic("release " + node) }, nil
+			}
+			return runtime.Goexit, nil
+		},
+	}, func(ctx context.Context, node string) (string, error) {
+		if node == "exe1" {
+			runtime.Goexit()
+		}
+		cancel()
+		return node, ctx.Err()
+	})
+	var p *fanout.PanicError
+	if o := outcomes[0]; !strings.Contains(fmt.Sprint(o.Err), "the work called runtime.Goexit") || !errors.As(o.Err, &p) || p.Value != "release exe1" {
+		t.Errorf("exe1 = %+v, want its call of runtime.Goexit and the panic of its release", o)
+	}
+	if o := outcomes[1]; o.Value != "exe2" || !errors.Is(o.Err, context.Canceled) || !strings.Contains(fmt.Sprint(o.Err), "releasing what the work needed called runtime.Goexit") {
+		t.Errorf("exe2 = %+v, want its value, the context's error and the call of runtime.Goexit in its release", o)
+	}
+	want := `step check total=2 limit=1 [fold]: failed (target): 2 of 2 failed: exe[1-2]
+  target exe1: failed (target): the work called runtime.Goexit instead of returning\nthe program panicked; this is a bug, please report it: "release {}"
+  target exe2: failed (target): context canceled\nreleasing what the work needed called runtime.Goexit instead of returning
 `
 	if got := tree(); got != want {
 		t.Errorf("tree:\n%s\nwant:\n%s", got, want)
