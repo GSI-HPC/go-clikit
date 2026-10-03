@@ -58,7 +58,8 @@ func logged(t *testing.T, o progress.Options, work func(ctx context.Context)) (s
 var update = flag.Bool("update", false, "rewrite testdata/log-v1.jsonl with what the log writes")
 
 // logFixture is what version 1 of the event log is, line for line: a run
-// that says every value of every key, which a reader of version 1 may
+// that has every key and every value of a key whose values are a set of
+// the kit's, and an example of the others, which a reader of version 1 may
 // count on. A change to it is a change to the log's format, which keeps
 // its version only when no key and no value means anything else.
 const logFixture = "testdata/log-v1.jsonl"
@@ -139,6 +140,18 @@ func TestTheEventLogWritesEveryEventOnALineOfItsOwn(t *testing.T) {
 		waitCtx, wait := progress.Start(ctx, progress.KindWait, "confirm", progress.Message("reset 2 hosts"))
 		progress.Suspend(waitCtx)()
 		wait.Skip("dry run: nothing was done")
+
+		// Lookups answered from each place a cache can answer from.
+		for _, cache := range []string{"hit", "miss", "memory", "disk"} {
+			_, lookup := progress.Start(ctx, progress.KindCall, "inventory", progress.WithFlags(progress.Hidden))
+			lookup.End(nil, progress.Cache(cache))
+		}
+		// A burst of output longer than the lines a display is sent at
+		// once: the line before the last is left out, and the last is sent
+		// as the call ends, saying so.
+		solCtx, sol := progress.Start(ctx, progress.KindCall, "sol", progress.WithFlags(progress.ShowLines))
+		_, _ = io.WriteString(progress.Tee(solCtx, io.Discard, progress.Stdout, nil), strings.Repeat("the secret console\n", 22))
+		sol.End(nil)
 		cmd.End(nil)
 	})
 
@@ -166,7 +179,8 @@ func TestTheEventLogWritesEveryEventOnALineOfItsOwn(t *testing.T) {
 // in the log, and the fixture says each of them, so that a reader of
 // version 1 knows them all: a value added without a name, or not in the
 // fixture, fails this test. The values are counted in the source, so that
-// none is missed here.
+// none is missed here. Every key an event is logged with is on a line of
+// the fixture too, and so is every value of Cache.
 func TestEveryValueHasANameInTheLog(t *testing.T) {
 	t.Parallel()
 
@@ -227,6 +241,35 @@ func TestEveryValueHasANameInTheLog(t *testing.T) {
 			}
 		}
 	}
+
+	// Cache is a string, but one of a set that the log's reference lists.
+	for _, name := range []string{"hit", "miss", "memory", "disk"} {
+		if !said("cache", name) {
+			t.Errorf("%s has no line whose %q is %q", logFixture, "cache", name)
+		}
+	}
+	// And every key an event may have is on a line of the fixture.
+	for member, key := range loggedAs {
+		if key == "" {
+			continue
+		}
+		if !slices.ContainsFunc(lines, func(line map[string]any) bool { _, ok := line[key]; return ok }) {
+			t.Errorf("%s has no line with %q, which Event.%s is logged as", logFixture, key, member)
+		}
+	}
+}
+
+// loggedAs is the key each member of Event is logged under, "" for never.
+var loggedAs = map[string]string{
+	"Seq": "seq", "Time": "time", "Type": "type", "Span": "span", "Parent": "parent",
+	"Kind": "kind", "Name": "name", "Flags": "flags", "State": "state",
+	"Node": "node", "Host": "host", "Role": "role", "Total": "total", "Limit": "limit",
+	"Batch": "batch", "Message": "message", "Method": "method", "Path": "path",
+	"HTTPStatus": "httpStatus", "Cache": "cache", "Source": "source", "Timeout": "timeout",
+	"Exit": "exit", "Status": "status", "Class": "class", "Err": "err",
+	"Stream": "stream", "Dropped": "dropped",
+	// The text of a line of output never leaves the process.
+	"Text": "",
 }
 
 // declaredConstants counts the constants of each named type file declares,
@@ -298,19 +341,7 @@ func TestTheEventLogSaysWhereItsTraceCameFrom(t *testing.T) {
 func TestEveryPartOfAnEventIsLoggedOrLeftOutOnPurpose(t *testing.T) {
 	t.Parallel()
 
-	// The key each member of Event is logged under, "" for never.
-	decided := map[string]string{
-		"Seq": "seq", "Time": "time", "Type": "type", "Span": "span", "Parent": "parent",
-		"Kind": "kind", "Name": "name", "Flags": "flags", "State": "state",
-		"Node": "node", "Host": "host", "Role": "role", "Total": "total", "Limit": "limit",
-		"Batch": "batch", "Message": "message", "Method": "method", "Path": "path",
-		"HTTPStatus": "httpStatus", "Cache": "cache", "Source": "source", "Timeout": "timeout",
-		"Exit": "exit", "Status": "status", "Class": "class", "Err": "err",
-		"Stream": "stream", "Dropped": "dropped",
-		// The text of a line of output never leaves the process.
-		"Text": "",
-	}
-
+	decided := loggedAs
 	var e progress.Event
 	var members []string
 	fill(t, reflect.ValueOf(&e).Elem(), &members)

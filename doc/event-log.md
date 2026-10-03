@@ -120,13 +120,17 @@ most, and returns the error that stopped the log short, if one did.
 
 ## The golden log
 
-`progress/testdata/log-v1.jsonl` is a run that says every value of every key
-this document lists, but `program`, which came after it and which a test of
-its own checks on the first line. The span ids, which each Bus draws at
-random, are written as `#1`, `#2` and so on in the order they first appear. The test
-that writes it compares what the log writes with it, line for line, and
-fails on any difference; another test sets every part of an `Event` and fails
-when one is neither logged nor left out on purpose, and a third fails when a
-value has no name in the log. `go test ./progress -run TestTheEventLog
+`progress/testdata/log-v1.jsonl` is a run that has every key this document
+lists, but `program`, which came after it and which a test of its own checks
+on the first line, and every value this document lists for a key: each
+`type`, `kind`, `flags`, `state`, `status`, `class`, `stream` and `cache`.
+Of the keys whose values are the program's to choose, text such as `name`
+and `err` and the kind of source a `source` names, it has an example each.
+The span ids, which each Bus draws at random, are written as `#1`, `#2` and
+so on in the order they first appear. The test that writes it compares what
+the log writes with it, line for line, and fails on any difference; another
+test sets every part of an `Event` and fails when one is neither logged nor
+left out on purpose, and a third fails when a value has no name in the log,
+or when a key or a listed value is on no line of the file. `go test ./progress -run TestTheEventLog
 -update` rewrites the file, and the difference is then a change to the
 format, reviewed as one: it keeps version 1 only when it adds.
