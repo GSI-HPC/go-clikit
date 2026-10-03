@@ -14,9 +14,16 @@ import (
 // character whose East Asian Width is wide or fullwidth, as CJK, kana,
 // Hangul and the emoji drawn as pictures are; none for a mark that
 // combines with the character before it or a character that only formats,
-// such as a zero-width joiner; and one for everything else.
+// such as a zero-width joiner; and one for everything else. The soft hyphen
+// U+00AD and the prepended concatenation marks, such as U+0600, format but
+// are drawn, and take one column.
 func RuneWidth(r rune) int {
-	if r == 0 || unicode.In(r, unicode.Mn, unicode.Me, unicode.Cf) {
+	switch {
+	case r == 0:
+		return 0
+	case r == 0x00ad, unicode.Is(prependedConcatenationMarks, r):
+		return 1
+	case unicode.In(r, unicode.Mn, unicode.Me, unicode.Cf):
 		return 0
 	}
 	switch width.LookupRune(r).Kind() {
@@ -62,4 +69,21 @@ func Truncate(s string, cols int) string {
 		cols -= w
 	}
 	return b.String()
+}
+
+// prependedConcatenationMarks are the format characters with the Unicode
+// property Prepended_Concatenation_Mark, which a terminal draws, such as the
+// Arabic number sign U+0600.
+var prependedConcatenationMarks = &unicode.RangeTable{
+	R16: []unicode.Range16{
+		{Lo: 0x0600, Hi: 0x0605, Stride: 1},
+		{Lo: 0x06dd, Hi: 0x06dd, Stride: 1},
+		{Lo: 0x070f, Hi: 0x070f, Stride: 1},
+		{Lo: 0x0890, Hi: 0x0891, Stride: 1},
+		{Lo: 0x08e2, Hi: 0x08e2, Stride: 1},
+	},
+	R32: []unicode.Range32{
+		{Lo: 0x110bd, Hi: 0x110bd, Stride: 1},
+		{Lo: 0x110cd, Hi: 0x110cd, Stride: 1},
+	},
 }
