@@ -205,5 +205,8 @@ escaped with `termtext.Escape`, or `EscapeLines` where its lines are kept,
 before it reaches a terminal, and there is no other escaper: a program that
 escapes everything with it has one place to fix when a character turns out
 to need escaping too. Decision 7 calls the two by their earlier names,
-`EscapeCell` and `EscapeText`. Decision 8 names `RuneWidth`, the width of
-one rune, which is no longer exported: `Width(string(r))` gives it.
+`EscapeCell` and `EscapeText`. The forms of the escapes are stable, but the
+runes escaped may grow in a minor release (decision 14). `termtext.Width`
+counts the columns of text that is already escaped. Decision 8 names
+`RuneWidth`, the width of one rune, which is no longer exported:
+`Width(string(r))` gives it.
