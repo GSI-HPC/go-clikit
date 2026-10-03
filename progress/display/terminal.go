@@ -36,6 +36,7 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/GSI-HPC/go-clikit/termtext"
 )
@@ -152,6 +153,60 @@ func (t *Terminal) recovered() {
 	// It is a line from beside the command, which may be asking a
 	// question, so it waits until the question has been answered.
 	_, _ = fmt.Fprintf(t.Lines(log), "%sthe progress display stopped: %v\n%s", prefix, p, debug.Stack())
+}
+
+// ticker is the goroutine a display draws from, from its Start to its
+// Close. Its lock keeps Start and Close apart: a display starts once at
+// most, and never once it has been closed.
+type ticker struct {
+	mu              sync.Mutex
+	started, closed bool
+	stop, stopped   chan struct{}
+}
+
+// start draws every so often, until close, from a goroutine of its own,
+// and flushes term each time wake receives; a nil wake never does. It does
+// nothing if the ticker was started or closed before.
+func (k *ticker) start(term *Terminal, every time.Duration, draw func(), wake <-chan struct{}) {
+	k.mu.Lock()
+	defer k.mu.Unlock()
+	if k.started || k.closed {
+		return
+	}
+	k.started = true
+	k.stop, k.stopped = make(chan struct{}), make(chan struct{})
+	go func() {
+		defer close(k.stopped)
+		defer term.recovered()
+		tick := time.NewTicker(every)
+		defer tick.Stop()
+		for {
+			select {
+			case <-k.stop:
+				return
+			case <-wake:
+				term.flush()
+			case <-tick.C:
+				draw()
+			}
+		}
+	}()
+}
+
+// close stops the drawing, once it has stopped takes the display off term
+// for good, and does nothing the second time.
+func (k *ticker) close(term *Terminal) {
+	k.mu.Lock()
+	defer k.mu.Unlock()
+	if k.closed {
+		return
+	}
+	k.closed = true
+	if k.started {
+		close(k.stop)
+		<-k.stopped
+	}
+	term.close()
 }
 
 // Writer returns a writer to w, a stream that shows on the terminal, such as

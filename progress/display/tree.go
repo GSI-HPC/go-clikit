@@ -124,8 +124,7 @@ type Tree struct {
 	// a newline.
 	lines strings.Builder
 
-	stop, stopped chan struct{}
-	closing       sync.Once
+	ticker ticker
 }
 
 // TreeOptions configure a Tree.
@@ -188,24 +187,8 @@ func NewTree(term *Terminal, o TreeOptions) *Tree {
 }
 
 // Start draws the tree every 100ms, from a second after it was made, until
-// Close.
-func (t *Tree) Start() {
-	t.stop, t.stopped = make(chan struct{}), make(chan struct{})
-	go func() {
-		defer close(t.stopped)
-		defer t.term.recovered()
-		tick := time.NewTicker(treeEvery)
-		defer tick.Stop()
-		for {
-			select {
-			case <-t.stop:
-				return
-			case <-tick.C:
-				t.Draw()
-			}
-		}
-	}()
-}
+// Close. Start does nothing if the Tree was already started or closed.
+func (t *Tree) Start() { t.ticker.start(t.term, treeEvery, t.Draw, nil) }
 
 // Draw draws a frame as the work stands now, with the lines of the steps
 // that finished above it, unless the command has run for less than a
@@ -235,15 +218,7 @@ func (t *Tree) Draw() {
 // Close stops the drawing, takes the region off the terminal and writes
 // the lines not yet written, if the tree was ever drawn. Closing a closed
 // Tree does nothing.
-func (t *Tree) Close() {
-	t.closing.Do(func() {
-		if t.stop != nil {
-			close(t.stop)
-			<-t.stopped
-		}
-		t.term.close()
-	})
-}
+func (t *Tree) Close() { t.ticker.close(t.term) }
 
 // Suspend takes the region off the terminal, once the lines not yet
 // written are, until Resume.

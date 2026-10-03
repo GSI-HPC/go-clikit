@@ -1141,3 +1141,15 @@ exec · 0:01
     ✗ exe1  failed
 `)
 }
+
+// A second Start, and a Start after Close, do nothing.
+func TestTheTreeStartsOnce(t *testing.T) {
+	t.Parallel()
+	startsOnce(t, 100*time.Millisecond, func(now func() time.Time) interface {
+		Start()
+		Close()
+	} {
+		term := display.NewTerminal(&screen{}, display.TerminalOptions{Size: func() (int, int, error) { return 100, 24, nil }})
+		return display.NewTree(term, display.TreeOptions{Now: now})
+	})
+}
