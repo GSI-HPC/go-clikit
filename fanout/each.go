@@ -13,7 +13,7 @@
 // when the context left them out, so that a display's count reaches its
 // total however the work ends. A panic in the work for one item becomes
 // that item's error. The package knows no program: its name, the rule
-// that tells an error's class and the error a step ends with are Options.
+// that tells an error's class and the error a step ends with are MapOptions.
 package fanout
 
 import (

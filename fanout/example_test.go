@@ -26,7 +26,7 @@ func ExampleMap() {
 	ctx := progress.WithBus(context.Background(), bus)
 
 	nodes := []string{"exe01", "exe02", "exe03", "exe04"}
-	outcomes := fanout.Map(ctx, nodes, fanout.Options[string]{Step: "uptime", Limit: 2},
+	outcomes := fanout.Map(ctx, nodes, fanout.MapOptions[string]{Step: "uptime", Limit: 2},
 		func(_ context.Context, node string) (string, error) {
 			if node == "exe03" {
 				return "", fmt.Errorf("%s: no answer", node)
@@ -100,7 +100,7 @@ func ExampleFailure() {
 // Skip leaves an item out on purpose: its target ends skipped, and it is
 // not counted among those that failed.
 func ExampleSkip() {
-	outcomes := fanout.Map(context.Background(), []string{"exe01", "exe02"}, fanout.Options[string]{Step: "push"},
+	outcomes := fanout.Map(context.Background(), []string{"exe01", "exe02"}, fanout.MapOptions[string]{Step: "push"},
 		func(_ context.Context, node string) (struct{}, error) {
 			if node == "exe02" {
 				return struct{}{}, fanout.Skip("nothing to push")

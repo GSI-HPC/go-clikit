@@ -14,8 +14,8 @@ import (
 	"github.com/GSI-HPC/go-nodeset"
 )
 
-// Options say how Map works on its items and how it reports them.
-type Options[T any] struct {
+// MapOptions say how Map works on its items and how it reports them.
+type MapOptions[T any] struct {
 	// Step names the step a display shows the items under, such as
 	// "copy" or "reset the machines".
 	Step string
@@ -79,20 +79,20 @@ type Outcome[R any] struct {
 	Value R
 	// Err is the error the work returned, which it keeps when the end of
 	// the context ends the item's target canceled, or the one a panic in
-	// it became; a panic in the release Options.Acquire gave is joined to
+	// it became; a panic in the release MapOptions.Acquire gave is joined to
 	// the error the work returned, or replaces it when that was nil or an
-	// error of Skip. When fn, Options.Acquire or the release ended its
+	// error of Skip. When fn, MapOptions.Acquire or the release ended its
 	// goroutine with runtime.Goexit rather than return, as t.FailNow does,
 	// it is an error that says which of them did, joined to a panic in the
 	// release and to the error the work returned, as a panic in the
 	// release is. For an item that was never started it is the error
-	// Options.Acquire refused it with, or the one a panic in it became,
+	// MapOptions.Acquire refused it with, or the one a panic in it became,
 	// even once the context had ended, or, when the pool left the item
 	// out, the context's.
 	Err error
 	// Started says whether the work for the item was started, which it
 	// is not when the pool left the item out once the context had ended,
-	// nor when Options.Acquire refused it, panicked or called
+	// nor when MapOptions.Acquire refused it, panicked or called
 	// runtime.Goexit.
 	Started bool
 }
@@ -132,8 +132,8 @@ type Outcome[R any] struct {
 // included. An item fn left out on purpose, by returning an error of
 // Skip, ends skipped and is none of those that failed. An item waiting
 // for o.Acquire is not yet running, and one it refused ends at once, as
-// Options.Acquire says.
-func Map[T, R any](ctx context.Context, items []T, o Options[T], fn func(ctx context.Context, item T) (R, error)) []Outcome[R] {
+// MapOptions.Acquire says.
+func Map[T, R any](ctx context.Context, items []T, o MapOptions[T], fn func(ctx context.Context, item T) (R, error)) []Outcome[R] {
 	limit := o.Limit
 	if limit < 1 {
 		limit = DefaultMax
@@ -234,7 +234,7 @@ func Map[T, R any](ctx context.Context, items []T, o Options[T], fn func(ctx con
 // canceled: skipped for an error of Skip, as one never started when ctx
 // had ended by then, unless err is a panic in o.Acquire, as panicked says,
 // and with err otherwise.
-func (o Options[T]) refused(ctx context.Context, span *progress.Span, err error, panicked bool) bool {
+func (o MapOptions[T]) refused(ctx context.Context, span *progress.Span, err error, panicked bool) bool {
 	if reason, ok := skipReason(err); ok {
 		span.Skip(reason)
 		return false
@@ -248,7 +248,7 @@ func (o Options[T]) refused(ctx context.Context, span *progress.Span, err error,
 }
 
 // endsCanceled reports whether a target that ends with err ends canceled.
-func (o Options[T]) endsCanceled(err error) bool {
+func (o MapOptions[T]) endsCanceled(err error) bool {
 	return err != nil && progress.Classify(err, o.Classify) == progress.ClassCanceled
 }
 
@@ -282,7 +282,7 @@ type skipped struct{ reason string }
 func (s *skipped) Error() string { return s.reason }
 
 // describe says what a display names an item by.
-func (o Options[T]) describe(item T) (node, host, role string) {
+func (o MapOptions[T]) describe(item T) (node, host, role string) {
 	if o.Describe == nil {
 		return fmt.Sprint(item), "", ""
 	}
@@ -291,7 +291,7 @@ func (o Options[T]) describe(item T) (node, host, role string) {
 
 // acquire takes what an item's work needs besides its place in the pool.
 // A panic in o.Acquire becomes the item's error, as panicked says.
-func (o Options[T]) acquire(ctx context.Context, name string, item T) (release func(), panicked bool, err error) {
+func (o MapOptions[T]) acquire(ctx context.Context, name string, item T) (release func(), panicked bool, err error) {
 	if o.Acquire == nil {
 		return func() {}, false, nil
 	}
@@ -307,7 +307,7 @@ func (o Options[T]) acquire(ctx context.Context, name string, item T) (release f
 	return release, false, err
 }
 
-// stage is how far the worker for an item has come: in Options.Acquire,
+// stage is how far the worker for an item has come: in MapOptions.Acquire,
 // in the work, or in the release.
 type stage int
 
@@ -384,7 +384,7 @@ func (e releaseFailure) Error() string { return e.text }
 func (e releaseFailure) Unwrap() error { return e.cause }
 
 // errGoexit is the error of an item whose worker runtime.Goexit ended, as
-// t.FailNow does, in each stage: which of Options.Acquire, the work and the
+// t.FailNow does, in each stage: which of MapOptions.Acquire, the work and the
 // release called it rather than return.
 var errGoexit = [...]error{
 	stageAcquire: errors.New("acquiring what the work needs called runtime.Goexit instead of returning"),

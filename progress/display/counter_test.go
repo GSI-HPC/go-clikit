@@ -164,7 +164,7 @@ func TestTheCounterCountsAFanOut(t *testing.T) {
 	f := newFixture(t, "exec", nil)
 	f.draw(time.Second)
 	nodes := []string{"exe1", "exe2", "exe3", "exe4"}
-	fanout.Map(f.ctx, nodes, fanout.Options[string]{Step: "run", Limit: 1}, func(_ context.Context, node string) (struct{}, error) {
+	fanout.Map(f.ctx, nodes, fanout.MapOptions[string]{Step: "run", Limit: 1}, func(_ context.Context, node string) (struct{}, error) {
 		f.draw(time.Second)
 		if node == "exe2" {
 			return struct{}{}, errors.New("exe2: command exited 1")
@@ -334,7 +334,7 @@ func TestTheCounterNamesAStepWithNoNameByTheSpanAboveIt(t *testing.T) {
 	t.Parallel()
 	f := newFixture(t, "exec", nil)
 	f.draw(time.Second)
-	fanout.Map(f.ctx, []string{"exe1", "exe2"}, fanout.Options[string]{Limit: 1},
+	fanout.Map(f.ctx, []string{"exe1", "exe2"}, fanout.MapOptions[string]{Limit: 1},
 		func(context.Context, string) (struct{}, error) {
 			f.draw(time.Second)
 			return struct{}{}, nil
@@ -343,7 +343,7 @@ func TestTheCounterNamesAStepWithNoNameByTheSpanAboveIt(t *testing.T) {
 	ssh, call := progress.Start(disarm, progress.KindCall, "ssh")
 	unnamed, step := progress.Start(ssh, progress.KindStep, "")
 	f.draw(time.Second)
-	fanout.Map(unnamed, []string{"exe1"}, fanout.Options[string]{},
+	fanout.Map(unnamed, []string{"exe1"}, fanout.MapOptions[string]{},
 		func(context.Context, string) (struct{}, error) {
 			f.draw(time.Second)
 			return struct{}{}, nil
@@ -368,7 +368,7 @@ func TestTheCounterOfAStepWithNothingToNameIt(t *testing.T) {
 	c := &clock{now: time.Date(2026, 9, 26, 12, 0, 0, 0, time.UTC)}
 	counter := display.NewCounter(display.NewTerminal(s, nil), display.CounterOptions{Now: c.Now})
 	bus := progress.NewBus(progress.BusOptions{Sinks: []progress.Sink{counter}, Now: c.Now})
-	fanout.Map(progress.WithBus(context.Background(), bus), []string{"exe1"}, fanout.Options[string]{},
+	fanout.Map(progress.WithBus(context.Background(), bus), []string{"exe1"}, fanout.MapOptions[string]{},
 		func(context.Context, string) (struct{}, error) {
 			c.Add(time.Second)
 			counter.Draw()

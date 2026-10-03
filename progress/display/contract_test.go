@@ -137,7 +137,7 @@ func checkEnd(t *testing.T, got, want string) {
 // once the pool is done, as a command that collects output does.
 func uptime(s *session, call bool) error {
 	nodes := []string{"exe0001", "exe0002", "exe0003"}
-	outcomes := fanout.Map(s.ctx, nodes, fanout.Options[string]{Step: "run", Limit: 1},
+	outcomes := fanout.Map(s.ctx, nodes, fanout.MapOptions[string]{Step: "run", Limit: 1},
 		func(ctx context.Context, node string) (string, error) {
 			if call {
 				_, span := progress.Start(ctx, progress.KindCall, "ssh", progress.Timeout(10*time.Minute))
@@ -210,7 +210,7 @@ func TestTheCounterOfAPowerOnInBatches(t *testing.T) {
 			_, _ = fmt.Fprintf(s.errOut, "powering on %s (%d of %d)\n", batch, i+1, n)
 		},
 	}, func(ctx context.Context, batch *nodeset.NodeSet) error {
-		outcomes := fanout.Map(ctx, batch.Expand(), fanout.Options[string]{Limit: 1},
+		outcomes := fanout.Map(ctx, batch.Expand(), fanout.MapOptions[string]{Limit: 1},
 			func(_ context.Context, node string) (struct{}, error) {
 				s.draw()
 				if node == "exe4" {

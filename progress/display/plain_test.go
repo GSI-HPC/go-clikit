@@ -97,7 +97,7 @@ func TestPlainLinesOfAFanOut(t *testing.T) {
 	t.Parallel()
 	f := newPlainFixture(t, "bmc power off")
 	nodes := []string{"exe1", "exe2", "exe3", "exe4", "exe5", "exe6"}
-	outcomes := fanout.Map(f.ctx, nodes, fanout.Options[string]{Step: "power off", Limit: 1, Describe: onBMC},
+	outcomes := fanout.Map(f.ctx, nodes, fanout.MapOptions[string]{Step: "power off", Limit: 1, Describe: onBMC},
 		func(_ context.Context, node string) (struct{}, error) {
 			f.draw(3 * time.Second)
 			if node == "exe3" || node == "exe5" {
@@ -186,7 +186,7 @@ func TestPlainLinesOfStepsWithNoName(t *testing.T) {
 	t.Run("under the command", func(t *testing.T) {
 		t.Parallel()
 		f := newPlainFixture(t, "exec")
-		fanout.Map(f.ctx, []string{"exe1", "exe2", "exe3", "exe4"}, fanout.Options[string]{Limit: 1},
+		fanout.Map(f.ctx, []string{"exe1", "exe2", "exe3", "exe4"}, fanout.MapOptions[string]{Limit: 1},
 			func(_ context.Context, node string) (struct{}, error) {
 				f.draw(3 * time.Second)
 				if node == "exe3" {
@@ -207,7 +207,7 @@ exec: failed in 12s: 3 ok, 1 failed
 		f := newPlainFixture(t, "exec")
 		batches := fanout.Batches(f.ctx, nodeset.MustParse("exe[1-4]"), fanout.BatchOptions{Step: "power on", Size: 2, Limit: 1},
 			func(ctx context.Context, batch *nodeset.NodeSet) error {
-				outcomes := fanout.Map(ctx, batch.Expand(), fanout.Options[string]{Limit: 1},
+				outcomes := fanout.Map(ctx, batch.Expand(), fanout.MapOptions[string]{Limit: 1},
 					func(_ context.Context, node string) (struct{}, error) {
 						f.draw(time.Second)
 						if node == "exe1" {
@@ -238,7 +238,7 @@ func TestPlainLinesOfAStepWithNothingToNameIt(t *testing.T) {
 	c := &clock{now: time.Date(2026, 9, 26, 12, 0, 0, 0, time.UTC)}
 	plain := display.NewPlain(display.NewTerminal(s, nil), display.PlainOptions{Now: c.Now})
 	bus := progress.NewBus(progress.BusOptions{Sinks: []progress.Sink{plain}, Now: c.Now})
-	fanout.Map(progress.WithBus(context.Background(), bus), []string{"exe1", "exe2"}, fanout.Options[string]{Limit: 1},
+	fanout.Map(progress.WithBus(context.Background(), bus), []string{"exe1", "exe2"}, fanout.MapOptions[string]{Limit: 1},
 		func(context.Context, string) (struct{}, error) {
 			c.Add(11 * time.Second)
 			plain.Draw()
@@ -270,7 +270,7 @@ func TestPlainLinesOfAFailure(t *testing.T) {
 	call.End(nil)
 	links.End(nil)
 	nodes := []string{"exe1", "exe2", "exe3"}
-	fanout.Map(f.ctx, nodes, fanout.Options[string]{Step: "setting the machines to boot from the network once", Limit: 8},
+	fanout.Map(f.ctx, nodes, fanout.MapOptions[string]{Step: "setting the machines to boot from the network once", Limit: 8},
 		func(_ context.Context, node string) (struct{}, error) {
 			if node == "exe2" {
 				f.draw(time.Second)
@@ -279,7 +279,7 @@ func TestPlainLinesOfAFailure(t *testing.T) {
 			return struct{}{}, nil
 		})
 	disarm, disarming := progress.Start(f.ctx, progress.KindStep, "disarming")
-	fanout.Map(disarm, []string{"exe1", "exe3"}, fanout.Options[string]{Step: "clearing the boot overrides", Limit: 8},
+	fanout.Map(disarm, []string{"exe1", "exe3"}, fanout.MapOptions[string]{Step: "clearing the boot overrides", Limit: 8},
 		func(context.Context, string) (struct{}, error) { return struct{}{}, nil })
 	disarming.End(nil)
 	checkScreen(t, f.end(unreachable("setting the machines to boot from the network once failed: exe2")), `
@@ -370,7 +370,7 @@ bmc power cycle: canceled in 3.0s
 func TestPlainLinesCarryNoEscapeCodes(t *testing.T) {
 	t.Parallel()
 	f := newPlainFixture(t, "exec")
-	fanout.Map(f.ctx, []string{"exe1"}, fanout.Options[string]{Step: "run"},
+	fanout.Map(f.ctx, []string{"exe1"}, fanout.MapOptions[string]{Step: "run"},
 		func(context.Context, string) (struct{}, error) {
 			return struct{}{}, errors.New("exe1: \x1b[2Jcleared\x07")
 		})
