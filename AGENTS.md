@@ -41,7 +41,7 @@ minor release (see Compatibility).
   `tree.go`, `counter.go`, `plain.go` and `summary.go`, one display each.
   `contract_test.go` holds the displays to their promises on a `Screen`.
 - `progress/progresstest/`: `progresstest.go`, `Capture`, `Check`,
-  `Checked`, `Watch` and `Tree`; `screen.go`, `Screen`.
+  `Watch`, `Watcher` and `Tree`; `screen.go`, `Screen`.
 - `fanout/`: `each.go`, `Each` and the package comment; `map.go`, `Map`
   and `Failure`; `batches.go`; `recover.go`, `Recovered`.
 - Every package has an `example_test.go`. Failing fuzz inputs go under the

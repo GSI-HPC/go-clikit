@@ -37,7 +37,7 @@ their own.
 | `termtext` | Escaping untrusted text for a terminal, and the columns text takes there | `golang.org/x/text/width` |
 | `progress` | Spans carried in a `context.Context`, the `Bus` that orders their events, `Tally`, `Sanitize`, the JSONL event log and the W3C trace context | `termtext` |
 | `progress/display` | The `Terminal` a display shares with the command, the live `Tree`, the `Counter`, `Plain` lines and the `Summary` | `progress`, `termtext`, `go-nodeset` |
-| `progress/progresstest` | `Capture`, `Check`, `Checked`, `Watch`, and `Screen`, a terminal for tests | `progress`, `termtext`, `go-nodeset` |
+| `progress/progresstest` | `Capture`, `Check`, `Watch` and its `Watcher`, and `Screen`, a terminal for tests | `progress`, `termtext`, `go-nodeset` |
 | `fanout` | `Each`, `Map` and `Batches`, the bounded pools that report their items as targets | `progress`, `go-nodeset` |
 
 Every arrow points down the table: nothing imports `display`, `progresstest`

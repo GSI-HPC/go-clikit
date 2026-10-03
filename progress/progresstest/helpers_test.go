@@ -68,59 +68,79 @@ func TestCheckReportsEachProblemAndHowManyMore(t *testing.T) {
 	}
 }
 
-// Checked checks the events when the test ends and before it closes the
-// Bus, so that a span the work left open is reported, not ended by Close.
-func TestCheckedChecksBeforeTheBusIsClosed(t *testing.T) {
+// A test that never calls Finish has its events checked when it ends,
+// before the Bus is closed, so that a span the work left open is
+// reported, not ended by Close; and the lines of output are asked for.
+func TestWatchFinishesWhenTheTestEnds(t *testing.T) {
 	t.Parallel()
 
 	tb := &fakeTB{}
-	ctx, c := Checked(context.Background(), tb)
+	ctx, w := Watch(context.Background(), tb)
 	_, span := progress.Start(ctx, progress.KindCall, "ssh")
-	if !c.WantsLines() {
-		t.Error("the capture of Checked asks for no lines")
+	if !w.capture.WantsLines() {
+		t.Error("the capture of Watch asks for no lines")
 	}
 	tb.end()
 	if len(tb.errors) != 1 || !strings.Contains(tb.errors[0], `call "ssh" (event 1) never ends`) {
-		t.Errorf("Checked reported %q, want the span that never ends", tb.errors)
+		t.Errorf("Watch reported %q, want the span that never ends", tb.errors)
 	}
 	// The Bus is closed once the check has run: nothing more is sent.
-	n := len(c.Events())
+	n := len(w.Events())
 	span.End(nil)
-	if len(c.Events()) != n {
-		t.Error("the Bus of Checked is still open once the test has ended")
+	if len(w.Events()) != n {
+		t.Error("the Bus of Watch is still open once the test has ended")
 	}
 }
 
-// Watch's function checks the events before it closes the Bus, and
-// returns their tree, which the Bus's Close has changed nothing in.
+// Finish checks the events before it closes the Bus, and returns their
+// tree, which the Bus's Close has changed nothing in; called again, or
+// when the test ends, it checks nothing more. Events and Tree read the
+// events so far and check nothing.
 func TestWatchChecksBeforeTheBusIsClosed(t *testing.T) {
 	t.Parallel()
 
 	tb := &fakeTB{}
-	ctx, tree := Watch(context.Background(), tb)
+	ctx, w := Watch(context.Background(), tb)
 	_, done := progress.Start(ctx, progress.KindCall, "ssh")
 	done.End(nil)
 	_, open := progress.Start(ctx, progress.KindCall, "scp")
-	got := tree()
+	if got, want := w.Tree(), "call scp: running\ncall ssh: ok\n"; got != want {
+		t.Errorf("tree so far:\n%s\nwant:\n%s", got, want)
+	}
+	if got := len(w.Events()); got != 3 {
+		t.Errorf("%d events so far, want 3", got)
+	}
+	if len(tb.errors) != 0 {
+		t.Errorf("Events and Tree reported %q", tb.errors)
+	}
+	got := w.Finish()
 	if len(tb.errors) != 1 || !strings.Contains(tb.errors[0], `call "scp" (event 3) never ends`) {
 		t.Errorf("Watch reported %q, want the span that never ends", tb.errors)
 	}
-	if want := "call scp: canceled (canceled): not finished\ncall ssh: ok\n"; got != want {
+	want := "call scp: canceled (canceled): not finished\ncall ssh: ok\n"
+	if got != want {
 		t.Errorf("tree:\n%s\nwant:\n%s", got, want)
+	}
+	if again := w.Finish(); again != want {
+		t.Errorf("Finish again drew:\n%s\nwant:\n%s", again, want)
+	}
+	tb.end()
+	if len(tb.errors) != 1 {
+		t.Errorf("a second Finish reported %q", tb.errors[1:])
 	}
 	open.End(nil)
 }
 
-// Classify has the Bus of Checked and Watch class an error by the fallback
+// Classify has the Bus of Watch class an error by the fallback
 // given, as the program's own Bus would.
 func TestClassifySetsTheFallbackOfTheBus(t *testing.T) {
 	t.Parallel()
 
 	unreachable := errors.New("no route to host")
-	ctx, tree := Watch(context.Background(), t, Classify(func(error) progress.Class { return progress.ClassTransport }))
+	ctx, w := Watch(context.Background(), t, Classify(func(error) progress.Class { return progress.ClassTransport }))
 	_, span := progress.Start(ctx, progress.KindCall, "ssh")
 	span.End(unreachable)
-	if got, want := tree(), "call ssh: failed (transport): no route to host\n"; got != want {
+	if got, want := w.Finish(), "call ssh: failed (transport): no route to host\n"; got != want {
 		t.Errorf("tree:\n%s\nwant:\n%s", got, want)
 	}
 }
@@ -130,7 +150,7 @@ type sinkFunc func(progress.Event)
 
 func (f sinkFunc) Handle(e progress.Event) { f(e) }
 
-// Sinks puts sinks on the Bus of Checked and Watch, each use adding to
+// Sinks puts sinks on the Bus of Watch, each use adding to
 // the ones before, ahead of the Capture, which no option takes off; the
 // slice given is left as it was.
 func TestSinksAddsSinksAheadOfTheCapture(t *testing.T) {
@@ -140,7 +160,7 @@ func TestSinksAddsSinksAheadOfTheCapture(t *testing.T) {
 	first := sinkFunc(func(progress.Event) { order = append(order, "first") })
 	untouched := &Capture{}
 	given := []progress.Sink{first, untouched}
-	ctx, tree := Watch(context.Background(), t,
+	ctx, w := Watch(context.Background(), t,
 		Sinks(given[:1]...), Classify(nil), Sinks(sinkFunc(func(progress.Event) {
 			order = append(order, "third")
 		})))
@@ -152,7 +172,7 @@ func TestSinksAddsSinksAheadOfTheCapture(t *testing.T) {
 		t.Errorf("the sinks given saw the start in the order %q, want %q", order, want)
 	}
 	span.End(nil)
-	if got, want := tree(), "call ssh: ok\n"; got != want {
+	if got, want := w.Finish(), "call ssh: ok\n"; got != want {
 		t.Errorf("the Capture drew\n%s\nwant\n%s", got, want)
 	}
 }
