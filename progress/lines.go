@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"io"
+	"slices"
 	"sync"
 	"time"
 	"unicode/utf8"
@@ -61,7 +62,10 @@ type lineState struct {
 // counted as dropped; so the newest line is never lost, and is sent when
 // its place comes, whether another line comes or not. A line that does
 // not end is sent in pieces of 4 KiB, and what is left of it when the span
-// ends is sent before the End.
+// ends is sent before the End. The End sends the line that waits, and what
+// is left of the lines that did not end, though it finds no place for
+// them: of those, the newest of each stream, so that the last line of
+// stdout and that of stderr both reach the sinks.
 //
 // Tee returns w itself when nothing needs the lines. The lines never fail a
 // write: what Write returns is what w returned.
@@ -307,31 +311,67 @@ func (ls *lineState) refill(now time.Time) {
 	ls.last = ls.last.Add(time.Duration(n) * lineEvery)
 }
 
+// heldLine is a line that found no token when its span ended.
+type heldLine struct {
+	stream Stream
+	text   string
+}
+
 // flushLines sends what the tees of s hold of an unfinished line and the
 // line held back, before s ends, and returns how many lines were dropped
 // in all. b.mu is held.
+//
+// The lines that find no token are sent all the same, the newest of each
+// stream: the line held back gives way to an unfinished line of its own
+// stream, but not to one of the other, so that the last line of each is
+// what a display shows.
 func (s *Span) flushLines() int {
 	ls := s.lines
 	if ls == nil {
 		return 0
 	}
 	ls.refill(s.bus.now())
+	if ls.hasPending && ls.tokens > 0 {
+		ls.tokens--
+		s.sendPending()
+	}
+	var held []heldLine
+	if ls.hasPending {
+		held = append(held, heldLine{ls.pendingOn, ls.pending})
+		ls.hasPending, ls.pending = false, ""
+	}
 	for _, t := range ls.tees {
 		t.mu.Lock()
 		rest := string(t.shown)
 		t.span, t.shown = nil, nil
 		t.mu.Unlock()
-		if rest != "" {
-			s.offer(t.stream, rest)
+		switch {
+		case rest == "":
+		case ls.tokens > 0:
+			ls.tokens--
+			s.sendLine(t.stream, rest)
+		default:
+			held = s.hold(held, heldLine{t.stream, rest})
 		}
 	}
 	ls.tees = nil
-	if ls.hasPending {
-		s.sendPending()
+	for _, h := range held {
+		s.sendLine(h.stream, h.text)
 	}
 	if ls.late != nil {
 		ls.late.Stop()
 		ls.late = nil
 	}
 	return ls.dropped
+}
+
+// hold adds h to the lines held at the End, in place of the one of its
+// stream held before it, which is counted as dropped. b.mu is held.
+func (s *Span) hold(held []heldLine, h heldLine) []heldLine {
+	if i := slices.IndexFunc(held, func(o heldLine) bool { return o.stream == h.stream }); i >= 0 {
+		held = slices.Delete(held, i, i+1)
+		s.lines.since++
+		s.lines.dropped++
+	}
+	return append(held, h)
 }

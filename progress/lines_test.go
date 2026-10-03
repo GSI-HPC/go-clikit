@@ -440,3 +440,60 @@ func TestALongLineWithoutAnEndIsCutInLinearTime(t *testing.T) {
 		t.Errorf("8 MiB without an end took %s, in lines %s", inOne, inLines)
 	}
 }
+
+// The unfinished last line of each stream is sent before the End, though
+// no token is left for either: the one of stdout does not give way to the
+// one of stderr.
+func TestTheUnfinishedLineOfEachStreamIsSentAtTheEnd(t *testing.T) {
+	t.Parallel()
+
+	ctx, call, capture := showing(t, progress.Options{Now: newClock().Now})
+	out := progress.Tee(ctx, io.Discard, progress.Stdout, nil)
+	errw := progress.Tee(ctx, io.Discard, progress.Stderr, nil)
+	for i := range 25 {
+		fmt.Fprintf(out, "line %d\n", i)
+	}
+	fmt.Fprint(out, "partial-out")
+	fmt.Fprint(errw, "partial-err")
+	call.End(nil)
+
+	var got []string
+	for _, e := range capture.Events() {
+		if e.Type == progress.TypeLine {
+			got = append(got, e.Stream.String()+" "+e.Text)
+		}
+	}
+	if len(got) < 2 || got[len(got)-2] != "stdout partial-out" || got[len(got)-1] != "stderr partial-err" {
+		t.Errorf("the last lines shown are %q, want both unfinished ones", got[max(0, len(got)-2):])
+	}
+	events := capture.Events()
+	// Lines 20 to 24 gave way to a newer line of their stream.
+	if end := events[len(events)-1]; end.Type != progress.TypeEnd || end.Dropped != 5 {
+		t.Errorf("the End reports %d lines dropped, want 5", end.Dropped)
+	}
+}
+
+// A token that has come free by the End goes to the line that waits for
+// one, and the unfinished line after it is sent all the same: neither
+// gives way to the other.
+func TestTheLineThatWaitsAndTheUnfinishedOneAreBothSentAtTheEnd(t *testing.T) {
+	t.Parallel()
+
+	clock := newClock()
+	ctx, call, capture := showing(t, progress.Options{Now: clock.Now})
+	w := progress.Tee(ctx, io.Discard, progress.Stdout, nil)
+	for i := range 21 {
+		fmt.Fprintf(w, "line %d\n", i)
+	}
+	fmt.Fprint(w, "partial")
+	clock.Add(100 * time.Millisecond)
+	call.End(nil)
+
+	if got := shown(capture); len(got) != 22 || got[20] != "line 20" || got[21] != "partial" {
+		t.Errorf("the last lines shown are %q, want line 20 and partial", got[min(20, len(got)):])
+	}
+	events := capture.Events()
+	if end := events[len(events)-1]; end.Type != progress.TypeEnd || end.Dropped != 0 {
+		t.Errorf("the End reports %d lines dropped, want none", end.Dropped)
+	}
+}
