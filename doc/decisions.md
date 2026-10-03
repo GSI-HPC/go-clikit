@@ -188,8 +188,13 @@ unpublish it.
   therefore also runs daily from `main` and verifies every `v*` tag against
   the listed keys, and that every version proxy.golang.org lists for the
   module has a tag, which finds a tag deleted again after the proxy fetched
-  it; its failure is the alarm. A key that signed a release
-  stays listed after it is retired, an SSH key with `valid-before`.
+  it; its failure is the alarm.
+- A published release is pinned in the `RELEASE_VERIFIED_TAGS` repository
+  variable, its tag and the id of the tag object verified when it was
+  pushed, and the audit holds a pinned tag to that object instead of to
+  today's keys. A key is retired by pinning its releases and removing it,
+  never by `valid-before`, which git checks against the date in the tag,
+  a date the signer writes.
 - A tag is never moved or deleted. A broken release is withdrawn with a
   `retract` directive in `go.mod`, which ships in the next release.
 - The module stays at v0 while its API settles, and a v0 minor release may
@@ -210,11 +215,13 @@ verification.
   accepted, so that a maintainer signs with the key they already use; the
   verification and its tests cover both.
 - An OpenPGP key is trusted as the variable holds it: an expired key stops
-  verifying on its own, a revoked one only once the variable holds its
-  revocation.
-- The daily audit holds every past release to today's keys, so retiring a
-  key takes care, and it finds a bad tag up to a day late. GitHub stops the
-  schedule of a repository idle for 60 days.
+  verifying on its own, the tags it signed earlier included, a revoked one
+  only once the variable holds its revocation.
+- Every release is pinned by hand after it is published; until it is, the
+  audit holds it to today's keys, and an unpinned release fails the audit
+  once its key expires or is removed. The audit finds a bad tag up to a day
+  late, and relies on proxy.golang.org's list of versions for a tag deleted
+  in between. GitHub stops the schedule of a repository idle for 60 days.
 
 ## 5. Progress and its displays are the kit's own
 

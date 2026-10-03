@@ -225,7 +225,7 @@ export PROXY_LIST="$scratch/proxy-list" PROXY_STATUS=200 CURL_LOG="$scratch/curl
 audit() {
   PATH="$scratch/proxy-bin:$PATH" GO_MOD="$scratch/audit.mod" \
     MODULE_PROXY=https://proxy.example.org ALLOWED_SIGNERS="$1" ALLOWED_PGP_KEYS="$2" \
-    GITHUB_OUTPUT="$scratch/output" "$scripts/audit-release-tags.sh"
+    VERIFIED_TAGS="${3:-}" GITHUB_OUTPUT="$scratch/output" "$scripts/audit-release-tags.sh"
 }
 expect 'an audit of signed release tags' pass 'all 1 release tag(s)' audit "$listed" ''
 expect 'an audit without key lists' fail 'RELEASE_ALLOWED_SIGNERS and RELEASE_ALLOWED_PGP_KEYS' audit '' ''
@@ -262,13 +262,34 @@ CURL_EXIT=6 expect 'an audit when the module proxy cannot be reached' fail 'cann
 printf 'go 1.26.0\n' > "$scratch/nomodule.mod"
 expect 'an audit with a go.mod naming no module' fail 'names no module' \
   env GO_MOD="$scratch/nomodule.mod" "$scripts/audit-release-tags.sh"
-# A retired SSH key stays listed with valid-before, which keeps the releases
-# it signed and refuses a tag it signs later.
+# valid-before does not retire a key: git checks it against the date in the
+# tag, which the signer writes, so a backdated tag passes. A key is retired
+# by removing it, after pinning the releases it signed.
 retired="maintainer@example.org namespaces=\"git\",valid-before=\"20000101\" $(cat "$scratch/listed.pub")"
 expect 'an audit of a tag signed after its key was retired' fail 'v1.0.0 is not signed by a key' audit "$retired" ''
 GIT_COMMITTER_DATE='1999-06-01T00:00:00Z' sign listed v0.9.0 -m 'release v0.9.0' "$old"
 git tag -d v1.0.0 > /dev/null
 expect 'an audit of a tag signed before its key was retired' pass '' audit "$retired" ''
+pinned="v0.9.0 $(git rev-parse refs/tags/v0.9.0)"
+expect 'an audit of a pinned release after its key was removed' pass \
+  'v0.9.0 is the tag object verified at its release' audit '' '' "$pinned"
+expect 'an audit of a pin list with a comment and blank lines' pass '' \
+  audit '' '' "$(printf '# releases\n\n%s\n' "$pinned")"
+expect 'an audit of a pinned release with its key still listed' pass '' audit "$listed" '' "$pinned"
+expect 'an audit of a pinned release whose tag was moved' fail \
+  'v0.9.0 is not the tag object verified at its release' \
+  audit "$listed" '' "v0.9.0 $(git rev-parse 'refs/tags/not-a-release^{commit}')"
+expect 'an audit of a pinned release whose tag was deleted' fail \
+  'v0.8.0 is pinned, but there is no tag v0.8.0' \
+  audit '' '' "$(printf '%s\nv0.8.0 %s\n' "$pinned" "$(git rev-parse refs/tags/v0.9.0)")"
+expect 'an audit of a pin list with a line that is no pin' fail 'RELEASE_VERIFIED_TAGS line 1' \
+  audit '' '' 'v0.9.0'
+expect 'an audit of a pin list with an object id that is none' fail 'RELEASE_VERIFIED_TAGS line 1' \
+  audit '' '' 'v0.9.0 not-an-object-id'
+sign unlisted v0.9.1 -m 'release v0.9.1' "$old"
+expect 'an audit of a pinned release next to a tag by an unlisted key' fail \
+  'v0.9.1 is not signed by a key' audit "$listed" '' "$pinned"
+git tag -d v0.9.1 > /dev/null
 git init -q "$scratch/untagged"
 cd "$scratch/untagged"
 git commit -q --allow-empty -m 'first'
@@ -277,6 +298,8 @@ printf 'v0.1.0\n' > "$PROXY_LIST"
 expect 'an audit finding a version on the module proxy and no tags at all' fail \
   '1 version(s) on the module proxy have no tag' audit '' ''
 : > "$PROXY_LIST"
+expect 'an audit finding a pinned release and no tags at all' fail \
+  '1 pinned release(s) have no tag' audit '' '' "v0.1.0 $(printf '%040d' 0)"
 
 # The version: one the go command takes for this module, or none.
 printf 'module example.org/kit\n\ngo 1.26.0\n' > "$scratch/go.mod"

@@ -39,10 +39,13 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
+      # A release pinned in RELEASE_VERIFIED_TAGS is held to the tag object
+      # verified when it was pushed instead of to today's keys.
       - name: Refuse a release tag not signed by a listed signer
         env:
           ALLOWED_SIGNERS: ${{ vars.RELEASE_ALLOWED_SIGNERS }}
           ALLOWED_PGP_KEYS: ${{ vars.RELEASE_ALLOWED_PGP_KEYS }}
+          VERIFIED_TAGS: ${{ vars.RELEASE_VERIFIED_TAGS }}
         run: .github/scripts/audit-release-tags.sh
 
   # The jobs after this one need it, so on any event but a tag push they are
@@ -145,3 +148,17 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ github.ref_name }}
         run: .github/scripts/publish-release.sh
+
+      # The line that pins the release for the daily audit (doc/release.md).
+      - name: Show the line that pins the release
+        env:
+          TAG: ${{ github.ref_name }}
+          OBJECT: ${{ needs.verify-tag.outputs.object }}
+        run: |
+          {
+            echo "Pin the release by adding this line to the RELEASE_VERIFIED_TAGS repository variable:"
+            echo
+            echo '```'
+            echo "$TAG $OBJECT"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
