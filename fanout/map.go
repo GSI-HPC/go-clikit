@@ -125,12 +125,13 @@ type Outcome[R any] struct {
 // o.Acquire refused, or whose work returned an error, once ctx had ended,
 // with an error other than of Skip, since the end of ctx is what ended it.
 // Its target ends with the context's error, and its outcome keeps the
-// error fn or o.Acquire returned. A panic or a call of runtime.Goexit is a bug,
-// though, and fails its item even once ctx has ended, and a panic in the
-// release fails it whatever fn returned, an error of Skip included. An
-// item fn left out on purpose, by returning an error of Skip, ends skipped
-// and is none of those that failed. An item waiting for o.Acquire is not
-// yet running, and one it refused ends at once, as Options.Acquire says.
+// error fn or o.Acquire returned. A panic or a call of runtime.Goexit is
+// a bug, though, and fails its item even once ctx has ended, and a panic
+// in the release fails it whatever fn returned, an error of Skip
+// included. An item fn left out on purpose, by returning an error of
+// Skip, ends skipped and is none of those that failed. An item waiting
+// for o.Acquire is not yet running, and one it refused ends at once, as
+// Options.Acquire says.
 func Map[T, R any](ctx context.Context, items []T, o Options[T], fn func(ctx context.Context, item T) (R, error)) []Outcome[R] {
 	limit := o.Limit
 	if limit < 1 {
