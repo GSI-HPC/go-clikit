@@ -47,6 +47,16 @@ func TestTheSummary(t *testing.T) {
 			c.Add(time.Second)
 			return nil
 		}, "exec: done in 1.0s: 3 ok"},
+		{"a command that ran for just under ten seconds", func(ctx context.Context, c *clock) error {
+			step(ctx, "run", three, nil)
+			c.Add(9940 * time.Millisecond)
+			return nil
+		}, "exec: done in 9.9s: 3 ok"},
+		{"a command that ran for ten seconds, rounded", func(ctx context.Context, c *clock) error {
+			step(ctx, "run", three, nil)
+			c.Add(9960 * time.Millisecond)
+			return nil
+		}, "exec: done in 10s: 3 ok"},
 		{"a target that failed at once", func(ctx context.Context, c *clock) error {
 			step(ctx, "run", three, map[string]error{"exe2": down})
 			c.Add(300 * time.Millisecond)

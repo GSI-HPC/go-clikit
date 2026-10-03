@@ -174,15 +174,18 @@ func (s *Summary) Line() string {
 	return line + ": " + tallied(ok, all.failed, all.canceled, all.skipped)
 }
 
-// took reads a length of time the way a person says it: tenths of a second
-// below ten seconds, then seconds, minutes and seconds, and hours, minutes
-// and seconds.
+// took reads a length of time the way a person says it: tenths of a second,
+// rounded, below ten seconds, then whole seconds, minutes and seconds, and
+// hours, minutes and seconds. A time that rounds to ten seconds reads 10s,
+// not 10.0s, as the times that follow it do.
 func took(d time.Duration) string {
 	d = max(0, d)
 	s := int(d / time.Second)
 	switch {
-	case d < 10*time.Second:
+	case d < 9950*time.Millisecond:
 		return fmt.Sprintf("%.1fs", d.Seconds())
+	case d < 10*time.Second:
+		return "10s"
 	case d < time.Minute:
 		return fmt.Sprintf("%ds", s)
 	case d < time.Hour:
