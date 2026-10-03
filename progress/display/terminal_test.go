@@ -10,6 +10,7 @@ import (
 	"regexp"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"testing/synctest"
 	"time"
@@ -246,6 +247,65 @@ func TestThePanicOfADisplayGoesToTheTerminalWithoutAPanicLog(t *testing.T) {
 			t.Errorf("the stack is not written: %q", got)
 		}
 	})
+}
+
+// A PanicLog that is one of the Terminal's own writers takes the stack of
+// a display that panicked like any other, and the command's writes and
+// Close go on; and Lines and Writer take each other's writers.
+func TestThePanicLogMayBeAWriterOfTheTerminal(t *testing.T) {
+	t.Parallel()
+	s := &progresstest.Screen{}
+	term := display.NewTerminal(s, nil)
+	errOut := term.Writer(s)
+	term.PanicLog = errOut
+	var draws atomic.Int32
+	term.Foreground = func() bool {
+		if draws.Add(1) == 3 {
+			panic("the foreground")
+		}
+		return true
+	}
+	// A clock past the counter's first second, so that it draws at once.
+	clock := &clock{now: time.Date(2026, 9, 26, 12, 0, 0, 0, time.UTC)}
+	counter := display.NewCounter(term, display.CounterOptions{Now: clock.Now})
+	clock.Add(2 * time.Second)
+	counter.Start()
+	deadline := time.Now().Add(5 * time.Second)
+	for !strings.Contains(s.String(), "the progress display stopped") {
+		if time.Now().After(deadline) {
+			t.Fatalf("the display's panic never reached the terminal: %q", s.String())
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		_, _ = io.WriteString(errOut, "done\n")
+		_, _ = io.WriteString(term.Lines(term.Lines(errOut)), "a line\n")
+		_, _ = io.WriteString(term.Writer(term.Lines(s)), "more\n")
+		counter.Close()
+	}()
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("the command's writes and Close hang after the display panicked")
+	}
+	got := s.String()
+	if !strings.Contains(got, "the progress display stopped: the foreground\n") || !strings.Contains(got, "goroutine") {
+		t.Errorf("the panic and its stack are not on the terminal: %q", got)
+	}
+	if !strings.HasSuffix(got, "done\na line\nmore\n") {
+		t.Errorf("the writes after the panic read %q", got)
+	}
+
+	// The writers of another Terminal are streams like any other: they are
+	// written through, and take their own region off.
+	other := display.NewTerminal(s, nil)
+	_, _ = io.WriteString(term.Writer(other.Writer(s)), "theirs\n")
+	_, _ = io.WriteString(term.Lines(other.Lines(s)), "their line\n")
+	if got := s.String(); !strings.HasSuffix(got, "theirs\ntheir line\n") {
+		t.Errorf("writes through another Terminal read %q", got)
+	}
 }
 
 // Lines from goroutines beside the command, written while the command

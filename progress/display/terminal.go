@@ -89,7 +89,8 @@ type Terminal struct {
 	liners []*lines
 
 	// PanicLog receives the stack of a display that panicked while it
-	// drew, the front end's diagnostics; nil is the terminal itself.
+	// drew, the front end's diagnostics; nil is the terminal itself. It
+	// may be one of the Terminal's own writers.
 	PanicLog io.Writer
 	// Program names the program in the line that says a display stopped,
 	// "prog: …", so that it is not read as the command's own; empty
@@ -145,7 +146,30 @@ func (t *Terminal) recovered() {
 // standard error or standard output, that takes the display's region off
 // before it writes. What is written is not changed.
 func (t *Terminal) Writer(w io.Writer) io.Writer {
-	return writer{t: t, w: w}
+	return writer{t: t, w: t.stream(w)}
+}
+
+// stream returns the stream under w when w is a writer of t's own, as
+// Writer and Lines return them, and w otherwise. Those writers take the
+// region off themselves, with t.mu held, so a writer of t's that wrote
+// through another would lock t.mu twice.
+func (t *Terminal) stream(w io.Writer) io.Writer {
+	for {
+		switch v := w.(type) {
+		case writer:
+			if v.t != t {
+				return w
+			}
+			w = v.w
+		case *lines:
+			if v.t != t {
+				return w
+			}
+			w = v.w
+		default:
+			return w
+		}
+	}
 }
 
 type writer struct {
@@ -214,10 +238,11 @@ func trimColours(p []byte) []byte {
 // end, and Close ends it. What waits is bounded, 256 KiB: a line past that
 // is left out, and a line written with the others says how many were.
 //
-// w must not be a writer of the Terminal's own. What is written is not
+// w may be a writer of the Terminal's own, such as its Writer of standard
+// error: the lines then go to the stream under it. What is written is not
 // changed, and Write reports it all written: the lines are a courtesy.
 func (t *Terminal) Lines(w io.Writer) io.Writer {
-	l := &lines{t: t, w: w}
+	l := &lines{t: t, w: t.stream(w)}
 	t.mu.Lock()
 	t.liners = append(t.liners, l)
 	t.mu.Unlock()
