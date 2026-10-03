@@ -33,7 +33,8 @@ which pkg.go.dev publishes:
   exported name without a doc comment.
 - A change of behaviour updates the doc comments, and the document here that
   describes it, in the same pull request.
-- A decision is never edited; a later one supersedes it.
+- A decision is never edited; a later one supersedes or refines it, and the
+  earlier one's status names it.
 - The golden log, `progress/testdata/log-v1.jsonl`, pins the format
   `event-log.md` describes.
 
