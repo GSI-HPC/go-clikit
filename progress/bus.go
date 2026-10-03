@@ -38,8 +38,8 @@ type BusOptions struct {
 	Program string
 	// Classify is the fallback of the classes End gives the errors of
 	// spans, asked for an error that none of Classify's first three rules
-	// fits, such as a program's rule for its exit codes; nil is
-	// ClassTarget.
+	// fits, such as a program's rule for its exit codes; nil, or an
+	// answer of ClassNone, is ClassTarget.
 	Classify func(error) Class
 }
 

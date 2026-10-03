@@ -87,3 +87,13 @@ func TestClassifyWithoutAFallback(t *testing.T) {
 		t.Errorf("Classify(nil) = %s, want %s", got, progress.ClassNone)
 	}
 }
+
+// A fallback that answers ClassNone for an error leaves it the target's,
+// for an error is a failure, and ClassNone says that nothing failed.
+func TestClassifyFallbackOfNone(t *testing.T) {
+	t.Parallel()
+	none := func(error) progress.Class { return progress.ClassNone }
+	if got := progress.Classify(errUnreachable, none); got != progress.ClassTarget {
+		t.Errorf("Classify(%v) = %s, want %s", errUnreachable, got, progress.ClassTarget)
+	}
+}
