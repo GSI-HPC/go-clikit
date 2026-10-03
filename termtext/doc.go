@@ -45,6 +45,7 @@
 // the rest. They do not cluster graphemes, so a sequence joined with U+200D,
 // a skin tone modifier, a variation selector that turns a character into an
 // emoji, or a flag is counted as the sum of its runes, which may be more
-// than a terminal shows. Truncate shortens text to a number of columns with
-// the same widths.
+// than a terminal shows. The widths follow Unicode up to version 18.0: a
+// wide character assigned later is counted as one column. Truncate shortens
+// text to a number of columns with the same widths.
 package termtext
