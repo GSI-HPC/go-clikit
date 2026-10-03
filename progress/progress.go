@@ -326,6 +326,10 @@ const (
 // Fields is the whole vocabulary a span can say about itself. There is no
 // bag of free-form attributes: a value without a field here cannot reach a
 // sink, and so reaches no log or exporter either.
+//
+// Fields is embedded in Event, and the event log writes both on one flat
+// line, so a field added here takes neither the name of a member of Event
+// nor a key of the log another part of an event has; a test holds both.
 type Fields struct {
 	// Node is what a display folds finished targets by: the target as the
 	// program names it, such as a host, a container, a file or a port. It

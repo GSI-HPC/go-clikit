@@ -137,7 +137,9 @@ at its end, by a later command on the same Bus, and a test holds its first
 lines, those version 1 was first released with, to a checksum. A test sets
 every part of an event and fails when one is neither logged nor left out on
 purpose, so a part added to `Event` or `Fields` is not logged, or kept out,
-without a decision. Other tests cover a run that appends to a file another run
+without a decision; another fails when a member of `Fields` takes the name
+of one of `Event`, which would shadow it, or two parts share a key of the
+log. Other tests cover a run that appends to a file another run
 appends to, a writer that fails, one that falls behind, and `Close`.
 
 ## Examples
