@@ -150,7 +150,8 @@ func Batches(ctx context.Context, nodes *nodeset.NodeSet, o BatchOptions, run fu
 // interrupted or ran out of time, so that it counts as its Total.
 type leftOut struct{ error }
 
-// ProgressClass says that the batch was left out, not that it failed.
+// ProgressClass says that the batch or target was left out, or cut short,
+// not that it failed.
 func (leftOut) ProgressClass() progress.Class { return progress.ClassCanceled }
 
 // pause waits between two batches, until o.Pause has passed or ctx has

@@ -117,15 +117,20 @@ keeps it without a line of the caller's.
   to in the order the items were given, whatever order they finished in, and
   turns a panic in one item's work, or in what it acquired and released for
   it, into that item's error, since `recover` reaches only its own
-  goroutine. A panic is a bug, and fails its item even once the context has
-  ended, when other failures are reported canceled. Work, an acquire or a
-  release that calls `runtime.Goexit`, as `t.FailNow` does, fails its item
-  with an error that says which of them did, rather than pass for done,
-  and loses nothing else that broke the item. What an item acquired is
-  released before its target ends, so that a panic in the release is the
-  target's failure; the next item can so take it and run before that
-  target has ended. `Batches` runs one batch after the other, with a pause between
-  them, and stops after one that failed.
+  goroutine. Work, an acquire or a release that calls `runtime.Goexit`, as
+  `t.FailNow` does, fails its item with an error that says which of them
+  did, rather than pass for done, and loses nothing else that broke the
+  item. The end of the context, an interrupt or a deadline alike, ends the
+  items it left out, and those whose acquire or work then gave up with an
+  error other than a skip, canceled, with the context's error, while each outcome keeps the
+  error it was given. A panic or a call of `runtime.Goexit` is a bug, and
+  fails its item even once the context has ended. An item its acquire
+  refused ends at once, before it gives its place up, as every target
+  does. What an item acquired is released before its target ends, so that
+  a panic in the release is the target's failure; the next item can so
+  take it and run before that target has ended. `Batches` runs one batch
+  after the other, with a pause between them, and stops after one that
+  failed.
 
 ## What a program fills in
 

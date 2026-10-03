@@ -29,8 +29,9 @@ type Options[T any] struct {
 	// whatever else the item is, the host the work goes to and its role.
 	// Nil names an item the way fmt.Sprint prints it.
 	Describe func(T) (node, host, role string)
-	// PanicLog receives the stack of a panic in the work, the front end's
-	// diagnostics; nil is the process's standard error.
+	// PanicLog receives the stack of a panic in the work, in Acquire or
+	// in the release it gave, the front end's diagnostics; nil is the
+	// process's standard error.
 	PanicLog io.Writer
 	// Program names the program in the line that says the work panicked,
 	// and in the error a panic becomes, as Recovered does.
@@ -42,39 +43,53 @@ type Options[T any] struct {
 	// Summarize sums up the items that failed of the n, as the error the
 	// step ends with; nil is Failure, with no noun. A program gives it
 	// the error its commands exit with, as Failure's text with an exit
-	// code of its own.
+	// code of its own. interrupted says that every item that failed ended
+	// canceled, which the end of ctx does whether it was interrupted or ran
+	// out of time; errors.Is on errs, or ctx.Err, tells the two apart.
 	Summarize func(n int, names []string, errs []error, interrupted bool) error
 	// Acquire, when it is set, takes what an item's work needs besides its
 	// place in the pool, such as a place on each host it goes to, and
-	// returns the function that gives that back once the work is done:
-	// once fn has returned, but before the item's target ends, so that a
-	// panic in it is reported as the item's. An event log or a display can
-	// so show the next item that takes what it gave back running before
-	// this one's target has ended.
+	// returns the function that gives that back once the work is done; a
+	// nil release gives nothing back. The release is called once fn has
+	// returned, panicked or called runtime.Goexit, but before the item's
+	// target ends, so that a panic in it is reported as the item's. An
+	// event log or a display can so show the next item that takes what it
+	// gave back running before this one's target has ended.
+	//
 	// It is called once the item has its place in the pool, and the item
-	// stays queued until it returns. An error it returns is the item's,
-	// whose work is then never started, and whose target ends at once,
-	// before the place is given up; an error of Skip leaves the item out
-	// on purpose, as one fn returns does.
+	// stays queued until it returns. An error it returns, or a panic in
+	// it, is the item's, whose work is then never started and whose
+	// release, if it returned one, is not called. The item's target ends
+	// then, before the place is given up: skipped for an error of Skip,
+	// which leaves the item out on purpose, as one fn returns does;
+	// canceled, with the context's error, when the context had ended by
+	// then and the error is not a panic; and with the error otherwise.
 	Acquire func(ctx context.Context, item T) (release func(), err error)
 }
 
 // Outcome is what the work for one item came to.
 type Outcome[R any] struct {
-	// Value is what the work returned; the zero value when it panicked.
+	// Value is what the work returned, which a panic in the release
+	// leaves as it was; the zero value when the work was never started,
+	// panicked or called runtime.Goexit.
 	Value R
-	// Err is the error the work returned, or the one a panic in it
-	// became; a panic in the release Options.Acquire gave is joined to the
-	// error the work returned, or replaces it when that was nil or an error
-	// of Skip. When fn, Options.Acquire or the release ended its goroutine
-	// with runtime.Goexit rather than return, as t.FailNow does, it is an
-	// error that says which of them did, joined to a panic in the release
-	// and to the error the work returned, as a panic in the release is. For
-	// an item that was never started it is the one Options.Acquire refused
-	// it with, or, when the pool left it out, the context's.
+	// Err is the error the work returned, which it keeps when the end of
+	// the context ends the item's target canceled, or the one a panic in
+	// it became; a panic in the release Options.Acquire gave is joined to
+	// the error the work returned, or replaces it when that was nil or an
+	// error of Skip. When fn, Options.Acquire or the release ended its
+	// goroutine with runtime.Goexit rather than return, as t.FailNow does,
+	// it is an error that says which of them did, joined to a panic in the
+	// release and to the error the work returned, as a panic in the
+	// release is. For an item that was never started it is the error
+	// Options.Acquire refused it with, or the one a panic in it became,
+	// even once the context had ended, or, when the pool left the item
+	// out, the context's.
 	Err error
 	// Started says whether the work for the item was started, which it
-	// is not once the context has ended.
+	// is not when the pool left the item out once the context had ended,
+	// nor when Options.Acquire refused it, panicked or called
+	// runtime.Goexit.
 	Started bool
 }
 
@@ -85,33 +100,34 @@ type Outcome[R any] struct {
 // the context's error. A panic in fn, o.Acquire or the release it gave
 // becomes that item's error, with its stack in o.PanicLog, as Recovered has
 // it, and so does a call of runtime.Goexit in them, as t.FailNow makes,
-// with an error that says which of them made it, which ends the item
-// failed rather than the worker without a word. The release is called
-// however fn ended, before the item's target ends, and an item whose
-// release panicked ends failed whatever fn returned, an error of Skip or
-// one after the context had ended included. Map returns once every call
-// has returned.
+// with an error that says which of them made it, so that the item fails
+// rather than its worker end without a word. The release is called however
+// fn ended, before the item's target ends. Map returns once every call has
+// returned.
 //
 // The work is reported under the span ctx carries as a step, o.Step, with
 // a target for each item, as every pool reports it: every target is
 // announced, queued, before the first one runs; each is marked running when
 // it takes its place and ended before it gives the place up, so that a
-// display never counts more running than the limit; those never started
-// end canceled, whether the context was interrupted or ran out of time, so
-// that the count reaches its total; and the step ends once the last has,
-// with what o.Summarize makes of the items that failed, canceled when every
-// one of them ended canceled, as an interrupt or a deadline leaves a pool.
+// display never counts more running than the limit; those the pool left
+// out end canceled once it is done, so that the count reaches its total;
+// and the step ends once the last has, with what o.Summarize makes of the
+// items that failed, told whether every one of them ended canceled, as the
+// end of ctx leaves a pool, which Failure, the default, then ends canceled.
 // fn is called with the context of its item's target, so that the calls it
-// makes are reported under it. An item that failed once the context had
-// ended is reported canceled, with the context's error, since the end of
-// the context is what ended it, and its outcome keeps the error fn
-// returned; a panic in fn is a bug, though, and so ends failed. An item fn
-// left out on purpose, by returning an error of Skip,
-// ends skipped and is none of those that failed, and so does one
-// o.Acquire leaves out with an error of Skip. An item waiting for o.Acquire
-// is not yet running; one it refused ends then, failed with the refusal,
-// or, when the context had ended by then, as one never started, unless
-// o.Acquire panicked, and its outcome keeps the refusal.
+// makes are reported under it.
+//
+// The end of ctx ends an item canceled, not failed, whether ctx was
+// interrupted or ran out of time: one the pool left out, and one that
+// o.Acquire refused, or whose work returned an error, once ctx had ended,
+// with an error other than of Skip, since the end of ctx is what ended it.
+// Its target ends with the context's error, and its outcome keeps the
+// error fn or o.Acquire returned. A panic or a call of runtime.Goexit is a bug,
+// though, and fails its item even once ctx has ended, and a panic in the
+// release fails it whatever fn returned, an error of Skip included. An
+// item fn left out on purpose, by returning an error of Skip, ends skipped
+// and is none of those that failed. An item waiting for o.Acquire is not
+// yet running, and one it refused ends at once, as Options.Acquire says.
 func Map[T, R any](ctx context.Context, items []T, o Options[T], fn func(ctx context.Context, item T) (R, error)) []Outcome[R] {
 	limit := o.Limit
 	if limit < 1 {
@@ -378,10 +394,11 @@ var errGoexit = [...]error{
 // names are written as a node set when each reads as one host name in one
 // and none repeats, and otherwise as a list separated by commas, in the
 // order given, so that a name such as "config volume" is not read as two
-// hosts and the list names as many as the count. Its progress
-// class is ClassCanceled when interrupted says that the interrupt ended the
-// items, since the error of an item is what its work returned, which need
-// not say so, and ClassTarget otherwise. It is nil when none failed.
+// hosts and the list names as many as the count. Its progress class is
+// ClassCanceled when interrupted says that the end of the context, an
+// interrupt or a deadline, ended the items, since the error of an item is
+// what its work returned, which need not say so, and ClassTarget
+// otherwise. It is nil when none failed.
 func Failure(noun string, n int, names []string, errs []error, interrupted bool) error {
 	if len(names) == 0 {
 		return nil
