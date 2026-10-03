@@ -171,15 +171,25 @@ func (w writer) Write(p []byte) (int, error) {
 }
 
 // trimColours returns p without the sequences that set colours and other
-// attributes of text (SGR, ESC [ … m) at its end, which take no column and
-// leave the cursor where it is: a write that ends a line and then sets the
-// colour back has left no line open. Any other sequence is text.
+// attributes of text (SGR, ESC [ … m) at its end, if the last of them sets
+// every attribute back (ESC [ m, ESC [ 0 m): they take no column, leave the
+// cursor where it is and leave no colour behind, so a write that ends a
+// line and then sets the colour back has left no line open. A colour set
+// at the end of a write and not set back is the start of the text that
+// follows, which the display must not be drawn in, and any other sequence
+// is text.
 func trimColours(p []byte) []byte {
+	reset := false
 	for len(p) > 0 && p[len(p)-1] == 'm' {
 		start := bytes.LastIndex(p, []byte("\x1b["))
-		if start < 0 || strings.Trim(string(p[start+2:len(p)-1]), "0123456789;:") != "" {
+		if start < 0 {
 			break
 		}
+		params := string(p[start+2 : len(p)-1])
+		if strings.Trim(params, "0123456789;:") != "" || !reset && strings.Trim(params, "0;") != "" {
+			break
+		}
+		reset = true
 		p = p[:start]
 	}
 	return p
@@ -194,8 +204,10 @@ func trimColours(p []byte) []byte {
 // the command has a line open, such as a question it asks itself; the next
 // frame, the write that ends the open line, the resume and Close write
 // them, in order, and so does a write of the command's, before its own
-// bytes. A write of the command's that ends a line and then sets a colour
-// (ESC [ … m) leaves no line open. A line that does not end waits for its
+// bytes. A write of the command's that ends a line and then sets the
+// colours (ESC [ … m), the last of them ESC [ 0 m, which sets them back,
+// leaves no line open; one that ends in a colour not set back leaves the
+// line open. A line that does not end waits for its
 // end, and Close ends it. What waits is bounded, 256 KiB: a line past that
 // is left out, and a line written with the others says how many were.
 //

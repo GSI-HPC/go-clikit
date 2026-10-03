@@ -321,6 +321,32 @@ func TestLinesStayWholeUnderInterleaving(t *testing.T) {
 	}
 }
 
+// A write that ends in a colour it does not set back, after the end of a
+// line or alone, has begun the text that follows in that colour: the line
+// stays open, so that no frame and no line of a Lines writer is drawn in
+// the colour, until a write ends the line, or sets the colour back.
+func TestAColourNotSetBackLeavesTheLineOpen(t *testing.T) {
+	t.Parallel()
+	f := newTerminalFixture(t)
+	out := f.term.Writer(f.screen)
+	diag := f.term.Lines(f.screen)
+	_, _ = io.WriteString(out, "line\n\x1b[41m")
+	_, _ = io.WriteString(diag, "a log line\n")
+	f.counter.Draw()
+	f.shows(t, "after a background colour", "line\n^[[41m\n")
+	_, _ = io.WriteString(out, "red\n\x1b[31m\x1b[0m")
+	f.counter.Draw()
+	f.shows(t, "once the colours are set back", "line\n^[[41mred\n^[[31m^[[0ma log line\n0:02\n")
+
+	_, _ = io.WriteString(out, "\x1b[7m")
+	_, _ = io.WriteString(diag, "another log line\n")
+	f.counter.Draw()
+	f.shows(t, "after a colour written alone", "line\n^[[41mred\n^[[31m^[[0ma log line\n^[[7m\n")
+	_, _ = io.WriteString(out, "reverse\n")
+	f.counter.Draw()
+	f.shows(t, "once the line has ended", "line\n^[[41mred\n^[[31m^[[0ma log line\n^[[7mreverse\nanother log line\n0:02\n")
+}
+
 // A display that panics after it has drawn takes its region off the
 // terminal at once, and writes its stack then, not only once the command
 // next writes or the display is closed: the frame it left would otherwise
