@@ -62,7 +62,8 @@ fails for each version whose `.info` on the proxy names, as `Origin.Hash`,
 another commit than its tag, or none; the publishing job checks the same
 before it publishes. A failed run of the job *Verify every release tag is
 signed* is the alarm: its log names the tag or the version. Investigate it
-as a compromise, and withdraw the version as below. GitHub disables
+as a compromise, and withdraw the version as below, which also clears the
+alarm for that version. GitHub disables
 scheduled workflows in a repository with no activity for 60 days; enable
 the workflow again when that happens.
 
@@ -114,6 +115,16 @@ database keep it regardless. Add a `retract` directive with the reason to
 ```go
 retract v0.2.0 // Tagged from the wrong commit.
 ```
+
+The retraction also acknowledges the alarm of the daily audit, which reads
+`go.mod` on `main`, so it takes effect as soon as it is merged. Whatever the
+audit finds wrong with a version that `go.mod` retracts on its own, a tag
+that is not signed, a tag that is gone, a version the proxy serves without
+a tag or from another commit, it reports as a warning and passes; any other
+version still fails it. A range such as `retract [v0.2.0, v0.2.3]`
+acknowledges none of its versions, so retract each version the audit names
+on a line of its own. Never pin a bad tag to silence the audit: a pin
+records a tag object that was verified.
 
 ## Setting up verification
 
