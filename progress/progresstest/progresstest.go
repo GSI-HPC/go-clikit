@@ -74,13 +74,13 @@ func (c *Capture) Events() []progress.Event {
 }
 
 // An Option sets up the Bus that Checked and Watch make.
-type Option func(*progress.Options)
+type Option func(*progress.BusOptions)
 
 // Classify has the Bus class an error that says no class of its own by
-// fallback, as progress.Options.Classify does, so that the events carry the
+// fallback, as progress.BusOptions.Classify does, so that the events carry the
 // classes the program's own Bus would give them.
 func Classify(fallback func(error) progress.Class) Option {
-	return func(o *progress.Options) { o.Classify = fallback }
+	return func(o *progress.BusOptions) { o.Classify = fallback }
 }
 
 // Checked returns ctx with a Bus of its own, whose events a Capture keeps
@@ -116,7 +116,7 @@ func Watch(ctx context.Context, t testing.TB, opts ...Option) (context.Context, 
 }
 
 func newBus(c *Capture, opts []Option) *progress.Bus {
-	o := progress.Options{Sinks: []progress.Sink{c}}
+	o := progress.BusOptions{Sinks: []progress.Sink{c}}
 	for _, opt := range opts {
 		opt(&o)
 	}

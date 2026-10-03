@@ -67,7 +67,7 @@ func newSession(t *testing.T, command string, newDisplay func(*display.Terminal,
 	term.Program = "prog"
 	s.out, s.errOut = term.Writer(s.screen), term.Writer(s.screen)
 	s.shown = newDisplay(term, s.clock.Now)
-	s.bus = progress.NewBus(progress.Options{Sinks: []progress.Sink{s.capture, s.shown, s.summary}, Now: s.clock.Now})
+	s.bus = progress.NewBus(progress.BusOptions{Sinks: []progress.Sink{s.capture, s.shown, s.summary}, Now: s.clock.Now})
 	s.ctx, s.command = progress.Start(progress.WithBus(context.Background(), s.bus), progress.KindCommand, command)
 	t.Cleanup(s.bus.Close)
 	return s

@@ -33,7 +33,7 @@ import (
 // returns the log with every span id the Bus drew replaced by "#n", n in
 // the order the spans started, and the events a capture was sent, which
 // asks for lines as a live display does.
-func logged(t *testing.T, o progress.Options, work func(ctx context.Context)) (string, []progress.Event) {
+func logged(t *testing.T, o progress.BusOptions, work func(ctx context.Context)) (string, []progress.Event) {
 	t.Helper()
 	var out bytes.Buffer
 	log := progress.NewLog(&out, progress.LogOptions{Run: "0123456789abcdef", Version: "v1.2.3"})
@@ -87,7 +87,7 @@ func TestTheEventLogWritesEveryEventOnALineOfItsOwn(t *testing.T) {
 		t.Fatal("the traceparent was refused")
 	}
 	clock := newClock()
-	log, events := logged(t, progress.Options{
+	log, events := logged(t, progress.BusOptions{
 		Now: clock.Now, Trace: tc.Trace, Parent: tc.Parent, TraceFlags: tc.Flags, TraceState: tc.State,
 	}, func(busCtx context.Context) {
 		ctx, cmd := progress.Start(busCtx, progress.KindCommand, "exec", progress.WithFlags(progress.DryRun))
@@ -351,7 +351,7 @@ func declaredConstants(t *testing.T, file string) map[string]int {
 func TestTheEventLogSaysWhereItsTraceCameFrom(t *testing.T) {
 	t.Parallel()
 
-	first := func(o progress.Options) map[string]any {
+	first := func(o progress.BusOptions) map[string]any {
 		t.Helper()
 		log, _ := logged(t, o, func(context.Context) {})
 		var line map[string]any
@@ -360,13 +360,13 @@ func TestTheEventLogSaysWhereItsTraceCameFrom(t *testing.T) {
 		}
 		return line
 	}
-	here := first(progress.Options{})
+	here := first(progress.BusOptions{})
 	if len(here) != 5 || here["type"] != "trace" || len(here["trace"].(string)) != 32 || here["v"] != float64(1) ||
 		here["run"] != "0123456789abcdef" || here["version"] != "v1.2.3" {
 		t.Errorf("the first line of a trace that began here: %v", here)
 	}
 	tc, _ := progress.ParseTraceContext("00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00", "")
-	unsampled := first(progress.Options{Trace: tc.Trace, Parent: tc.Parent, TraceFlags: tc.Flags})
+	unsampled := first(progress.BusOptions{Trace: tc.Trace, Parent: tc.Parent, TraceFlags: tc.Flags})
 	if unsampled["parent"] != "00f067aa0ba902b7" || unsampled["traceFlags"] != "00" || unsampled["traceState"] != nil {
 		t.Errorf("the first line of a trace not sampled: %v", unsampled)
 	}
@@ -473,7 +473,7 @@ func TestALogThatCannotBeWrittenStopsAndSaysWhy(t *testing.T) {
 	w := &unwritable{}
 	log := progress.NewLog(w, progress.LogOptions{Run: "0123456789abcdef"})
 	capture := &progresstest.Capture{}
-	bus := progress.NewBus(progress.Options{Sinks: []progress.Sink{log, capture}})
+	bus := progress.NewBus(progress.BusOptions{Sinks: []progress.Sink{log, capture}})
 	ctx := progress.WithBus(context.Background(), bus)
 	const n = 2000
 	for i := range n {
@@ -539,7 +539,7 @@ func TestTheLogIsWrittenSoonAfterEachLine(t *testing.T) {
 		t.Parallel()
 		w := &writes{}
 		log := progress.NewLog(w, progress.LogOptions{Run: "0123456789abcdef", FlushEvery: 20 * time.Millisecond})
-		bus := progress.NewBus(progress.Options{Sinks: []progress.Sink{log}})
+		bus := progress.NewBus(progress.BusOptions{Sinks: []progress.Sink{log}})
 		_, cmd := progress.Start(progress.WithBus(context.Background(), bus), progress.KindCommand, "exec")
 		soon(t, w, `"kind":"command"`, "the command's start")
 		cmd.End(nil)
@@ -554,7 +554,7 @@ func TestTheLogIsWrittenSoonAfterEachLine(t *testing.T) {
 		w := &writes{}
 		// Nothing but the end of the step has the lines written here.
 		log := progress.NewLog(w, progress.LogOptions{Run: "0123456789abcdef", FlushEvery: time.Hour})
-		bus := progress.NewBus(progress.Options{Sinks: []progress.Sink{log}})
+		bus := progress.NewBus(progress.BusOptions{Sinks: []progress.Sink{log}})
 		ctx, cmd := progress.Start(progress.WithBus(context.Background(), bus), progress.KindCommand, "exec")
 		_, step := progress.Start(ctx, progress.KindStep, "run")
 		step.End(nil)
@@ -587,7 +587,7 @@ func TestALogThatStallsHoldsNothingUp(t *testing.T) {
 	w := stalled{release: make(chan struct{})}
 	defer close(w.release)
 	log := progress.NewLog(w, progress.LogOptions{FlushEvery: time.Millisecond, CloseWait: 50 * time.Millisecond})
-	bus := progress.NewBus(progress.Options{Sinks: []progress.Sink{log}})
+	bus := progress.NewBus(progress.BusOptions{Sinks: []progress.Sink{log}})
 	ctx := progress.WithBus(context.Background(), bus)
 	done := make(chan struct{})
 	go func() {
@@ -633,7 +633,7 @@ func TestALogThatFallsBehindKeepsWhatItHad(t *testing.T) {
 	t.Parallel()
 	w := &gate{open: make(chan struct{})}
 	log := progress.NewLog(w, progress.LogOptions{Run: "0123456789abcdef", FlushEvery: time.Millisecond, CloseWait: time.Minute})
-	bus := progress.NewBus(progress.Options{Sinks: []progress.Sink{log}})
+	bus := progress.NewBus(progress.BusOptions{Sinks: []progress.Sink{log}})
 	ctx := progress.WithBus(context.Background(), bus)
 	const n = 50000
 	for i := range n {
@@ -677,7 +677,7 @@ func TestTheLogIsWrittenInWholeLines(t *testing.T) {
 
 	w := &writes{}
 	log := progress.NewLog(w, progress.LogOptions{Run: "0123456789abcdef"})
-	bus := progress.NewBus(progress.Options{Sinks: []progress.Sink{log}})
+	bus := progress.NewBus(progress.BusOptions{Sinks: []progress.Sink{log}})
 	ctx := progress.WithBus(context.Background(), bus)
 	for i := range 3000 {
 		_, s := progress.Start(ctx, progress.KindCall, "ssh", progress.Node(fmt.Sprintf("exe%04d", i)))
@@ -731,7 +731,7 @@ func TestTwoRunsAppendingToOneFileCanBeToldApart(t *testing.T) {
 			}
 			defer func() { _ = f.Close() }()
 			log := progress.NewLog(f, progress.LogOptions{Run: run})
-			bus := progress.NewBus(progress.Options{Sinks: []progress.Sink{log}, Trace: trace})
+			bus := progress.NewBus(progress.BusOptions{Sinks: []progress.Sink{log}, Trace: trace})
 			ctx := progress.WithBus(context.Background(), bus)
 			for i := range events / 2 {
 				_, s := progress.Start(ctx, progress.KindCall, "ssh", progress.Node(fmt.Sprintf("exe%04d", i)))
@@ -784,7 +784,7 @@ func TestALogThatCannotFinishSaysSo(t *testing.T) {
 	w := stalled{release: make(chan struct{})}
 	defer close(w.release)
 	log := progress.NewLog(w, progress.LogOptions{FlushEvery: time.Millisecond, CloseWait: 20 * time.Millisecond})
-	bus := progress.NewBus(progress.Options{Sinks: []progress.Sink{log}})
+	bus := progress.NewBus(progress.BusOptions{Sinks: []progress.Sink{log}})
 	_, s := progress.Start(progress.WithBus(context.Background(), bus), progress.KindCall, "ssh")
 	s.End(nil)
 	bus.Close()
@@ -825,7 +825,7 @@ func TestALogStartsNoWriteOnceCloseHasGivenUp(t *testing.T) {
 	t.Parallel()
 	w := &counted{release: make(chan struct{})}
 	log := progress.NewLog(w, progress.LogOptions{FlushEvery: time.Hour, CloseWait: 20 * time.Millisecond})
-	bus := progress.NewBus(progress.Options{Sinks: []progress.Sink{log}})
+	bus := progress.NewBus(progress.BusOptions{Sinks: []progress.Sink{log}})
 	ctx := progress.WithBus(context.Background(), bus)
 	// Well over the 64 KiB at which the log writes, so that the first write
 	// is under way and more lines wait behind it.
@@ -860,7 +860,7 @@ func TestTheEventLogNamesTheProgram(t *testing.T) {
 	t.Parallel()
 	var out bytes.Buffer
 	log := progress.NewLog(&out, progress.LogOptions{Run: "0123456789abcdef", Program: "sind", Version: "v1.2.3"})
-	bus := progress.NewBus(progress.Options{Sinks: []progress.Sink{log}})
+	bus := progress.NewBus(progress.BusOptions{Sinks: []progress.Sink{log}})
 	bus.Close()
 	if err := log.Close(); err != nil {
 		t.Fatalf("closing the log: %v", err)

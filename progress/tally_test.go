@@ -31,7 +31,7 @@ func (s *tallied) Handle(e progress.Event) {
 func TestTallyCountsEveryTargetOnce(t *testing.T) {
 	t.Parallel()
 	sink := &tallied{ended: map[string]progress.Count{}}
-	ctx, _, _ := watched(t, progress.Options{Sinks: []progress.Sink{sink}})
+	ctx, _, _ := watched(t, progress.BusOptions{Sinks: []progress.Sink{sink}})
 	ctx, cmd := progress.Start(ctx, progress.KindCommand, "bmc power on")
 
 	targets := func(ctx context.Context, n int) []*progress.Span {
@@ -147,7 +147,7 @@ func TestTallyCountsWhatAQueuedBatchGrowsBy(t *testing.T) {
 func TestTallyCountsANestedStepLeftOutOnce(t *testing.T) {
 	t.Parallel()
 	sink := &tallied{ended: map[string]progress.Count{}}
-	ctx, bus, _ := watched(t, progress.Options{Sinks: []progress.Sink{sink}})
+	ctx, bus, _ := watched(t, progress.BusOptions{Sinks: []progress.Sink{sink}})
 	outerCtx, _ := progress.Start(ctx, progress.KindStep, "outer", progress.WithFlags(progress.Fold), progress.Total(6))
 	innerCtx, _ := progress.Start(outerCtx, progress.KindStep, "inner", progress.WithFlags(progress.Fold), progress.Total(6))
 	progress.Start(innerCtx, progress.KindBatch, "1/2", progress.Queued(), progress.Batch(1, 2), progress.Total(4))

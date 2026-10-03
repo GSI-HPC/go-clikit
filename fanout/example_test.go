@@ -22,7 +22,7 @@ import (
 // reported: a Fold step with a target for each item.
 func ExampleMap() {
 	capture := &progresstest.Capture{}
-	bus := progress.NewBus(progress.Options{Sinks: []progress.Sink{capture}})
+	bus := progress.NewBus(progress.BusOptions{Sinks: []progress.Sink{capture}})
 	ctx := progress.WithBus(context.Background(), bus)
 
 	nodes := []string{"exe01", "exe02", "exe03", "exe04"}

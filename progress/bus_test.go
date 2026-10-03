@@ -41,7 +41,7 @@ func (c *clock) Add(d time.Duration) {
 
 // watched returns a context whose Bus sends to a capture, and closes the
 // Bus and checks the events when the test ends.
-func watched(t *testing.T, o progress.Options) (context.Context, *progress.Bus, *progresstest.Capture) {
+func watched(t *testing.T, o progress.BusOptions) (context.Context, *progress.Bus, *progresstest.Capture) {
 	t.Helper()
 	capture := &progresstest.Capture{}
 	o.Sinks = append([]progress.Sink{capture}, o.Sinks...)
@@ -141,7 +141,7 @@ func BenchmarkTargetLifecycle(b *testing.B) {
 		}
 	})
 	b.Run("with a bus", func(b *testing.B) {
-		bus := progress.NewBus(progress.Options{Sinks: []progress.Sink{discard{}}})
+		bus := progress.NewBus(progress.BusOptions{Sinks: []progress.Sink{discard{}}})
 		defer bus.Close()
 		ctx, step := progress.Start(progress.WithBus(context.Background(), bus), progress.KindStep, "uptime")
 		defer step.End(nil)
@@ -159,7 +159,7 @@ func TestASpanReportsItsLifeInOrder(t *testing.T) {
 	t.Parallel()
 
 	clock := newClock()
-	ctx, bus, capture := watched(t, progress.Options{Now: clock.Now})
+	ctx, bus, capture := watched(t, progress.BusOptions{Now: clock.Now})
 	cmdCtx, cmd := progress.Start(ctx, progress.KindCommand, "bmc power on", progress.WithFlags(progress.DryRun))
 	stepCtx, step := progress.Start(cmdCtx, progress.KindStep, "power on", progress.WithFlags(progress.Fold), progress.Total(1), progress.Limit(8))
 	_, target := progress.Start(stepCtx, progress.KindTarget, "exe0001", progress.Queued(), progress.Node("exe0001"))
@@ -221,7 +221,7 @@ func TestOnlyTheFirstEndCounts(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			ctx, bus, capture := watched(t, progress.Options{})
+			ctx, bus, capture := watched(t, progress.BusOptions{})
 			_, span := progress.Start(ctx, progress.KindCall, "ssh", progress.Queued())
 			tc.finish(span)
 			bus.Close()
@@ -257,7 +257,7 @@ func TestEndTellsTheOutcomeFromTheError(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			ctx, bus, capture := watched(t, progress.Options{})
+			ctx, bus, capture := watched(t, progress.BusOptions{})
 			_, span := progress.Start(ctx, progress.KindCall, "ssh")
 			span.End(tc.err)
 			bus.Close()
@@ -270,7 +270,7 @@ func TestEndTellsTheOutcomeFromTheError(t *testing.T) {
 
 	t.Run("a long error is cut", func(t *testing.T) {
 		t.Parallel()
-		ctx, bus, capture := watched(t, progress.Options{})
+		ctx, bus, capture := watched(t, progress.BusOptions{})
 		_, span := progress.Start(ctx, progress.KindCall, "ipmi")
 		span.End(errors.New(strings.Repeat("é", progress.MaxErr)))
 		bus.Close()
@@ -283,7 +283,7 @@ func TestEndTellsTheOutcomeFromTheError(t *testing.T) {
 func TestSkipIsTheEndOfASpanLeftOut(t *testing.T) {
 	t.Parallel()
 
-	ctx, bus, capture := watched(t, progress.Options{})
+	ctx, bus, capture := watched(t, progress.BusOptions{})
 	stepCtx, step := progress.Start(ctx, progress.KindStep, "power on", progress.WithFlags(progress.Fold), progress.Total(4))
 	firstCtx, first := progress.Start(stepCtx, progress.KindBatch, "batch", progress.Queued(), progress.Batch(1, 2), progress.Total(2))
 	_, second := progress.Start(stepCtx, progress.KindBatch, "batch", progress.Queued(), progress.Batch(2, 2), progress.Total(2))
@@ -309,7 +309,7 @@ func TestSkipIsTheEndOfASpanLeftOut(t *testing.T) {
 func TestHiddenAndShowLinesArePassedDown(t *testing.T) {
 	t.Parallel()
 
-	ctx, bus, capture := watched(t, progress.Options{})
+	ctx, bus, capture := watched(t, progress.BusOptions{})
 	ctx, cmd := progress.Start(ctx, progress.KindCommand, "exec", progress.WithFlags(progress.DryRun))
 	ctx, step := progress.Start(ctx, progress.KindStep, "uptime", progress.WithFlags(progress.Fold|progress.ShowLines))
 	ctx, lookup := progress.Start(ctx, progress.KindCall, "credential bmc", progress.WithFlags(progress.Hidden))
@@ -331,7 +331,7 @@ func TestHiddenAndShowLinesArePassedDown(t *testing.T) {
 func TestTotalNeverShrinks(t *testing.T) {
 	t.Parallel()
 
-	ctx, bus, capture := watched(t, progress.Options{})
+	ctx, bus, capture := watched(t, progress.BusOptions{})
 	_, span := progress.Start(ctx, progress.KindStep, "ssh", progress.Total(5))
 	span.Update(progress.Total(3), progress.Node("ignored"))
 	span.Update(progress.Total(8))
@@ -353,7 +353,7 @@ func TestTotalNeverShrinks(t *testing.T) {
 func TestAParentEndsAfterItsChildren(t *testing.T) {
 	t.Parallel()
 
-	ctx, bus, capture := watched(t, progress.Options{})
+	ctx, bus, capture := watched(t, progress.BusOptions{})
 	stepCtx, step := progress.Start(ctx, progress.KindStep, "copy")
 	targetCtx, target := progress.Start(stepCtx, progress.KindTarget, "exe0001")
 	_, call := progress.Start(targetCtx, progress.KindCall, "scp")
@@ -380,7 +380,7 @@ func TestAParentEndsAfterItsChildren(t *testing.T) {
 func TestNothingStartsUnderASpanThatEnded(t *testing.T) {
 	t.Parallel()
 
-	ctx, bus, capture := watched(t, progress.Options{})
+	ctx, bus, capture := watched(t, progress.BusOptions{})
 	stepCtx, step := progress.Start(ctx, progress.KindStep, "copy")
 	targetCtx, target := progress.Start(stepCtx, progress.KindTarget, "exe0001")
 	target.End(nil)
@@ -402,7 +402,7 @@ func TestNothingStartsUnderASpanThatEnded(t *testing.T) {
 func TestCloseEndsWhatIsStillOpen(t *testing.T) {
 	t.Parallel()
 
-	ctx, bus, capture := watched(t, progress.Options{})
+	ctx, bus, capture := watched(t, progress.BusOptions{})
 	ctx, cmd := progress.Start(ctx, progress.KindCommand, "exec")
 	ctx, step := progress.Start(ctx, progress.KindStep, "uptime")
 	_, target := progress.Start(ctx, progress.KindTarget, "exe0001", progress.Queued())
@@ -443,7 +443,7 @@ func TestSpanIDsAreNeverZeroAndNeverShared(t *testing.T) {
 	seen := map[progress.SpanID]bool{}
 	for range 2 {
 		capture := &progresstest.Capture{}
-		bus := progress.NewBus(progress.Options{Sinks: []progress.Sink{capture}, Trace: trace})
+		bus := progress.NewBus(progress.BusOptions{Sinks: []progress.Sink{capture}, Trace: trace})
 		if bus.Trace() != trace {
 			t.Errorf("Trace() = %s, want %s", bus.Trace(), trace)
 		}
@@ -464,7 +464,7 @@ func TestSpanIDsAreNeverZeroAndNeverShared(t *testing.T) {
 		}
 	}
 
-	a, b := progress.NewBus(progress.Options{}), progress.NewBus(progress.Options{})
+	a, b := progress.NewBus(progress.BusOptions{}), progress.NewBus(progress.BusOptions{})
 	if a.Trace() == (progress.TraceID{}) || a.Trace() == b.Trace() {
 		t.Errorf("drawn traces %s and %s", a.Trace(), b.Trace())
 	}
@@ -479,9 +479,9 @@ func TestSpanIDsAreNeverZeroAndNeverShared(t *testing.T) {
 func TestASpanOfAnotherBusIsNoParent(t *testing.T) {
 	t.Parallel()
 
-	outer, _, _ := watched(t, progress.Options{})
+	outer, _, _ := watched(t, progress.BusOptions{})
 	outer, _ = progress.Start(outer, progress.KindCommand, "mcp serve")
-	inner, bus, capture := watched(t, progress.Options{})
+	inner, bus, capture := watched(t, progress.BusOptions{})
 	ctx := progress.WithBus(outer, bus)
 	if progress.SpanFrom(ctx) != nil {
 		t.Error("SpanFrom returned the span of another Bus")
@@ -497,7 +497,7 @@ func TestASpanOfAnotherBusIsNoParent(t *testing.T) {
 func TestEventsHaveOneOrderUnderConcurrency(t *testing.T) {
 	t.Parallel()
 
-	ctx, bus, capture := watched(t, progress.Options{})
+	ctx, bus, capture := watched(t, progress.BusOptions{})
 	stepCtx, step := progress.Start(ctx, progress.KindStep, "uptime", progress.WithFlags(progress.Fold), progress.Total(64), progress.Limit(8))
 	spans := make([]*progress.Span, 64)
 	ctxs := make([]context.Context, 64)
@@ -559,7 +559,7 @@ func TestASinkThatPanicsIsRemoved(t *testing.T) {
 
 	var log bytes.Buffer
 	bad := &panicky{n: 2}
-	ctx, bus, capture := watched(t, progress.Options{Sinks: []progress.Sink{bad}, PanicLog: &log})
+	ctx, bus, capture := watched(t, progress.BusOptions{Sinks: []progress.Sink{bad}, PanicLog: &log})
 	for range 3 {
 		_, span := progress.Start(ctx, progress.KindCall, "ssh")
 		span.End(nil)
@@ -579,7 +579,7 @@ func TestASinkThatPanicsIsRemoved(t *testing.T) {
 	// A sink listed twice that panics is taken off under both listings,
 	// and is not sent the event again under the second.
 	twice := &panicky{n: 1}
-	tctx, tbus, _ := watched(t, progress.Options{Sinks: []progress.Sink{twice, twice}, PanicLog: io.Discard})
+	tctx, tbus, _ := watched(t, progress.BusOptions{Sinks: []progress.Sink{twice, twice}, PanicLog: io.Discard})
 	_, span := progress.Start(tctx, progress.KindCall, "ssh")
 	span.End(nil)
 	tbus.Close()
@@ -588,7 +588,7 @@ func TestASinkThatPanicsIsRemoved(t *testing.T) {
 	}
 
 	// A sink that panics when asked for lines asks for none.
-	lines := progress.NewBus(progress.Options{Sinks: []progress.Sink{&panicky{lines: true}}, PanicLog: io.Discard})
+	lines := progress.NewBus(progress.BusOptions{Sinks: []progress.Sink{&panicky{lines: true}}, PanicLog: io.Discard})
 	var lctx context.Context
 	lctx, span = progress.Start(progress.WithBus(context.Background(), lines), progress.KindCall, "ssh", progress.WithFlags(progress.ShowLines))
 	var buf bytes.Buffer
@@ -600,7 +600,7 @@ func TestASinkThatPanicsIsRemoved(t *testing.T) {
 
 	// A sink that panics when told the trace is sent nothing.
 	begins := &panicky{begin: true}
-	traced := progress.NewBus(progress.Options{Sinks: []progress.Sink{begins}, PanicLog: io.Discard})
+	traced := progress.NewBus(progress.BusOptions{Sinks: []progress.Sink{begins}, PanicLog: io.Discard})
 	_, span = progress.Start(progress.WithBus(context.Background(), traced), progress.KindCall, "ssh")
 	span.End(nil)
 	traced.Close()
@@ -633,7 +633,7 @@ func TestASinkIsAskedForLinesOnce(t *testing.T) {
 
 	var log bytes.Buffer
 	bad, good := &asker{panics: true}, &asker{}
-	bus := progress.NewBus(progress.Options{
+	bus := progress.NewBus(progress.BusOptions{
 		Sinks:    []progress.Sink{bad, &panicky{n: 1}, &panicky{n: 2}, good},
 		PanicLog: &log,
 	})
@@ -710,7 +710,7 @@ func TestSuspendReturnsOnceTheDisplaysAreOff(t *testing.T) {
 	t.Parallel()
 
 	display := &terminal{t: t}
-	ctx, bus, capture := watched(t, progress.Options{Sinks: []progress.Sink{display}})
+	ctx, bus, capture := watched(t, progress.BusOptions{Sinks: []progress.Sink{display}})
 	display.ctx = ctx
 	gateCtx, gate := progress.Start(ctx, progress.KindWait, "confirm")
 
@@ -754,7 +754,7 @@ func TestADisplayThatPanicsWhenSuspendedIsRemoved(t *testing.T) {
 	t.Parallel()
 
 	display := &terminal{t: t, panic: true}
-	ctx, bus, _ := watched(t, progress.Options{Sinks: []progress.Sink{display}, PanicLog: io.Discard})
+	ctx, bus, _ := watched(t, progress.BusOptions{Sinks: []progress.Sink{display}, PanicLog: io.Discard})
 	display.ctx = ctx
 	progress.Suspend(ctx)()
 	progress.Suspend(ctx)()
@@ -765,7 +765,7 @@ func TestADisplayThatPanicsWhenSuspendedIsRemoved(t *testing.T) {
 
 	// Listed twice, it is taken off under both listings at once.
 	display = &terminal{t: t, panic: true}
-	ctx, bus, _ = watched(t, progress.Options{Sinks: []progress.Sink{display, display}, PanicLog: io.Discard})
+	ctx, bus, _ = watched(t, progress.BusOptions{Sinks: []progress.Sink{display, display}, PanicLog: io.Discard})
 	display.ctx = ctx
 	progress.Suspend(ctx)()
 	bus.Close()
@@ -826,7 +826,7 @@ func TestADisplayRemovedWhileSuspendedIsResumed(t *testing.T) {
 
 	// Removed under one suspension, and resumed by it.
 	display := &fragile{}
-	ctx, _, _ := watched(t, progress.Options{Sinks: []progress.Sink{display}, PanicLog: io.Discard})
+	ctx, _, _ := watched(t, progress.BusOptions{Sinks: []progress.Sink{display}, PanicLog: io.Discard})
 	resume := progress.Suspend(ctx)
 	display.Break()
 	progress.Start(ctx, progress.KindCall, "ssh")
@@ -838,7 +838,7 @@ func TestADisplayRemovedWhileSuspendedIsResumed(t *testing.T) {
 	// Removed between two nested suspensions: the inner one, which it was
 	// never sent, does not resume it, and the outer one does.
 	display = &fragile{}
-	ctx, _, _ = watched(t, progress.Options{Sinks: []progress.Sink{display}, PanicLog: io.Discard})
+	ctx, _, _ = watched(t, progress.BusOptions{Sinks: []progress.Sink{display}, PanicLog: io.Discard})
 	outer := progress.Suspend(ctx)
 	display.Break()
 	progress.Start(ctx, progress.KindCall, "ssh")
@@ -854,7 +854,7 @@ func TestADisplayRemovedWhileSuspendedIsResumed(t *testing.T) {
 
 	// Removed while suspended twice, and resumed by Close.
 	display = &fragile{}
-	ctx, bus, _ := watched(t, progress.Options{Sinks: []progress.Sink{display}, PanicLog: io.Discard})
+	ctx, bus, _ := watched(t, progress.BusOptions{Sinks: []progress.Sink{display}, PanicLog: io.Discard})
 	progress.Suspend(ctx)
 	progress.Suspend(ctx)
 	display.Break()
@@ -866,7 +866,7 @@ func TestADisplayRemovedWhileSuspendedIsResumed(t *testing.T) {
 
 	// Panics when resumed: called no more.
 	display = &fragile{fails: true}
-	ctx, bus, _ = watched(t, progress.Options{Sinks: []progress.Sink{display}, PanicLog: io.Discard})
+	ctx, bus, _ = watched(t, progress.BusOptions{Sinks: []progress.Sink{display}, PanicLog: io.Discard})
 	first := progress.Suspend(ctx)
 	progress.Suspend(ctx)
 	first()
@@ -883,7 +883,7 @@ func TestADisplayListedTwiceIsResumedTwice(t *testing.T) {
 
 	display := &fragile{}
 	sinks := []progress.Sink{display, display}
-	ctx, _, _ := watched(t, progress.Options{Sinks: sinks, PanicLog: io.Discard})
+	ctx, _, _ := watched(t, progress.BusOptions{Sinks: sinks, PanicLog: io.Discard})
 	progress.Suspend(ctx)()
 	if got := display.Calls(); got != "suspend suspend resume resume" {
 		t.Errorf("after its resume the display saw %q, want two suspends and two resumes", got)
@@ -891,7 +891,7 @@ func TestADisplayListedTwiceIsResumedTwice(t *testing.T) {
 
 	display = &fragile{}
 	sinks = []progress.Sink{display, display}
-	ctx, bus, _ := watched(t, progress.Options{Sinks: sinks, PanicLog: io.Discard})
+	ctx, bus, _ := watched(t, progress.BusOptions{Sinks: sinks, PanicLog: io.Discard})
 	outer := progress.Suspend(ctx)
 	inner := progress.Suspend(ctx)
 	inner()
@@ -929,7 +929,7 @@ func TestADisplayThatCannotBeComparedIsSuspended(t *testing.T) {
 		valueDisplay{names: []string{"a"}, calls: &one},
 		valueDisplay{names: []string{"b"}, calls: &two},
 	}
-	ctx, bus, _ := watched(t, progress.Options{Sinks: sinks, PanicLog: io.Discard})
+	ctx, bus, _ := watched(t, progress.BusOptions{Sinks: sinks, PanicLog: io.Discard})
 	outer := progress.Suspend(ctx)
 	inner := progress.Suspend(ctx)
 	inner()
@@ -1004,7 +1004,7 @@ func TestASinkThatCannotBeComparedIsRemoved(t *testing.T) {
 		panic("drawing went wrong")
 	}
 	var g sinkFunc = func(progress.Event) { kept++ }
-	ctx, bus, capture := watched(t, progress.Options{Sinks: []progress.Sink{f, g}, PanicLog: io.Discard})
+	ctx, bus, capture := watched(t, progress.BusOptions{Sinks: []progress.Sink{f, g}, PanicLog: io.Discard})
 	_, span := progress.Start(ctx, progress.KindCall, "ssh")
 	span.End(nil)
 	unblocked(ctx, t, "after a func sink panicked")
@@ -1019,7 +1019,7 @@ func TestASinkThatCannotBeComparedIsRemoved(t *testing.T) {
 	// A display that panics on the event of a suspension, which is sent
 	// with the Bus locked, and one that panics when suspended.
 	for _, m := range []mapDisplay{{"suspend": true}, {"Suspend": true}} {
-		ctx, bus, _ := watched(t, progress.Options{Sinks: []progress.Sink{m}, PanicLog: io.Discard})
+		ctx, bus, _ := watched(t, progress.BusOptions{Sinks: []progress.Sink{m}, PanicLog: io.Discard})
 		resume := progress.Suspend(ctx)
 		unblocked(ctx, t, fmt.Sprintf("after %v", m))
 		resume()
@@ -1040,7 +1040,7 @@ func TestAClockThatPanicsLeavesTheBusUnlocked(t *testing.T) {
 		}
 		return time.Unix(0, 0)
 	}
-	ctx, bus, _ := watched(t, progress.Options{Now: now})
+	ctx, bus, _ := watched(t, progress.BusOptions{Now: now})
 	broken.Store(true)
 	func() {
 		defer func() {
@@ -1076,7 +1076,7 @@ func TestEndClassesByTheFallbackOfTheBus(t *testing.T) {
 		{"no fallback", nil, progress.ClassTarget},
 		{"a fallback", byCode, progress.ClassTransport},
 	} {
-		ctx, bus, capture := watched(t, progress.Options{Classify: tc.fallback})
+		ctx, bus, capture := watched(t, progress.BusOptions{Classify: tc.fallback})
 		_, span := progress.Start(ctx, progress.KindTarget, "exe0001")
 		span.End(errUnreachable)
 		bus.Close()
@@ -1093,7 +1093,7 @@ func TestThePanicLogNamesTheProgram(t *testing.T) {
 	t.Parallel()
 
 	var log bytes.Buffer
-	ctx, bus, _ := watched(t, progress.Options{Sinks: []progress.Sink{&panicky{n: 1}}, PanicLog: &log, Program: "sind"})
+	ctx, bus, _ := watched(t, progress.BusOptions{Sinks: []progress.Sink{&panicky{n: 1}}, PanicLog: &log, Program: "sind"})
 	_, span := progress.Start(ctx, progress.KindCall, "docker ps")
 	span.End(nil)
 	bus.Close()
@@ -1106,7 +1106,7 @@ func TestThePanicLogNamesTheProgram(t *testing.T) {
 func TestSkipAfterCloseIsIgnored(t *testing.T) {
 	t.Parallel()
 
-	ctx, bus, capture := watched(t, progress.Options{})
+	ctx, bus, capture := watched(t, progress.BusOptions{})
 	_, span := progress.Start(ctx, progress.KindBatch, "batch 2/2", progress.Queued())
 	bus.Close()
 	n := len(capture.Events())
@@ -1121,7 +1121,7 @@ func TestSkipAfterCloseIsIgnored(t *testing.T) {
 func TestAnEndLeavesOtherSpansOpen(t *testing.T) {
 	t.Parallel()
 
-	ctx, bus, capture := watched(t, progress.Options{})
+	ctx, bus, capture := watched(t, progress.BusOptions{})
 	aCtx, a := progress.Start(ctx, progress.KindStep, "a")
 	_, child := progress.Start(aCtx, progress.KindCall, "a's call")
 	_, b := progress.Start(ctx, progress.KindStep, "b")

@@ -52,7 +52,7 @@ func ExampleNewPlain() {
 		},
 	})
 	summary := &display.Summary{}
-	bus := progress.NewBus(progress.Options{Sinks: []progress.Sink{plain, summary}, Now: clock.Now})
+	bus := progress.NewBus(progress.BusOptions{Sinks: []progress.Sink{plain, summary}, Now: clock.Now})
 	ctx, command := progress.Start(progress.WithBus(context.Background(), bus), progress.KindCommand, "create cluster")
 
 	ctx, step := progress.Start(ctx, progress.KindStep, "starting the nodes",
@@ -89,7 +89,7 @@ func ExampleNewTree() {
 	screen := &progresstest.Screen{Width: 60}
 	term := display.NewTerminal(screen, func() (int, int, error) { return 60, 24, nil })
 	tree := display.NewTree(term, display.TreeOptions{Now: clock.Now})
-	bus := progress.NewBus(progress.Options{Sinks: []progress.Sink{tree}, Now: clock.Now})
+	bus := progress.NewBus(progress.BusOptions{Sinks: []progress.Sink{tree}, Now: clock.Now})
 	ctx, command := progress.Start(progress.WithBus(context.Background(), bus), progress.KindCommand, "power on")
 
 	ctx, step := progress.Start(ctx, progress.KindStep, "powering on",
@@ -139,7 +139,7 @@ func ExampleNewCounter() {
 	screen := &progresstest.Screen{}
 	term := display.NewTerminal(screen, nil)
 	counter := display.NewCounter(term, display.CounterOptions{Now: clock.Now})
-	bus := progress.NewBus(progress.Options{Sinks: []progress.Sink{counter}, Now: clock.Now})
+	bus := progress.NewBus(progress.BusOptions{Sinks: []progress.Sink{counter}, Now: clock.Now})
 	ctx, command := progress.Start(progress.WithBus(context.Background(), bus), progress.KindCommand, "uptime")
 
 	ctx, step := progress.Start(ctx, progress.KindStep, "uptime",

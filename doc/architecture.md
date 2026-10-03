@@ -88,7 +88,7 @@ keeps it without a line of the caller's.
   with its lock held, in `Seq` order. A sink updates memory and returns: it
   never blocks, never writes to a terminal or a file there, and never calls
   the Bus back. A sink that panics is taken off the Bus, whatever its type,
-  and its stack goes to `Options.PanicLog`. The Bus knows its sinks by
+  and its stack goes to `BusOptions.PanicLog`. The Bus knows its sinks by
   where they are listed, never by comparing them, and releases its lock
   however a call under it ends, so neither a sink nor a clock that panics
   leaves it locked.
@@ -144,9 +144,9 @@ The kit knows no program. What depends on one is a parameter or a hook:
 
 | What | Where |
 | --- | --- |
-| The program's name, in the line that says a sink, a display or a pool's work panicked, and in the error a panic becomes | `progress.Options.Program`, `display.Terminal.Program`, `fanout.Options.Program`, `fanout.Recovered` |
+| The program's name, in the line that says a sink, a display or a pool's work panicked, and in the error a panic becomes | `progress.BusOptions.Program`, `display.Terminal.Program`, `fanout.Options.Program`, `fanout.Recovered` |
 | The program's name and version on the event log's first line | `progress.LogOptions` |
-| The class of an error that says none of its own, such as the program's rule for its exit codes | `progress.Options.Classify`, `fanout.Options.Classify`, `progresstest.Classify` |
+| The class of an error that says none of its own, such as the program's rule for its exit codes | `progress.BusOptions.Classify`, `fanout.Options.Classify`, `progresstest.Classify` |
 | The error a pool's step ends with, such as the program's exit code on the kit's summary | `fanout.Options.Summarize`, with `fanout.Failure` as the default |
 | The noun for the targets, "1 host" and "480 hosts" | `display.PlainOptions.Noun`, `fanout.Failure` |
 | What a display names an item by, and what an item needs besides its place in the pool | `fanout.Options.Describe`, `fanout.Options.Acquire` |

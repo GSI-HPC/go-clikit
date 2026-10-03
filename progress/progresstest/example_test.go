@@ -57,7 +57,7 @@ func ExampleWatch() {
 // read the same folded into one line.
 func ExampleCapture() {
 	capture := &progresstest.Capture{}
-	bus := progress.NewBus(progress.Options{Sinks: []progress.Sink{capture}})
+	bus := progress.NewBus(progress.BusOptions{Sinks: []progress.Sink{capture}})
 	_ = reset(progress.WithBus(context.Background(), bus), []string{"exe1", "exe2", "exe3", "exe10"})
 	bus.Close()
 	fmt.Print(capture.Tree())

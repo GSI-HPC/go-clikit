@@ -15,7 +15,7 @@ import (
 // zero, which means no span, is skipped.
 func TestTheSpanIDThatWouldBeZeroIsSkipped(t *testing.T) {
 	t.Parallel()
-	b := NewBus(Options{})
+	b := NewBus(BusOptions{})
 	b.base = math.MaxUint64
 	_, s := Start(WithBus(context.Background(), b), KindCall, "ssh")
 	if s.id != 1 {

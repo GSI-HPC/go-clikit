@@ -59,7 +59,7 @@ func reset(ctx context.Context, nodes []string) error {
 // A command attaches a Bus to its context and ends the spans it started;
 // the library it calls reports its work under them.
 func Example() {
-	bus := progress.NewBus(progress.Options{Sinks: []progress.Sink{printer{}}})
+	bus := progress.NewBus(progress.BusOptions{Sinks: []progress.Sink{printer{}}})
 	ctx, command := progress.Start(progress.WithBus(context.Background(), bus), progress.KindCommand, "power reset")
 	command.End(reset(ctx, []string{"exe01", "exe02"}))
 	bus.Close()
@@ -97,7 +97,7 @@ func ExampleNewLog() {
 	var buf bytes.Buffer
 	log := progress.NewLog(&buf, progress.LogOptions{Program: "prog", Version: "v1.2.3", Run: "0123456789abcdef"})
 	now := time.Date(2026, 9, 25, 12, 0, 0, 0, time.UTC)
-	bus := progress.NewBus(progress.Options{
+	bus := progress.NewBus(progress.BusOptions{
 		Sinks: []progress.Sink{log},
 		Now:   func() time.Time { return now },
 		Trace: progress.TraceID{0x4b, 0xf9, 0x2f, 0x35, 0x77, 0xb3, 0x4d, 0xa6, 0xa3, 0xce, 0x92, 0x9d, 0x0e, 0x0e, 0x47, 0x36},
@@ -134,7 +134,7 @@ var spanID = regexp.MustCompile(`"(span|parent)":"[0-9a-f]{16}"`)
 func ExampleParseTraceContext() {
 	tc, ok := progress.ParseTraceContext("00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01", "rojo=00f067aa0ba902b7")
 	fmt.Println(ok, tc.Trace, tc.Parent, tc.Flags, tc.State)
-	bus := progress.NewBus(progress.Options{Trace: tc.Trace, Parent: tc.Parent, TraceFlags: tc.Flags, TraceState: tc.State})
+	bus := progress.NewBus(progress.BusOptions{Trace: tc.Trace, Parent: tc.Parent, TraceFlags: tc.Flags, TraceState: tc.State})
 	defer bus.Close()
 
 	_, ok = progress.ParseTraceContext("00-00000000000000000000000000000000-00f067aa0ba902b7-01", "")

@@ -51,7 +51,7 @@ func newPlainFixtureWith(t *testing.T, command string, o display.PlainOptions) *
 	f.plain = display.NewPlain(f.term, o)
 	f.summary = &display.Summary{}
 	f.capture = &progresstest.Capture{}
-	f.bus = progress.NewBus(progress.Options{Sinks: []progress.Sink{f.capture, f.plain, f.summary}, Now: f.clock.Now})
+	f.bus = progress.NewBus(progress.BusOptions{Sinks: []progress.Sink{f.capture, f.plain, f.summary}, Now: f.clock.Now})
 	t.Cleanup(func() {
 		f.close()
 		progresstest.Check(t, f.capture.Events())
@@ -237,7 +237,7 @@ func TestPlainLinesOfAStepWithNothingToNameIt(t *testing.T) {
 	s := &screen{}
 	c := &clock{now: time.Date(2026, 9, 26, 12, 0, 0, 0, time.UTC)}
 	plain := display.NewPlain(display.NewTerminal(s, nil), display.PlainOptions{Now: c.Now})
-	bus := progress.NewBus(progress.Options{Sinks: []progress.Sink{plain}, Now: c.Now})
+	bus := progress.NewBus(progress.BusOptions{Sinks: []progress.Sink{plain}, Now: c.Now})
 	fanout.Map(progress.WithBus(context.Background(), bus), []string{"exe1", "exe2"}, fanout.Options[string]{Limit: 1},
 		func(context.Context, string) (struct{}, error) {
 			c.Add(11 * time.Second)
@@ -411,7 +411,7 @@ func TestPlainReadsTheRealClock(t *testing.T) {
 		s := &screen{}
 		plain := display.NewPlain(display.NewTerminal(s, nil), display.PlainOptions{})
 		capture := &progresstest.Capture{}
-		bus := progress.NewBus(progress.Options{Sinks: []progress.Sink{capture, plain}})
+		bus := progress.NewBus(progress.BusOptions{Sinks: []progress.Sink{capture, plain}})
 		ctx, command := progress.Start(progress.WithBus(context.Background(), bus), progress.KindCommand, "exec")
 		plain.Start()
 		ctx, step := progress.Start(ctx, progress.KindStep, "run", progress.WithFlags(progress.Fold), progress.Total(1))
@@ -455,7 +455,7 @@ func TestPlainWritesTheLinesThatComeWhileItDraws(t *testing.T) {
 		plain := display.NewPlain(display.NewTerminal(s, nil), display.PlainOptions{Now: now})
 		made = true
 		capture := &progresstest.Capture{}
-		bus := progress.NewBus(progress.Options{Sinks: []progress.Sink{capture, plain}})
+		bus := progress.NewBus(progress.BusOptions{Sinks: []progress.Sink{capture, plain}})
 		ctx, command := progress.Start(progress.WithBus(context.Background(), bus), progress.KindCommand, "exec")
 		plain.Start()
 		// The first tick finds the Plain drawing, held up by the clock.

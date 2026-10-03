@@ -77,7 +77,7 @@ func newFixture(t *testing.T, command string, size func() (int, int, error)) *fi
 	f.term = display.NewTerminal(f.screen, size)
 	f.counter = display.NewCounter(f.term, display.CounterOptions{Now: f.clock.Now})
 	capture := &progresstest.Capture{}
-	bus := progress.NewBus(progress.Options{Sinks: []progress.Sink{capture, f.counter}, Now: f.clock.Now})
+	bus := progress.NewBus(progress.BusOptions{Sinks: []progress.Sink{capture, f.counter}, Now: f.clock.Now})
 	t.Cleanup(func() {
 		bus.Close()
 		f.counter.Close()
@@ -367,7 +367,7 @@ func TestTheCounterOfAStepWithNothingToNameIt(t *testing.T) {
 	s := &screen{}
 	c := &clock{now: time.Date(2026, 9, 26, 12, 0, 0, 0, time.UTC)}
 	counter := display.NewCounter(display.NewTerminal(s, nil), display.CounterOptions{Now: c.Now})
-	bus := progress.NewBus(progress.Options{Sinks: []progress.Sink{counter}, Now: c.Now})
+	bus := progress.NewBus(progress.BusOptions{Sinks: []progress.Sink{counter}, Now: c.Now})
 	fanout.Map(progress.WithBus(context.Background(), bus), []string{"exe1"}, fanout.Options[string]{},
 		func(context.Context, string) (struct{}, error) {
 			c.Add(time.Second)

@@ -474,7 +474,7 @@ func TestThePanicOfADisplayWritesWhatItHeldFirst(t *testing.T) {
 			return 100, 24, nil
 		})
 		tree := display.NewTree(term, display.TreeOptions{})
-		bus := progress.NewBus(progress.Options{Sinks: []progress.Sink{tree}})
+		bus := progress.NewBus(progress.BusOptions{Sinks: []progress.Sink{tree}})
 		ctx, command := progress.Start(progress.WithBus(context.Background(), bus), progress.KindCommand, "cmd")
 		tree.Start()
 		time.Sleep(2 * time.Second)
