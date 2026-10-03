@@ -66,7 +66,10 @@ var ErrNotTried = errors.New("not tried: an earlier batch failed")
 // returns an error stops the run: the batches after it are not tried. A
 // skip, an error that is progress.ErrSkipped as errors.Is tells, such as
 // one progress.Skip returns, is no failure, though: the batch ends skipped
-// and the run goes on. An interrupt stops the run too, at the next pause
+// and the run goes on. errors.Is finds a skip in every error an error
+// joins, so a run that joins the errors of its nodes returns a skip only
+// when every node was skipped; joined with a failure, the skip hides it,
+// and the next batch runs. An interrupt stops the run too, at the next pause
 // or, without one, before the next batch; the batch under way when it
 // came is left to stop by itself, as a pool does, and the first batch is
 // always run, so that the work for each of its nodes reports how the
