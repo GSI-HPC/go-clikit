@@ -66,6 +66,15 @@ as a compromise, and withdraw the version as below. GitHub disables
 scheduled workflows in a repository with no activity for 60 days; enable
 the workflow again when that happens.
 
+The audit reads the proxy's list of the module's versions, not the feed at
+index.golang.org. The feed records every version the proxy has fetched, but
+of every module in one stream that cannot be asked for one module, so the
+audit would read all of it every day. The list goes on listing a version
+the proxy has fetched, retracted or not; the proxy drops one only in rare
+cases, such as a legal request. When the proxy cannot be read, the audit
+verifies the tags all the same, and fails, saying that the versions are
+unchecked.
+
 The audit finds a bad release, up to a day late; it does not prevent one.
 What prevents one is the tag ruleset under *Setting up verification*, which
 lets only the maintainers create `v*` tags and nobody delete them.

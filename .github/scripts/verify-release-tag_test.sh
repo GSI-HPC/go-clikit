@@ -321,6 +321,15 @@ PROXY_STATUS=404 expect 'an audit of a module the proxy has not fetched' pass ''
 PROXY_STATUS=410 expect 'an audit of a module the proxy refuses as gone' pass '' audit "$listed" ''
 PROXY_STATUS=500 expect 'an audit when the module proxy fails' fail 'answered 500' audit "$listed" ''
 CURL_EXIT=6 expect 'an audit when the module proxy cannot be reached' fail 'cannot fetch' audit "$listed" ''
+PROXY_STATUS=500 expect 'an audit saying what a failing module proxy leaves unchecked' fail \
+  'the versions the module proxy serves are unchecked' audit "$listed" ''
+# A module proxy that fails leaves the tags verified all the same.
+git tag -a v0.0.5 -m 'release v0.0.5' "$old"
+PROXY_STATUS=500 expect 'an audit finding an unsigned tag while the module proxy fails' fail \
+  'v0.0.5 is not signed by a key' audit "$listed" ''
+CURL_EXIT=6 expect 'an audit counting the bad tags while the module proxy cannot be reached' fail \
+  '1 of 2 release tag(s)' audit "$listed" ''
+git tag -d v0.0.5 > /dev/null
 : > "$PROXY_LIST"
 printf 'go 1.26.0\n' > "$scratch/nomodule.mod"
 expect 'an audit with a go.mod naming no module' fail 'names no module' \
@@ -359,6 +368,8 @@ git init -q "$scratch/untagged"
 cd "$scratch/untagged"
 git commit -q --allow-empty -m 'first'
 expect 'an audit of a repository without release tags' pass 'no release tags' audit '' ''
+PROXY_STATUS=500 expect 'an audit of a repository without release tags while the module proxy fails' fail \
+  'answered 500' audit '' ''
 printf 'v0.1.0\n' > "$PROXY_LIST"
 expect 'an audit finding a version on the module proxy and no tags at all' fail \
   '1 version(s) on the module proxy have no tag' audit '' ''
