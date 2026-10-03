@@ -133,7 +133,8 @@ func newBus(c *Capture, opts []Option) *progress.Bus {
 // read the same once their own node and host are written {} are folded into
 // one line naming them as a node set, or listing them when a name is no
 // node or is given twice, as a target that ran twice is; siblings are sorted by what they
-// read, with numbers in their numeric order; and neither ids, times nor
+// read, with numbers in their numeric order and those that differ only in
+// leading zeros, as x01 and x1, byte by byte; and neither ids, times nor
 // lines of output are drawn. A span not ended reads as its state.
 //
 // Tests compare trees whole, so the format is kept: a field is drawn only
@@ -199,7 +200,7 @@ func blocks(siblings []*node, repl func(string) string) []string {
 	for block, names := range folded {
 		out = append(out, strings.Replace(block, foldHere, fold(names), 1))
 	}
-	slices.SortFunc(out, natural)
+	slices.SortFunc(out, order)
 	return out
 }
 
@@ -278,12 +279,19 @@ func fold(names []string) string {
 	for _, name := range names {
 		one, err := nodeset.Parse(name)
 		if err != nil || one.String() != name || set.Contains(name) {
-			slices.SortFunc(names, natural)
+			slices.SortFunc(names, order)
 			return strings.Join(names, ",")
 		}
 		_ = set.Add(name)
 	}
 	return set.String()
+}
+
+// order is natural, with strings it holds equal, such as "x01" and "x1",
+// ordered byte by byte, so that siblings are drawn in one order whichever
+// started first.
+func order(a, b string) int {
+	return cmp.Or(natural(a, b), strings.Compare(a, b))
 }
 
 // natural orders strings with the numbers in them compared by value, so
