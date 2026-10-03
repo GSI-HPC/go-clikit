@@ -361,7 +361,9 @@ type Fields struct {
 	Source string
 	// Timeout is the bound of a call, or the length of a wait.
 	Timeout time.Duration
-	// Exit is the exit code of a command, nil when there was none.
+	// Exit is the exit code of a command, nil when there was none. Exit,
+	// when set, points to a value every sink of the event shares; a sink
+	// never writes through it.
 	Exit *int
 }
 
