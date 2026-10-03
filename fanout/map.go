@@ -153,6 +153,7 @@ type Outcome[R any] struct {
 // Summary of the items that failed, which says whether every one of them
 // ended canceled, as the end of ctx leaves a pool, which Failure, the
 // default, then ends canceled.
+//
 // fn is called with the context of its item's target, so that the calls it
 // makes are reported under it.
 //
@@ -167,9 +168,9 @@ type Outcome[R any] struct {
 // fn left out on purpose, by returning a skip, an error that is
 // progress.ErrSkipped as errors.Is tells, such as one progress.Skip
 // returns, ends skipped, with the error's text as its Err, and is none of
-// those that failed. An item waiting
-// for o.Acquire is not yet running, and one it refused ends at once, as
-// MapOptions.Acquire says.
+// those that failed, even when the error joins the skip with a failure,
+// as progress.ErrSkipped warns. An item waiting for o.Acquire is not yet
+// running, and one it refused ends at once, as MapOptions.Acquire says.
 func Map[T, R any](ctx context.Context, items []T, o MapOptions[T], fn func(ctx context.Context, item T) (R, error)) ([]Outcome[R], error) {
 	limit := o.Limit
 	if limit < 1 {
