@@ -11,10 +11,9 @@
 // every target is announced queued before the first runs, each is ended
 // before its place is given up, and those never started end too, canceled
 // when the context left them out, so that a display's count reaches its
-// total however the work ends. A panic
-// in the work for one item becomes that item's error. The package knows no
-// program: its name, the rule that tells an error's class and the error a
-// step ends with are Options.
+// total however the work ends. A panic in the work for one item becomes
+// that item's error. The package knows no program: its name, the rule
+// that tells an error's class and the error a step ends with are Options.
 package fanout
 
 import (
