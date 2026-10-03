@@ -27,7 +27,7 @@ type Tally struct {
 }
 
 // Count is where the targets below a step or a batch that counts them
-// stand.
+// stand. Fields may be added in a minor release.
 type Count struct {
 	// Span, Name and Flags are the step's or the batch's.
 	Span  SpanID
@@ -44,8 +44,9 @@ type Count struct {
 	// those that wait for their turn, and the Total of every batch below
 	// that waits for its own.
 	Running, Queued int
-	// Targets counts the targets that started below, queued or running.
-	Targets int
+	// Started counts the targets below that have started (TypeStart),
+	// whether queued, running or ended since; it only grows.
+	Started int
 	// Batch is the place, "i/n", of the batch below that ran last, or of
 	// the span itself when it is a batch.
 	Batch string
@@ -132,7 +133,7 @@ func (t *Tally) start(e Event) {
 	}
 	switch e.Kind {
 	case KindTarget:
-		s.above(func(c *Count) { c.Targets++ })
+		s.above(func(c *Count) { c.Started++ })
 		if e.State == StateQueued {
 			s.queued = 1
 		} else {
@@ -205,7 +206,7 @@ func (t *Tally) end(e Event) (Count, bool) {
 	if !s.counts {
 		return Count{}, false
 	}
-	if s.count.Targets == 0 && (e.Status == StatusSkipped || e.Status == StatusCanceled) {
+	if s.count.Started == 0 && (e.Status == StatusSkipped || e.Status == StatusCanceled) {
 		// The spans left out below it have counted their Totals already,
 		// in its count and above it alike.
 		left := max(s.count.Total-s.count.Done, 0)

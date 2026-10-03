@@ -80,9 +80,9 @@ func TestTallyCountsEveryTargetOnce(t *testing.T) {
 	cmd.End(nil)
 
 	for _, want := range []progress.Count{
-		{Name: "reset the machines", Flags: progress.Fold, Total: 3, Done: 3, Failed: 1, Canceled: 1, Targets: 3},
-		{Name: "power on", Flags: progress.Fold, Total: 4, Done: 4, Skipped: 2, Targets: 2, Batch: "1/2"},
-		{Name: "1/2", Total: 2, Done: 2, Targets: 2, Batch: "1/2"},
+		{Name: "reset the machines", Flags: progress.Fold, Total: 3, Done: 3, Failed: 1, Canceled: 1, Started: 3},
+		{Name: "power on", Flags: progress.Fold, Total: 4, Done: 4, Skipped: 2, Started: 2, Batch: "1/2"},
+		{Name: "1/2", Total: 2, Done: 2, Started: 2, Batch: "1/2"},
 		{Name: "2/2", Total: 2, Batch: "2/2"},
 	} {
 		got := sink.ended[want.Name]
@@ -115,7 +115,7 @@ func TestTallyIgnoresEventsItCannotPlace(t *testing.T) {
 		t.Error("the end of a span never started counted")
 	}
 	roots := tally.Roots()
-	if len(roots) != 1 || roots[0].Targets != 1 || roots[0].Running != 1 || roots[0].Queued != 0 {
+	if len(roots) != 1 || roots[0].Started != 1 || roots[0].Running != 1 || roots[0].Queued != 0 {
 		t.Errorf("roots = %+v, want one step with one target running", roots)
 	}
 	if _, ok := tally.Count(9); ok {

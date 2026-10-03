@@ -602,7 +602,7 @@ func violations(events []progress.Event) []string {
 			if s.parent != nil {
 				s.parent.open--
 			}
-			leftOut := counted && ended.Targets == 0 &&
+			leftOut := counted && ended.Started == 0 &&
 				(e.Status == progress.StatusSkipped || e.Status == progress.StatusCanceled)
 			if counted && !leftOut && ended.Done != ended.Total {
 				bad("%s ends with %d of its Total of %d targets", s, ended.Done, ended.Total)
