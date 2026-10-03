@@ -15,6 +15,8 @@ edited: a later one supersedes it, and the earlier one's status names it.
 | [4](#4-a-release-is-a-signed-tag) | A release is a signed tag | accepted |
 | [5](#5-progress-and-its-displays-are-the-kits-own) | Progress and its displays are the kit's own | accepted |
 | [6](#6-the-pools-are-the-kits-own) | The pools are the kit's own | accepted |
+| [7](#7-escapes-are-for-a-reader-not-for-decoding) | Escapes are for a reader, not for decoding | accepted |
+| [8](#8-widths-err-wide-and-follow-unicode-180) | Widths err wide, and follow Unicode 18.0 | accepted |
 
 ## 1. Apache-2.0, and GSI holds the copyright
 
@@ -318,3 +320,85 @@ None of them reports its items, and none keeps the order of the results.
 - A program that wants errgroup's semantics, the first failure cancelling
   the rest, keeps errgroup until `Map` has them, and announces its items
   queued itself.
+
+## 7. Escapes are for a reader, not for decoding
+
+Status: accepted
+
+### Context
+
+`termtext.EscapeText` and `EscapeCell` show a control character, such as
+ESC, as a visible escape, `\x1b`, and write a backslash as it is. Text that
+holds the four characters `\x1b` therefore looks the same as text whose ESC
+was escaped: the escapes are not injective, and what is shown cannot always
+be decoded back to what came.
+
+Escaping the backslash as well, as `strconv.Quote` does, would make them
+injective, but would double every backslash in a Windows path, a regular
+expression or a shell command a host reports, and escaped text would change
+each time it was escaped again. The displays escape the cells of a row with
+`EscapeCell` and may meet text escaped once already, and they, and
+`termtext.FuzzEscape`, rely on escaping twice changing nothing.
+
+### Decision
+
+- A backslash is written as it is. The escapes are for a person reading a
+  terminal, and escaping is idempotent.
+- The package comment of `termtext` says that the escapes cannot always be
+  decoded, and that a program that has to tell the two apart keeps the text
+  as it came.
+
+### Costs
+
+- A host can print text that looks like an escaped control character
+  without one. It cannot move the cursor or change the terminal with it,
+  which is what the escaper guards against.
+- A program that needs the original, to compare or store it, cannot take it
+  from a display, from escaped text or from the event log, whose texts
+  `progress.Sanitize` escapes too, and keeps its own copy.
+
+## 8. Widths err wide, and follow Unicode 18.0
+
+Status: accepted
+
+### Context
+
+A display cuts each row with `termtext.Truncate` to the columns of the
+terminal, so that it never wraps: a row that wraps pushes the region down
+and leaves a copy of it behind with each frame. A width that is less than a
+terminal draws breaks this; one that is more only cuts a row short.
+
+`golang.org/x/text/width`, the East Asian Widths `RuneWidth` reads, knows
+Unicode 15.0, so emoji and other characters made wide since then were
+counted as one column. A character followed by the variation selector
+U+FE0F, such as a red heart or a keycap, is drawn as a two-column emoji
+picture by terminals but was counted as one. A full grapheme clusterer, or
+a module such as `go-runewidth` or `uniseg`, would need a record under
+decision 3, and terminals do not agree among themselves on how wide a
+joined emoji sequence is.
+
+### Decision
+
+- Widths are meant never to be less than a terminal draws: a row may be
+  cut a little short, but never wraps.
+- `RuneWidth` adds to the tables of `golang.org/x/text` a table of its own,
+  kept by hand in `termtext/width.go`, of the characters whose East Asian
+  Width is wide in Unicode 18.0 but not in those tables. The soft hyphen
+  and the prepended concatenation marks, format characters that are drawn,
+  take one column.
+- `Width` and `Truncate` count a character of one column followed by U+FE0F
+  as two columns, and `Truncate` keeps such a character without its
+  selector when the selector would reach past the columns given.
+- Graphemes are not clustered: a sequence joined with U+200D, a skin tone
+  modifier or a flag counts as the sum of its runes, which is more than a
+  terminal shows, never less.
+
+### Costs
+
+- The table has to be brought up to date by hand when a version of Unicode
+  makes more characters wide, until `golang.org/x/text` catches up; a wide
+  character assigned after Unicode 18.0 counts as one column until then.
+- A terminal that draws a character with U+FE0F as one column shows less
+  than `Width` counts, and a row holding one is cut a column short there.
+- A joined emoji sequence is counted wider than it is drawn, and a row
+  holding one is cut shorter than it need be.
