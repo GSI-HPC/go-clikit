@@ -178,6 +178,57 @@ bmc power on: failed in 13s: 3 ok, 1 failed, 2 skipped
 `)
 }
 
+// A step with no name, as a pool given none reports its targets under,
+// names no part of the path: its lines are said under the span above it,
+// and none at all where a batch above it already says them.
+func TestPlainLinesOfStepsWithNoName(t *testing.T) {
+	t.Parallel()
+	t.Run("under the command", func(t *testing.T) {
+		t.Parallel()
+		f := newPlainFixture(t, "exec")
+		fanout.Map(f.ctx, []string{"exe1", "exe2", "exe3", "exe4"}, fanout.Options[string]{Limit: 1},
+			func(_ context.Context, node string) (struct{}, error) {
+				f.draw(3 * time.Second)
+				if node == "exe3" {
+					return struct{}{}, unreachable("dial tcp: i/o timeout")
+				}
+				return struct{}{}, nil
+			})
+		checkScreen(t, f.end(errors.New("1 of 4 hosts failed: exe3")), `
+[0:00] exec: start, 4 hosts, 1 at a time
+[0:09] exec › exe3 failed (transport): dial tcp: i/o timeout
+[0:12] exec: 3/4 done, 1 failed, 1 running
+[0:12] exec: failed in 12s: 3 ok, 1 failed
+exec: failed in 12s: 3 ok, 1 failed
+`)
+	})
+	t.Run("in batches", func(t *testing.T) {
+		t.Parallel()
+		f := newPlainFixture(t, "exec")
+		batches := fanout.Batches(f.ctx, nodeset.MustParse("exe[1-4]"), fanout.BatchOptions{Step: "power on", Size: 2, Limit: 1},
+			func(ctx context.Context, batch *nodeset.NodeSet) error {
+				outcomes := fanout.Map(ctx, batch.Expand(), fanout.Options[string]{Limit: 1},
+					func(_ context.Context, node string) (struct{}, error) {
+						f.draw(time.Second)
+						if node == "exe1" {
+							return struct{}{}, unreachable("dial tcp: i/o timeout")
+						}
+						return struct{}{}, nil
+					})
+				return outcomes[0].Err
+			})
+		checkScreen(t, f.end(batches[0].Err), `
+[0:00] exec › power on: start, 4 hosts
+[0:00] exec › power on › batch 1/2: start, 2 hosts, 1 at a time
+[0:01] exec › power on › batch 1/2 › exe1 failed (transport): dial tcp: i/o timeout
+[0:02] exec › power on › batch 1/2: failed in 2.0s: 1 ok, 1 failed
+[0:02] exec › power on › batch 2/2: skipped: not tried: an earlier batch failed
+[0:02] exec › power on: failed in 2.0s: 1 ok, 1 failed, 2 skipped
+exec: failed in 2.0s: 1 ok, 1 failed, 2 skipped
+`)
+	})
+}
+
 // A failure after several steps: the steps that count nothing say only how
 // they ended and how long they took, hidden ones and calls nothing, and a
 // node counted by two steps is one node in the summary, whose count is

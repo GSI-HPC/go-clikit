@@ -36,7 +36,10 @@ const (
 // target that fails, once; and, every ten seconds, for each counted step
 // under way, a root of a progress.Tally, with how far it has got. Hidden
 // spans and calls get no line, and neither do the lines of output the work
-// prints: a command whose product that output is prints it itself.
+// prints: a command whose product that output is prints it itself. A step
+// with no name, as a pool given none reports its targets under, names no
+// part of a path: its lines name the span above it, and it has none of
+// its own under a batch, or another span that counts its targets.
 //
 // The lines go out through the Terminal: ahead of whatever the command
 // writes after the events they tell of, never into a line the command has
@@ -234,8 +237,15 @@ func (p *Plain) begin(e progress.Event) {
 		s.below = parent.counts || parent.below
 	}
 	// A call names no part of the path: nothing below one gets a line of
-	// its own but through its target.
-	if e.Kind != progress.KindCall {
+	// its own but through its target. Nor does a step with no name, as a
+	// pool given none reports its targets under: it speaks under the path
+	// above it, unless a span above it counts its targets and so speaks
+	// for them, or nothing above it names it.
+	unnamed := e.Kind == progress.KindStep && e.Name == ""
+	if unnamed && (s.below || s.path == "") {
+		s.hidden = true
+	}
+	if e.Kind != progress.KindCall && !unnamed {
 		name := e.Name
 		if e.Kind == progress.KindBatch {
 			name = "batch " + name
