@@ -135,15 +135,16 @@ the version, and nothing that happens to the tag later. For a version that
 
 - a version the proxy serves without a tag, and a pinned release whose tag
   is gone;
-- a tag that is not signed by a listed signer, or not the pinned tag
-  object, while the proxy says, as `Origin.Hash`, that it serves the
-  version from the commit the tag names.
+- a tag that is neither pinned nor signed by a listed signer, while the
+  proxy says, as `Origin.Hash`, that it serves the version from the commit
+  the tag names.
 
 It still fails a retracted version whose tag names another commit than the
 proxy serves, such as a tag that was moved, or deleted and pushed again,
-after the proxy fetched it: the tag then names content that nobody withdrew.
-Restore the tag the proxy fetched, or delete the tag, which leaves a
-version without a tag. A bad tag whose version the proxy does not record a
+after the proxy fetched it, and a pinned release whose tag is not the
+pinned tag object, whatever commit it names: the tag then names content
+that nobody withdrew. Restore the tag the proxy fetched, or the pinned tag
+object, or delete the tag, which leaves a version without a tag. A bad tag whose version the proxy does not record a
 commit for is not acknowledged either, since nothing records which commit
 was withdrawn:
 

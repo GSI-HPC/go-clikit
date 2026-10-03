@@ -437,8 +437,19 @@ AUDIT_MOD="$scratch/retract.mod" expect 'an audit of a pinned release whose tag 
   'retracts v0.0.8' audit "$listed" '' "v0.0.8 $(printf '%040d' 0)"
 git tag -a v0.0.8 -m 'release v0.0.8' "$old"
 AUDIT_MOD="$scratch/retract.mod" expect 'an audit of a retracted pinned release whose tag is pushed again' fail \
-  'the module proxy does not say that it serves v0.0.8 from the commit the tag names' \
+  'v0.0.8 is not the tag object verified at its release' \
   audit "$listed" '' "v0.0.8 $(printf '%040d' 0)"
+# A pinned tag replaced after the release names content that nobody
+# withdrew, even on the commit the proxy serves.
+printf 'v0.0.8\nv1.0.0\n' > "$PROXY_LIST"
+info v0.0.8 "$old"
+AUDIT_MOD="$scratch/retract.mod" expect 'an audit of a retracted pinned release pushed again on the commit the proxy serves' fail \
+  'the tag of a retracted pinned release still has to be the tag object pinned for it' \
+  audit "$listed" '' "v0.0.8 $(printf '%040d' 0)"
+AUDIT_MOD="$scratch/retract.mod" expect 'an audit counting a retracted pinned release pushed again' fail \
+  '1 of 2 release tag(s) are neither pinned nor signed' audit "$listed" '' "v0.0.8 $(printf '%040d' 0)"
+rm "$PROXY_INFO/v0.0.8.info"
+printf 'v1.0.0\n' > "$PROXY_LIST"
 git tag -d v0.0.8 > /dev/null
 PROXY_STATUS=404 expect 'an audit of a module the proxy has not fetched' pass '' audit "$listed" ''
 PROXY_STATUS=410 expect 'an audit of a module the proxy refuses as gone' pass '' audit "$listed" ''

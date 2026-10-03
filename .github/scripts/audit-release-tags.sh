@@ -29,8 +29,9 @@
 # what the retraction withdraws, the content the module proxy serves under
 # it: that its tag is gone, or is not signed while it names the commit the
 # proxy serves, is a warning, and passes. A tag that names another commit
-# than the proxy serves, pushed again or moved, still fails. Run in a
-# checkout with all tags:
+# than the proxy serves, pushed again or moved, still fails, and so does a
+# pinned tag that is not the tag object pinned for it. Run in a checkout
+# with all tags:
 #
 #   ALLOWED_SIGNERS, ALLOWED_PGP_KEYS  as for verify-release-tag.sh
 #   VERIFIED_TAGS  the pinned releases, from the RELEASE_VERIFIED_TAGS
@@ -98,7 +99,7 @@ problem() {
 # names: the record a retraction of a tagged version is held to.
 declare -A recorded=()
 
-# check <version> <what: gone|tag|proxy> <command...>: runs a check of a
+# check <version> <what: gone|tag|pin|proxy> <command...>: runs a check of a
 # version, and fails as it fails, unless go.mod retracts the version and the
 # retraction answers what the check found. A retraction is how a bad version
 # is withdrawn, and it acknowledges the alarm: the errors of the check are
@@ -107,9 +108,13 @@ declare -A recorded=()
 #
 #   gone   a version without a tag; it answers this, until a tag is pushed
 #          again, which is then held to the proxy
-#   tag    a tag that is not signed or pinned; it answers this while the
-#          proxy says it serves the version from the commit the tag names,
-#          and not once the tag is moved, or if nothing records the commit
+#   tag    a tag that is neither pinned nor signed; it answers this while
+#          the proxy says it serves the version from the commit the tag
+#          names, and not once the tag is moved, or if nothing records the
+#          commit
+#   pin    a pinned tag that is not the tag object pinned for it; it never
+#          answers this, since the tag was replaced after the release and
+#          names content that nobody withdrew, whatever commit it names
 #   proxy  the proxy serving a tagged version from another commit than the
 #          tag names, or failing to answer for it; it never answers this,
 #          since the tag names content that nobody withdrew
@@ -128,6 +133,11 @@ check() {
   if [ "$what" = proxy ]; then
     printf '%s\n' "$out"
     echo "::error::$go_mod retracts $version, which does not acknowledge this: the tag of a retracted version still has to name the commit the module proxy serves it from; see doc/release.md"
+    return 1
+  fi
+  if [ "$what" = pin ]; then
+    printf '%s\n' "$out"
+    echo "::error::$go_mod retracts $version, which does not acknowledge this: the tag of a retracted pinned release still has to be the tag object pinned for it; see doc/release.md"
     return 1
   fi
   if [ "$what" = tag ] && [ -z "${recorded[$version]+recorded}" ]; then
@@ -195,7 +205,7 @@ for tag in "${tags[@]}"; do
     if [ "$(git rev-parse --verify "refs/tags/$tag")" = "${pins[$tag]}" ]; then
       echo "::notice::$tag is the tag object verified at its release"
     else
-      check "$tag" tag problem "$tag is not the tag object verified at its release, ${pins[$tag]}" ||
+      check "$tag" pin problem "$tag is not the tag object verified at its release, ${pins[$tag]}" ||
         failed=$((failed + 1))
     fi
     continue
