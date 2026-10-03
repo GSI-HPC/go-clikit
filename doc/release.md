@@ -40,6 +40,23 @@ build metadata.
 If the publishing job fails, run it again: it fetches the version once more
 and leaves a GitHub release that an earlier attempt created as it is.
 
+## The daily audit
+
+A tag push runs the Release workflow as the tagged commit has it. A tag on a
+commit from before the workflow, or on a commit that changes it, therefore
+verifies nothing when it is pushed. So the workflow also runs every day from
+`main`, and can be started by hand, and then verifies every `v*` tag in the
+repository against the listed keys. A failed run of the job *Verify every
+release tag is signed* is the alarm: its log names the tag. Investigate it
+as a compromise, and withdraw the version as below. GitHub disables
+scheduled workflows in a repository with no activity for 60 days; enable
+the workflow again when that happens.
+
+Because the audit checks old tags against today's keys, a key that signed a
+release stays listed after it is retired. Give a retired SSH key a
+`valid-before` option in `RELEASE_ALLOWED_SIGNERS` instead of removing it,
+and extend an OpenPGP key's expiry date before it expires.
+
 ## Withdrawing a release
 
 Never move or delete a pushed tag: the module proxy and the checksum
