@@ -460,6 +460,13 @@ type Classifier interface {
 
 // Option sets what a span says about itself when it starts, changes or
 // ends.
+//
+// Start takes every option. Update takes Total and Message only, and
+// ignores the others. End takes every option that sets a field, but not
+// Queued or WithFlags, which only Start can give; it is where a field
+// learned late is set, such as an address known only once the work has
+// started, or the Exit of a command. A field an option does not set keeps
+// the value it had.
 type Option func(*options)
 
 type options struct {
