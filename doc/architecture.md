@@ -114,7 +114,8 @@ keeps it without a line of the caller's.
   to in the order the items were given, whatever order they finished in, and
   turns a panic in one item's work, or in what it acquired and released for
   it, into that item's error, since `recover` reaches only its own
-  goroutine; work that calls `runtime.Goexit`, as `t.FailNow` does, fails
+  goroutine. A panic is a bug, and fails its item even once the context has
+  ended, when other failures are reported canceled. Work that calls `runtime.Goexit`, as `t.FailNow` does, fails
   its item rather than pass for done. What an item acquired is released
   before its target ends, so that a panic in the release is the target's
   failure; the next item can so take it and run before that target has

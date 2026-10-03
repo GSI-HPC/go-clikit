@@ -102,12 +102,13 @@ type Outcome[R any] struct {
 // makes are reported under it. An item that failed once the context had
 // ended is reported canceled, with the context's error, since the end of
 // the context is what ended it, and its outcome keeps the error fn
-// returned. An item fn left out on purpose, by returning an error of Skip,
+// returned; a panic in fn is a bug, though, and so ends failed. An item fn
+// left out on purpose, by returning an error of Skip,
 // ends skipped and is none of those that failed, and so does one
 // o.Acquire leaves out with an error of Skip. An item waiting for o.Acquire
 // is not yet running; one it refused ends then, failed with the refusal,
-// or, when the context had ended by then, as one never started, and its
-// outcome keeps the refusal.
+// or, when the context had ended by then, as one never started, unless
+// o.Acquire panicked, and its outcome keeps the refusal.
 func Map[T, R any](ctx context.Context, items []T, o Options[T], fn func(ctx context.Context, item T) (R, error)) []Outcome[R] {
 	limit := o.Limit
 	if limit < 1 {
@@ -138,16 +139,16 @@ func Map[T, R any](ctx context.Context, items []T, o Options[T], fn func(ctx con
 				spans[i].End(errGoexit)
 			}
 		}()
-		release, err := o.acquire(ctxs[i], names[i], items[i])
+		release, panicked, err := o.acquire(ctxs[i], names[i], items[i])
 		if err != nil {
 			returned = true
 			out[i].Err = err
-			canceled[i] = o.refused(ctxs[i], spans[i], err)
+			canceled[i] = o.refused(ctxs[i], spans[i], err, panicked)
 			return
 		}
 		spans[i].Run()
 		out[i].Started = true
-		value, err, broke := call(ctxs[i], o.PanicLog, o.Program, names[i], items[i], fn, release)
+		value, err, panicked, broke := call(ctxs[i], o.PanicLog, o.Program, names[i], items[i], fn, release)
 		returned = true
 		if broke != nil {
 			out[i].Value, out[i].Err = value, broke
@@ -165,7 +166,7 @@ func Map[T, R any](ctx context.Context, items []T, o Options[T], fn func(ctx con
 			spans[i].Skip(reason)
 			return
 		}
-		if err != nil && ctxs[i].Err() != nil {
+		if err != nil && !panicked && ctxs[i].Err() != nil {
 			err = leftOut{ctxs[i].Err()}
 		}
 		canceled[i] = o.endsCanceled(err)
@@ -200,13 +201,14 @@ func Map[T, R any](ctx context.Context, items []T, o Options[T], fn func(ctx con
 // refused ends the target of an item o.Acquire refused with err, before
 // the item gives its place in the pool up, and reports whether it ended
 // canceled: skipped for an error of Skip, as one never started when ctx
-// had ended by then, and with err otherwise.
-func (o Options[T]) refused(ctx context.Context, span *progress.Span, err error) bool {
+// had ended by then, unless err is a panic in o.Acquire, as panicked says,
+// and with err otherwise.
+func (o Options[T]) refused(ctx context.Context, span *progress.Span, err error, panicked bool) bool {
 	if reason, ok := skipReason(err); ok {
 		span.Skip(reason)
 		return false
 	}
-	if cause := ctx.Err(); cause != nil {
+	if cause := ctx.Err(); cause != nil && !panicked {
 		span.End(leftOut{cause})
 		return true
 	}
@@ -257,27 +259,28 @@ func (o Options[T]) describe(item T) (node, host, role string) {
 }
 
 // acquire takes what an item's work needs besides its place in the pool.
-// A panic in o.Acquire becomes the item's error.
-func (o Options[T]) acquire(ctx context.Context, name string, item T) (release func(), err error) {
+// A panic in o.Acquire becomes the item's error, as panicked says.
+func (o Options[T]) acquire(ctx context.Context, name string, item T) (release func(), panicked bool, err error) {
 	if o.Acquire == nil {
-		return func() {}, nil
+		return func() {}, false, nil
 	}
 	defer func() {
 		if p := Recovered(o.PanicLog, o.Program, name, recover()); p != nil {
-			release, err = nil, p
+			release, panicked, err = nil, true, p
 		}
 	}()
 	release, err = o.Acquire(ctx, item)
 	if err == nil && release == nil {
 		release = func() {}
 	}
-	return release, err
+	return release, false, err
 }
 
 // call calls fn with one item, and then release, however fn ended. A
-// panic in fn becomes its error, and one in release is returned as broke,
-// rather than the end of the process, each with its stack written to log.
-func call[T, R any](ctx context.Context, log io.Writer, program, name string, item T, fn func(context.Context, T) (R, error), release func()) (value R, err, broke error) {
+// panic in fn becomes its error, as panicked says, and one in release is
+// returned as broke, rather than the end of the process, each with its
+// stack written to log.
+func call[T, R any](ctx context.Context, log io.Writer, program, name string, item T, fn func(context.Context, T) (R, error), release func()) (value R, err error, panicked bool, broke error) {
 	defer func() {
 		broke = Recovered(log, program, name, recover())
 	}()
@@ -285,11 +288,11 @@ func call[T, R any](ctx context.Context, log io.Writer, program, name string, it
 	defer func() {
 		if p := Recovered(log, program, name, recover()); p != nil {
 			var zero R
-			value, err = zero, p
+			value, err, panicked = zero, p, true
 		}
 	}()
 	value, err = fn(ctx, item)
-	return value, err, nil
+	return value, err, false, nil
 }
 
 // releasePanic is what the target of an item ends with when its release
