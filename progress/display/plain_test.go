@@ -229,6 +229,31 @@ exec: failed in 2.0s: 1 ok, 1 failed, 2 skipped
 	})
 }
 
+// A step with no name and no span above it that has a name, as a pool
+// given none on a Bus with no command, still has its lines, which then
+// name nothing.
+func TestPlainLinesOfAStepWithNothingToNameIt(t *testing.T) {
+	t.Parallel()
+	s := &screen{}
+	c := &clock{now: time.Date(2026, 9, 26, 12, 0, 0, 0, time.UTC)}
+	plain := display.NewPlain(display.NewTerminal(s, nil), display.PlainOptions{Now: c.Now})
+	bus := progress.NewBus(progress.Options{Sinks: []progress.Sink{plain}, Now: c.Now})
+	fanout.Map(progress.WithBus(context.Background(), bus), []string{"exe1", "exe2"}, fanout.Options[string]{Limit: 1},
+		func(context.Context, string) (struct{}, error) {
+			c.Add(11 * time.Second)
+			plain.Draw()
+			return struct{}{}, nil
+		})
+	bus.Close()
+	plain.Close()
+	checkScreen(t, s.String(), `
+[0:00] start, 2 hosts, 1 at a time
+[0:11] 0/2 done, 1 running, 1 queued
+[0:22] 1/2 done, 1 running
+[0:22] done in 22s: 2 ok
+`)
+}
+
 // A failure after several steps: the steps that count nothing say only how
 // they ended and how long they took, hidden ones and calls nothing, and a
 // node counted by two steps is one node in the summary, whose count is

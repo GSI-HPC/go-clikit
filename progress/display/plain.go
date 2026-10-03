@@ -38,8 +38,11 @@ const (
 // spans and calls get no line, and neither do the lines of output the work
 // prints: a command whose product that output is prints it itself. A step
 // with no name, as a pool given none reports its targets under, names no
-// part of a path: its lines name the span above it, and it has none of
-// its own under a batch, or another span that counts its targets.
+// part of a path: its lines name the span above it, it has none of its
+// own under a batch, or another span that counts its targets, and with no
+// span above it that has a name its lines name nothing:
+//
+//	[0:00] start, 2 hosts
 //
 // The lines go out through the Terminal: ahead of whatever the command
 // writes after the events they tell of, never into a line the command has
@@ -240,9 +243,9 @@ func (p *Plain) begin(e progress.Event) {
 	// its own but through its target. Nor does a step with no name, as a
 	// pool given none reports its targets under: it speaks under the path
 	// above it, unless a span above it counts its targets and so speaks
-	// for them, or nothing above it names it.
+	// for them.
 	unnamed := e.Kind == progress.KindStep && e.Name == ""
-	if unnamed && (s.below || s.path == "") {
+	if unnamed && s.below {
 		s.hidden = true
 	}
 	if e.Kind != progress.KindCall && !unnamed {
@@ -269,13 +272,13 @@ func (p *Plain) run(e progress.Event, s *plainSpan) {
 	}
 	switch e.Kind {
 	case progress.KindStep, progress.KindBatch:
-		p.line(e.Time, s.path+": start"+p.sizes(e.Fields))
+		p.say(e.Time, s.path, "start"+p.sizes(e.Fields))
 		if s.counts && !s.below {
 			p.beats = append(p.beats, beat{span: e.Span, due: e.Time.Add(plainBeat)})
 		}
 	case progress.KindWait:
 		if e.Timeout > 0 {
-			p.line(e.Time, fmt.Sprintf("%s: waiting %s", s.path, e.Timeout))
+			p.say(e.Time, s.path, fmt.Sprintf("waiting %s", e.Timeout))
 		}
 	}
 }
@@ -304,17 +307,17 @@ func (p *Plain) end(e progress.Event, s *plainSpan, count progress.Count, counte
 		if s.ran.IsZero() {
 			// Left out before it ran, as the batches after one that
 			// failed are.
-			p.line(e.Time, s.path+": "+outcome(e))
+			p.say(e.Time, s.path, outcome(e))
 			return
 		}
-		text := fmt.Sprintf("%s: %s in %s", s.path, word(e.Status), took(e.Time.Sub(s.ran)))
+		text := fmt.Sprintf("%s in %s", word(e.Status), took(e.Time.Sub(s.ran)))
 		if counted {
 			text += ": " + ended(count)
 		}
-		p.line(e.Time, text)
+		p.say(e.Time, s.path, text)
 	case progress.KindWait:
 		if e.Status == progress.StatusFailed || e.Status == progress.StatusCanceled {
-			p.line(e.Time, s.path+": "+outcome(e))
+			p.say(e.Time, s.path, outcome(e))
 		}
 	}
 }
@@ -335,7 +338,7 @@ func (p *Plain) heartbeats(now time.Time) {
 		if s == nil || !ok {
 			continue
 		}
-		p.line(now, s.path+": "+standing(count))
+		p.say(now, s.path, standing(count))
 	}
 }
 
@@ -349,6 +352,15 @@ func (p *Plain) line(t time.Time, text string) {
 		default:
 		}
 	}
+}
+
+// say writes the line that says text of the span path names, after its
+// path when there is one. p.mu is held.
+func (p *Plain) say(t time.Time, path, text string) {
+	if path != "" {
+		text = path + ": " + text
+	}
+	p.line(t, text)
 }
 
 // sizes says how many targets a step or a batch expects, and how many of
