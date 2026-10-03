@@ -111,8 +111,8 @@ func NewTerminal(w io.Writer, size func() (w, h int, err error)) *Terminal {
 // recovered, deferred by the goroutine a display draws from, keeps a panic
 // there from ending the process, as the Bus keeps one in a sink from: the
 // display draws no more, its region comes off the terminal at once, the
-// stack is written to PanicLog, and the command goes on. Close still writes
-// what the display left.
+// lines it holds are written, then the stack to PanicLog, and the command
+// goes on. Close still writes what the display left.
 func (t *Terminal) recovered() {
 	p := recover()
 	if p == nil {
@@ -120,9 +120,12 @@ func (t *Terminal) recovered() {
 	}
 	// No frame follows to write the lines that wait above the region, so
 	// the region comes off now, its rows stopped at the moment of the
-	// panic, and the stack is written at once unless a question is asked.
+	// panic, and the lines the display holds and those of the Lines
+	// writers are written as a frame would have, ahead of the stack,
+	// which is then written at once, unless a question is asked.
 	t.mu.Lock()
 	t.erase()
+	t.release(false)
 	t.mu.Unlock()
 	log := t.PanicLog
 	if log == nil {
