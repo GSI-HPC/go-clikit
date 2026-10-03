@@ -11,6 +11,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode"
+	"unicode/utf8"
 
 	"github.com/GSI-HPC/go-clikit/progress"
 	"github.com/GSI-HPC/go-nodeset"
@@ -500,26 +502,64 @@ func (f *folded) merge(o *folded) {
 // what it dialled has it: 10.0.0.7:443, [fe80::1]:623.
 var addresses = regexp.MustCompile(`\b(?:\d{1,3}\.){3}\d{1,3}(?::\d+)?\b|\[[0-9A-Fa-f:.]+\](?::\d+)?`)
 
-// failureText is how a target failed: its class and its error, with its
-// own name, and its host's, and any address, read as {}, so that the
-// targets that failed alike share it, the processors that refused the
-// connection to their own addresses among them.
+// failureText is how a target failed: its class and its error, with any
+// address, and its own name and its host's where each stands as a name of
+// its own, read as {}, so that the targets that failed alike share it, the
+// processors that refused the connection to their own addresses among
+// them.
 func failureText(s *treeSpan, e progress.Event) string {
 	if e.Class == progress.ClassNone && e.Err == "" {
 		return "failed"
 	}
-	var pairs []string
-	// The host first, since it usually holds the node's name.
-	for _, own := range []string{e.Host, e.Node, s.name} {
-		if own != "" {
-			pairs = append(pairs, own, "{}")
-		}
-	}
 	text := e.Class.String()
 	if e.Err != "" {
-		text += ": " + addresses.ReplaceAllString(strings.NewReplacer(pairs...).Replace(e.Err), "{}")
+		// The host first, since it usually holds the node's name.
+		text += ": " + ownNames(addresses.ReplaceAllString(e.Err, "{}"), e.Host, e.Node, s.name)
 	}
 	return text
+}
+
+// ownNames reads each of names in text as {} where it stands as a name of
+// its own, with no letter, digit, "-" or "_" right before or after it: a
+// target named "e" leaves "timeout" as it is, and "exe1" leaves "exe10".
+// Where two names start at the same place the first given is read.
+func ownNames(text string, names ...string) string {
+	var b strings.Builder
+	for i := 0; i < len(text); {
+		if n := ownNameAt(text, i, names); n > 0 {
+			b.WriteString("{}")
+			i += n
+			continue
+		}
+		b.WriteByte(text[i])
+		i++
+	}
+	return b.String()
+}
+
+// ownNameAt returns the length of the first of names that stands as a
+// name of its own at text[i:], or 0.
+func ownNameAt(text string, i int, names []string) int {
+	if i > 0 {
+		if r, _ := utf8.DecodeLastRuneInString(text[:i]); inName(r) {
+			return 0
+		}
+	}
+	for _, name := range names {
+		if name == "" || !strings.HasPrefix(text[i:], name) {
+			continue
+		}
+		if r, _ := utf8.DecodeRuneInString(text[i+len(name):]); !inName(r) {
+			return len(name)
+		}
+	}
+	return 0
+}
+
+// inName reports whether r can be part of a name, of a node or a host,
+// that it stands next to.
+func inName(r rune) bool {
+	return r == '-' || r == '_' || unicode.IsLetter(r) || unicode.IsDigit(r)
 }
 
 // names are the names of targets, read as a node set, with any that do not

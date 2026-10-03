@@ -268,6 +268,36 @@ bmc power off: failed in 2.0s: 0 ok, 3 failed
 `)
 }
 
+// A target's name is read as {} only where it stands as a name of its own,
+// not where it is part of a word or of an address: targets named 1 and 2
+// that time out dialling their addresses fail alike, and an error that
+// holds a target's name inside a word still reads.
+func TestTheTreeReadsOnlyWholeNamesAsTheTargets(t *testing.T) {
+	t.Parallel()
+	f := newTreeFixture(t, "bmc power off", treeSetup{})
+	ctx, step := progress.Start(f.ctx, progress.KindStep, "power off",
+		progress.WithFlags(progress.Fold), progress.Total(3), progress.Limit(8))
+	var spans []*progress.Span
+	for _, node := range []string{"1", "2", "e"} {
+		_, span := progress.Start(ctx, progress.KindTarget, node, progress.Queued(), progress.Node(node))
+		spans = append(spans, span)
+	}
+	for _, span := range spans {
+		span.Run()
+	}
+	f.draw(2 * time.Second)
+	spans[0].End(unreachable("1: dial tcp 10.0.0.12:443: i/o timeout"))
+	spans[1].End(unreachable("2: dial tcp 10.0.0.12:443: i/o timeout"))
+	spans[2].End(unreachable("e-1 e: dial tcp: i/o timeout"))
+	step.End(errors.New("3 of 3 failed: 1,2,e"))
+	checkScreen(t, f.end(errors.New("3 of 3 failed: 1,2,e")), `
+✗ power off  2.0s  0 ok, 3 failed
+  ✗ [1-2]  transport: {}: dial tcp {}: i/o timeout
+  ✗ e  transport: e-1 {}: dial tcp: i/o timeout
+bmc power off: failed in 2.0s: 0 ok, 3 failed
+`)
+}
+
 // Plumbing is hidden: a lookup is drawn only once it has taken a second,
 // and leaves a line only if it took that long or failed.
 func TestTheTreeRevealsASlowHiddenSpan(t *testing.T) {
