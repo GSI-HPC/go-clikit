@@ -35,6 +35,20 @@ func TestTheWidthOfTextOnATerminal(t *testing.T) {
 	}
 }
 
+// A combining mark takes no column even when its East Asian Width is wide,
+// as the ideographic tone marks are.
+func TestACombiningMarkThatIsWideTakesNoColumn(t *testing.T) {
+	t.Parallel()
+	for _, r := range []rune{0x302a, 0x302b, 0x302c, 0x302d} {
+		if got := termtext.RuneWidth(r); got != 0 {
+			t.Errorf("RuneWidth(%U) = %d, want 0", r, got)
+		}
+	}
+	if got := termtext.Width("\u3042\u302a"); got != 2 {
+		t.Errorf("Width(%q) = %d, want 2", "\u3042\u302a", got)
+	}
+}
+
 // A variation selector U+FE0F asks for the emoji picture of the character
 // before it, which a terminal draws two columns wide, as it does a keycap.
 func TestAnEmojiPresentationSequenceTakesTwoColumns(t *testing.T) {

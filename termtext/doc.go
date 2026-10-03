@@ -51,7 +51,9 @@
 // Asian wide and fullwidth characters take two columns. Combining marks and
 // format characters take none, save the soft hyphen, the prepended
 // concatenation marks such as U+0600, and the Ahom medial ra U+1171E (a
-// spacing mark since Unicode 16.0), which are drawn and take one column.
+// spacing mark since Unicode 16.0), which are drawn and take one column. The
+// rule for marks comes first, so a combining mark that is East Asian wide,
+// such as the ideographic tone marks U+302A to U+302D, takes none as well.
 // NUL takes none, and every other character one. Width counts a character
 // followed by the variation selector U+FE0F, which asks for its emoji
 // picture, as two columns, as terminals draw it. Beyond that it does not
