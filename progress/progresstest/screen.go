@@ -21,7 +21,10 @@ import (
 // which erases the row the cursor is on, ESC [ K, which erases the rest of
 // it, and ESC [ J, which erases from the cursor to the end of the screen.
 // Any other control character or sequence is shown as text, "^[[?25l" or
-// "^G", so that a test sees it.
+// "^G", so that a test sees it. So is an escape or a sequence that a byte
+// it cannot hold, such as a newline or another escape, cuts short, up to
+// that byte, which then takes effect, and an escape, a sequence or a rune
+// that the output ends in the middle of.
 //
 // Every row is kept, those that have scrolled off the top too, so that what
 // a Screen shows is the scrollback and the screen in one. With Width set, a
@@ -44,15 +47,24 @@ type Screen struct {
 func (s *Screen) Write(p []byte) (int, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	b := append(s.pending, p...)
-	s.pending = nil
+	s.pending = s.feed(append(s.pending, p...), false)
+	return len(p), nil
+}
+
+// feed applies b, and returns what is left of it: the start of a sequence
+// or of a rune that b ends in the middle of. With end set, nothing more
+// comes, and that start is shown as it is.
+func (s *Screen) feed(b []byte, end bool) []byte {
 	for len(b) > 0 {
 		switch c := b[0]; {
 		case c == 0x1b:
 			n, ok := s.escape(b)
 			if !ok {
-				s.pending = append([]byte(nil), b...)
-				return len(p), nil
+				if !end {
+					return append([]byte(nil), b...)
+				}
+				s.text("^[" + string(b[1:]))
+				return nil
 			}
 			b = b[n:]
 		case c == '\n':
@@ -67,34 +79,42 @@ func (s *Screen) Write(p []byte) (int, error) {
 			s.text(fmt.Sprintf("^%c", c^0x40))
 			b = b[1:]
 		default:
-			if !utf8.FullRune(b) {
-				s.pending = append([]byte(nil), b...)
-				return len(p), nil
+			if !end && !utf8.FullRune(b) {
+				return append([]byte(nil), b...)
 			}
 			r, n := utf8.DecodeRune(b)
 			s.put(r)
 			b = b[n:]
 		}
 	}
-	return len(p), nil
+	return nil
 }
 
 // escape applies the sequence b starts with, and returns its length; false
-// when b ends before the sequence does.
+// when b ends before the sequence does. A sequence that a byte it cannot
+// hold cuts short is shown up to that byte, which is left to take effect.
 func (s *Screen) escape(b []byte) (int, bool) {
 	if len(b) < 2 {
 		return 0, false
 	}
 	if b[1] != '[' {
+		if b[1] < 0x20 || b[1] > 0x7e {
+			s.text("^[")
+			return 1, true
+		}
 		s.text("^[" + string(b[1]))
 		return 2, true
 	}
 	end := 2
-	for end < len(b) && (b[end] < 0x40 || b[end] > 0x7e) {
+	for end < len(b) && b[end] >= 0x20 && b[end] <= 0x3f {
 		end++
 	}
 	if end == len(b) {
 		return 0, false
+	}
+	if b[end] > 0x7e || b[end] < 0x40 {
+		s.text("^[" + string(b[1:end]))
+		return end, true
 	}
 	param, final := string(b[2:end]), b[end]
 	n, err := strconv.Atoi(param)
@@ -108,20 +128,23 @@ func (s *Screen) escape(b []byte) (int, bool) {
 		s.at()
 		s.rows[s.row] = s.rows[s.row][:0]
 	case final == 'K' && n == 0 && err == nil:
-		s.at()
-		if s.col < len(s.rows[s.row]) {
-			s.rows[s.row] = s.rows[s.row][:s.col]
-		}
+		s.cut()
 	case final == 'J' && n == 0 && err == nil:
-		s.at()
-		if s.col < len(s.rows[s.row]) {
-			s.rows[s.row] = s.rows[s.row][:s.col]
-		}
+		s.cut()
 		s.rows = s.rows[:s.row+1]
 	default:
 		s.text("^[" + string(b[1:end+1]))
 	}
 	return end + 1, true
+}
+
+// cut erases the row the cursor is on from the cursor to its end.
+func (s *Screen) cut() {
+	s.at()
+	row := s.rows[s.row]
+	if s.col < len(row) {
+		s.rows[s.row] = row[:s.col]
+	}
 }
 
 // at makes sure the row the cursor is on exists.
@@ -164,16 +187,27 @@ func (s *Screen) put(r rune) {
 }
 
 // String returns what the screen shows, each row ended by a newline, up to
-// the last row that is not blank.
+// the last row that is not blank. An escape, a sequence or a rune that the
+// output so far ends in the middle of is shown as text, as if nothing more
+// came; the next Write still completes it.
 func (s *Screen) String() string {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	last := len(s.rows) - 1
-	for last >= 0 && len(s.rows[last]) == 0 {
+	rows := s.rows
+	if len(s.pending) > 0 {
+		v := &Screen{Width: s.Width, rows: make([][]rune, len(s.rows)), row: s.row, col: s.col}
+		for i, row := range s.rows {
+			v.rows[i] = append([]rune(nil), row...)
+		}
+		v.feed(s.pending, true)
+		rows = v.rows
+	}
+	last := len(rows) - 1
+	for last >= 0 && len(rows[last]) == 0 {
 		last--
 	}
 	var b strings.Builder
-	for _, row := range s.rows[:last+1] {
+	for _, row := range rows[:last+1] {
 		for _, r := range row {
 			if r != wideRest {
 				b.WriteRune(r)

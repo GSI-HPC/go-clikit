@@ -57,7 +57,9 @@ test replaces.
 `progresstest.Screen` is a terminal for tests: it applies text, newlines,
 carriage returns and the sequences the displays write, moving up rows,
 erasing a row, the rest of it or the rest of the screen, and shows every
-other control character as text, so that a test sees it. It keeps what has
+other control character as text, so that a test sees it, as it does a
+sequence cut short and an escape, a sequence or a rune that the output ends
+in the middle of. It keeps what has
 scrolled off the top, and with `Width` set wraps a row the way a terminal
 does, so a row drawn too wide shows as the two it would be. A test compares
 what a person would see, frame by frame.
