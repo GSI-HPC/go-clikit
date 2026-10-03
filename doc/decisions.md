@@ -19,6 +19,7 @@ edited: a later one supersedes it, and the earlier one's status names it.
 | [8](#8-widths-err-wide-and-follow-unicode-180) | Widths err wide, and follow Unicode 18.0 | accepted |
 | [9](#9-the-region-comes-off-one-line-a-row) | The region comes off one line a row | accepted |
 | [10](#10-a-daily-audit-holds-the-releases-to-their-record) | A daily audit holds the releases to their record | accepted |
+| [11](#11-a-deadline-ends-a-pool-as-an-interrupt-does) | A deadline ends a pool as an interrupt does | accepted |
 
 ## 1. Apache-2.0, and GSI holds the copyright
 
@@ -537,3 +538,49 @@ and withdrawn.
   database and the `retract` line are then its only record.
 - What a retraction acknowledges stays in every run of the audit as a
   warning.
+
+## 11. A deadline ends a pool as an interrupt does
+
+Status: accepted
+
+### Context
+
+`progress` names `ClassTimeout` for work that ran out of time and
+`ClassCanceled` for work that was interrupted, and `progress.Classify`
+classes `context.DeadlineExceeded` as a timeout. A pool runs its items
+under one context, though, and when that context ends, whether interrupted
+or past its deadline, the pool starts no further item, and the work of
+those running gives up with whatever error it returns, which need not say
+why. Classed by their own errors, the items one deadline cut short would
+end as timeouts, failures of their own, or as whatever their work
+returned, and the step would end failed, although no item ran out of its
+own time.
+
+### Decision
+
+- The end of a pool's context ends its items canceled, `ClassCanceled`,
+  whether it was interrupted or ran out of time: those the pool left out,
+  and those whose `Acquire` refused them or whose work returned an error
+  other than of `Skip` once the context had ended. Their targets end with
+  the context's error, in a type that says `ClassCanceled`, and when every
+  item that failed ended so, `Summarize` is told that they were
+  interrupted, which `Failure` ends canceled. `Batches` ends the
+  batches a deadline left out in the same way. The pool, not the item,
+  stopped the work.
+- An item that runs out of its own time, a call whose own deadline passed
+  while the pool's context had not ended, is classed by its error as any
+  other, and so stays a timeout, a failure of that item.
+- A panic, or a call of `runtime.Goexit`, fails its item even once the
+  context has ended.
+
+### Costs
+
+- An event log or a display does not tell from the class whether a pool
+  was interrupted or ran out of time; the error text in the event log,
+  `context canceled` or `context deadline exceeded`, does, and a program
+  asks its context, with `ctx.Err` or `context.Cause`, to tell the two
+  apart, such as to exit with another code.
+- The outcome of an item cut short keeps the error its work returned,
+  which may be a timeout of its own, while its target ends canceled.
+- An item whose work fails for a reason of its own just as the context
+  ends is counted as cut short, not as failed.
