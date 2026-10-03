@@ -32,7 +32,8 @@ maintainers create tags.
 
 The Release workflow verifies the tag and its version, tests the tagged
 commit on both Go lines, fetches the version through the module proxy, after
-which pkg.go.dev lists it, and publishes the GitHub release. The version is
+which pkg.go.dev lists it, checks that the proxy serves it from the verified
+commit, and publishes the GitHub release. The version is
 one the go command accepts: `vX.Y.Z`, optionally with a pre-release such as
 `-rc.1`, with no leading zeros in any number, `-rc.01` included, and no
 build metadata.
@@ -54,7 +55,12 @@ repository against the listed keys. A tag that was pushed, fetched through
 the module proxy and deleted again between two runs is no longer in the
 repository, but the proxy goes on serving its version; so the audit also
 reads the versions proxy.golang.org lists for the module, and fails for each
-one that has no tag. A failed run of the job *Verify every release tag is
+one that has no tag. The proxy also keeps the content it fetched first: a
+tag deleted and pushed again under the same name on another commit, even a
+signed one, leaves the proxy serving the first commit. So the audit also
+fails for each version whose `.info` on the proxy names, as `Origin.Hash`,
+another commit than its tag, or none; the publishing job checks the same
+before it publishes. A failed run of the job *Verify every release tag is
 signed* is the alarm: its log names the tag or the version. Investigate it
 as a compromise, and withdraw the version as below. GitHub disables
 scheduled workflows in a repository with no activity for 60 days; enable

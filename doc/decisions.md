@@ -187,8 +187,10 @@ unpublish it.
   older commit, or on one that changes the workflow, escapes. The workflow
   therefore also runs daily from `main` and verifies every `v*` tag against
   the listed keys, and that every version proxy.golang.org lists for the
-  module has a tag, which finds a tag deleted again after the proxy fetched
-  it; its failure is the alarm.
+  module has a tag and is served from the commit that tag names, which
+  finds a tag deleted again after the proxy fetched it, and one pushed again
+  on another commit; its failure is the alarm. The publishing job holds the
+  version the proxy fetched to the verified commit as well.
 - A published release is pinned in the `RELEASE_VERIFIED_TAGS` repository
   variable, its tag and the id of the tag object verified when it was
   pushed, and the audit holds a pinned tag to that object instead of to

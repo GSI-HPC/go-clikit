@@ -4,8 +4,10 @@
 #
 # Refuses every release tag, every v* tag in the checkout, that is neither
 # the tag object pinned for it nor a signed statement by a listed signer,
-# checking the latter with verify-release-tag.sh, and every version the
-# module proxy lists, or release pinned, that has no tag in the checkout.
+# checking the latter with verify-release-tag.sh; every version the module
+# proxy lists, or release pinned, that has no tag in the checkout; and every
+# version the module proxy serves from another commit than its tag names,
+# asking module-proxy.sh.
 #
 # A tag push runs the release workflow of the tagged commit, so a tag on a
 # commit from before the workflow, or on one that changes it, verifies
@@ -13,7 +15,9 @@
 # schedule, and finds such a tag whatever commit it names. A tag deleted
 # again before this runs is gone from the checkout, but the module proxy
 # goes on serving a version it has fetched once, so the versions it lists
-# are held to the tags as well.
+# are held to the tags as well, and to the commits they name: a tag deleted
+# and pushed again under the same name names another commit than the one
+# the proxy serves.
 #
 # A pinned release is held to the tag object verified when it was pushed
 # rather than to today's keys, so that a key is retired by removing it
@@ -24,14 +28,13 @@
 #                  repository variable: one line each, the tag and the id
 #                  of its tag object; # starts a comment line, after
 #                  any blanks
-#   GO_MOD         the go.mod naming the module; go.mod if not set
-#   MODULE_PROXY   the module proxy; https://proxy.golang.org if not set
+#   GO_MOD, MODULE_PROXY  as for module-proxy.sh
 
 set -euo pipefail
 
-verify="$(cd "$(dirname "$0")" && pwd)/verify-release-tag.sh"
-go_mod="${GO_MOD:-go.mod}"
-proxy="${MODULE_PROXY:-https://proxy.golang.org}"
+scripts="$(cd "$(dirname "$0")" && pwd)"
+verify="$scripts/verify-release-tag.sh"
+module_proxy="$scripts/module-proxy.sh"
 
 fail() {
   echo "::error::$*"
@@ -61,39 +64,28 @@ while IFS= read -r tag; do
   tags+=("$tag")
 done < <(git for-each-ref --format='%(refname:strip=2)' 'refs/tags/v*')
 
-# The versions the module proxy serves, from its list, which spells a module
-# path with each upper-case letter as ! and the letter in lower case. A proxy
-# that has never fetched the module answers 404 or 410; any other answer than
-# 200 leaves the audit undone, and fails it.
-module="$(sed -n 's/^module[[:space:]]*//p' "$go_mod" | tr -d '"[:space:]')"
-[ -n "$module" ] || fail "$go_mod names no module"
-escaped=''
-for ((i = 0; i < ${#module}; i++)); do
-  c="${module:i:1}"
-  case "$c" in
-    [ABCDEFGHIJKLMNOPQRSTUVWXYZ]) escaped+="!${c,,}" ;;
-    *) escaped+="$c" ;;
-  esac
-done
-url="$proxy/$escaped/@v/list"
-list="$(mktemp)"
-trap 'rm -f "$list"' EXIT
-status="$(curl --silent --show-error --location --retry 3 --output "$list" \
-  --write-out '%{http_code}' "$url")" || fail "cannot fetch $url"
-case "$status" in
-  200) ;;
-  404 | 410) : > "$list" ;;
-  *) fail "$url answered $status" ;;
-esac
+# The versions the module proxy serves: each has a tag, and the proxy serves
+# it from the commit its tag names. A failure to read the list leaves the
+# audit undone, and fails it.
+if ! versions="$("$module_proxy" list)"; then
+  printf '%s\n' "$versions"
+  exit 1
+fi
 
 untagged=0
+moved=0
 while IFS= read -r version; do
   [ -n "$version" ] || continue
   if ! git rev-parse --verify --quiet "refs/tags/$version" > /dev/null; then
     echo "::error::the module proxy serves $version, but there is no tag $version"
     untagged=$((untagged + 1))
+    continue
   fi
-done < <(tr -d '\r' < "$list")
+  commit="$(git rev-parse --verify --quiet "refs/tags/$version^{commit}")" || commit="(none)"
+  if ! "$module_proxy" check "$version" "$commit"; then
+    moved=$((moved + 1))
+  fi
+done <<< "$versions"
 
 gone=0
 for pin in "${!pins[@]}"; do
@@ -103,7 +95,7 @@ for pin in "${!pins[@]}"; do
   fi
 done
 
-if [ "${#tags[@]}" -eq 0 ] && [ "$untagged" -eq 0 ] && [ "$gone" -eq 0 ]; then
+if [ "${#tags[@]}" -eq 0 ] && [ "$untagged" -eq 0 ] && [ "$moved" -eq 0 ] && [ "$gone" -eq 0 ]; then
   echo "::notice::no release tags to verify"
   exit 0
 fi
@@ -133,10 +125,13 @@ fi
 if [ "$untagged" -ne 0 ]; then
   echo "::error::$untagged version(s) on the module proxy have no tag; see doc/release.md"
 fi
+if [ "$moved" -ne 0 ]; then
+  echo "::error::$moved version(s) on the module proxy are not served from the commit their tag names; see doc/release.md"
+fi
 if [ "$gone" -ne 0 ]; then
   echo "::error::$gone pinned release(s) have no tag; see doc/release.md"
 fi
-if [ "$failed" -ne 0 ] || [ "$untagged" -ne 0 ] || [ "$gone" -ne 0 ]; then
+if [ "$failed" -ne 0 ] || [ "$untagged" -ne 0 ] || [ "$moved" -ne 0 ] || [ "$gone" -ne 0 ]; then
   exit 1
 fi
-echo "::notice::all ${#tags[@]} release tag(s) are pinned or signed by a listed signer, and the module proxy serves no other version"
+echo "::notice::all ${#tags[@]} release tag(s) are pinned or signed by a listed signer, and the module proxy serves no other version or commit"
