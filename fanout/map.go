@@ -439,7 +439,9 @@ func list(names []string) string {
 		if err != nil || one.Len() != 1 || one.String() != name {
 			return strings.Join(names, ",")
 		}
-		set = set.Union(one)
+		// Add grows the set in place; a Union of each name would copy the
+		// whole set every time, which takes seconds for thousands of names.
+		_ = set.Add(name)
 	}
 	// A node set holds a name once, so names that repeat are listed as
 	// given, as many as the count says.

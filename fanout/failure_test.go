@@ -6,7 +6,9 @@ package fanout_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
+	"time"
 
 	"github.com/GSI-HPC/go-clikit/fanout"
 	"github.com/GSI-HPC/go-clikit/progress"
@@ -64,6 +66,42 @@ func TestFailure(t *testing.T) {
 				if e != nil && !errors.Is(err, e) {
 					t.Errorf("%v is not kept underneath", e)
 				}
+			}
+		})
+	}
+}
+
+// manyNames returns n host names, exe00000 up.
+func manyNames(n int) []string {
+	names := make([]string, n)
+	for i := range names {
+		names[i] = fmt.Sprintf("exe%05d", i)
+	}
+	return names
+}
+
+// Failure names the items of a wide fan-out that an interrupt ended, all
+// of them failed, in time linear in their number: a command stopped with
+// Ctrl-C over a large cluster exits at once rather than seconds later.
+func TestFailureOfManyItemsIsQuick(t *testing.T) {
+	t.Parallel()
+	names := manyNames(16000)
+	start := time.Now()
+	err := fanout.Failure("hosts", len(names), names, nil, true)
+	if took := time.Since(start); took > 5*time.Second {
+		t.Errorf("Failure of %d names took %s", len(names), took)
+	}
+	if want := "16000 of 16000 hosts failed: exe[00000-15999]"; err.Error() != want {
+		t.Errorf("Failure = %q, want %q", err, want)
+	}
+}
+
+func BenchmarkFailure(b *testing.B) {
+	for _, n := range []int{1000, 16000} {
+		names := manyNames(n)
+		b.Run(fmt.Sprint(n), func(b *testing.B) {
+			for b.Loop() {
+				_ = fanout.Failure("hosts", n, names, nil, false)
 			}
 		})
 	}
