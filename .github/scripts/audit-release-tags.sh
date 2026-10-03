@@ -140,12 +140,6 @@ for pin in "${!pins[@]}"; do
   fi
 done
 
-if [ "${#tags[@]}" -eq 0 ] && [ "$untagged" -eq 0 ] && [ "$moved" -eq 0 ] && [ "$gone" -eq 0 ] &&
-  [ "$unread" -eq 0 ]; then
-  echo "::notice::no release tags to verify"
-  exit 0
-fi
-
 failed=0
 for tag in "${tags[@]}"; do
   if [ -n "${pins[$tag]+pinned}" ]; then
@@ -183,9 +177,13 @@ if [ "$failed" -ne 0 ] || [ "$untagged" -ne 0 ] || [ "$moved" -ne 0 ] || [ "$gon
   [ "$unread" -ne 0 ]; then
   exit 1
 fi
+# What a retraction acknowledged is reported whether or not there are tags:
+# only an audit that found nothing at all says there was nothing to verify.
 if [ "$acknowledged" -ne 0 ]; then
   echo "::warning::$acknowledged problem(s) are acknowledged by the versions $go_mod retracts"
   echo "::notice::all ${#tags[@]} release tag(s) but the retracted versions are pinned or signed by a listed signer, and the module proxy serves no other version or commit"
-  exit 0
+elif [ "${#tags[@]}" -eq 0 ]; then
+  echo "::notice::no release tags to verify"
+else
+  echo "::notice::all ${#tags[@]} release tag(s) are pinned or signed by a listed signer, and the module proxy serves no other version or commit"
 fi
-echo "::notice::all ${#tags[@]} release tag(s) are pinned or signed by a listed signer, and the module proxy serves no other version or commit"
