@@ -51,6 +51,13 @@ func TestScreenShowsWhatATerminalWould(t *testing.T) {
 		{"an escape before a newline", 0, []string{"x\x1b\ny", "\x1b[2K"}, "x^[\n"},
 		{"an escape before an escape", 0, []string{"x\x1b\x1by"}, "x^[^[y\n"},
 		{"an escape before a rune", 0, []string{"x\x1b✓"}, "x^[✓\n"},
+		{"a full row erased to its end", 4, []string{"abcd\x1b[K\n"}, "abc\n"},
+		{"a full row wraps at the next rune", 4, []string{"abcd", "e"}, "abcd\ne\n"},
+		{"a full row returned to", 4, []string{"abcd\rx"}, "xbcd\n"},
+		{"a full row and a newline", 4, []string{"abcd\nx"}, "abcd\nx\n"},
+		{"a full row moved up from", 4, []string{"a\nbcde", "\x1b[1Ax"}, "a  x\nbcde\n"},
+		{"a full row erased below", 4, []string{"abcd\x1b[J"}, "abc\n"},
+		{"a wide rune at the end of a full row erased", 3, []string{"a失\x1b[K"}, "a\n"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			s := &Screen{Width: tc.width}

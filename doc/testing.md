@@ -59,12 +59,13 @@ carriage returns and the sequences the displays write, moving up rows,
 erasing a row, the rest of it or the rest of the screen, and shows every
 other control character as text, so that a test sees it, as it does a
 sequence cut short and an escape, a sequence or a rune that the output ends
-in the middle of. It keeps what has
-scrolled off the top, and with `Width` set wraps a row the way a terminal
-does, so a row drawn too wide shows as the two it would be. A wide rune
-takes two columns, and writing over half of one blanks the other, as a
-terminal does. A test compares
-what a person would see, frame by frame.
+in the middle of. It keeps what has scrolled off the top, and with `Width`
+set wraps a row the way a terminal does, so a row drawn too wide shows as
+the two it would be: a row written to its last column leaves the cursor on
+that column until the next rune, where an erase to the end of the row takes
+the last rune. A wide rune takes two columns, and writing over half of one
+blanks the other, as a terminal does. A test compares what a person would
+see, frame by frame.
 
 The tests of each display cover a wide fan-out, failures that group, a hidden
 span that turns slow, a step that fails at once, a power-on in batches, two
