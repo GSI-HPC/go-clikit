@@ -115,8 +115,11 @@ keeps it without a line of the caller's.
   turns a panic in one item's work, or in what it acquired and released for
   it, into that item's error, since `recover` reaches only its own
   goroutine; work that calls `runtime.Goexit`, as `t.FailNow` does, fails
-  its item rather than pass for done. `Batches` runs one batch after the other,
-  with a pause between them, and stops after one that failed.
+  its item rather than pass for done. What an item acquired is released
+  before its target ends, so that a panic in the release is the target's
+  failure; the next item can so take it and run before that target has
+  ended. `Batches` runs one batch after the other, with a pause between
+  them, and stops after one that failed.
 
 ## What a program fills in
 

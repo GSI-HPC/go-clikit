@@ -46,7 +46,11 @@ type Options[T any] struct {
 	Summarize func(n int, names []string, errs []error, interrupted bool) error
 	// Acquire, when it is set, takes what an item's work needs besides its
 	// place in the pool, such as a place on each host it goes to, and
-	// returns the function that gives that back once the work is done.
+	// returns the function that gives that back once the work is done:
+	// once fn has returned, but before the item's target ends, so that a
+	// panic in it is reported as the item's. An event log or a display can
+	// so show the next item that takes what it gave back running before
+	// this one's target has ended.
 	// It is called once the item has its place in the pool, and the item
 	// stays queued until it returns. An error it returns is the item's,
 	// whose work is then never started, and whose target ends at once,
@@ -80,9 +84,10 @@ type Outcome[R any] struct {
 // becomes that item's error, with its stack in o.PanicLog, as Recovered has
 // it, and so does a call of runtime.Goexit in them, as t.FailNow makes,
 // which ends the item failed rather than the worker without a word. The
-// release is called however fn ended, and an item whose release panicked
-// ends failed whatever fn returned, an error of Skip or one after the
-// context had ended included. Map returns once every call has returned.
+// release is called however fn ended, before the item's target ends, and
+// an item whose release panicked ends failed whatever fn returned, an
+// error of Skip or one after the context had ended included. Map returns
+// once every call has returned.
 //
 // The work is reported under the span ctx carries as a step, o.Step, with
 // a target for each item, as every pool reports it: every target is
