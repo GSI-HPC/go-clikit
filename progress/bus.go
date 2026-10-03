@@ -54,8 +54,9 @@ type Bus struct {
 	// from interleaving with another's, and guards holds.
 	suspending sync.Mutex
 	// holds are the displays sent a Suspend that returned, in the order
-	// they were first sent one, with the number not yet resumed: those of
-	// a display taken off the Bus since are owed it all the same.
+	// they were first sent one, with the Suspends not yet resumed at each
+	// depth: those of a display taken off the Bus since are owed it all
+	// the same.
 	holds []*hold
 
 	mu    sync.Mutex
@@ -458,12 +459,13 @@ func (b *Bus) suspend(id SpanID) bool {
 		return false
 	}
 	b.suspended++
+	depth := b.suspended
 	b.emit(Event{Type: TypeSuspend, Span: id})
 	sus := b.suspenders()
 	b.mu.Unlock()
 	for _, x := range sus {
 		if b.safely(x.Suspend) {
-			b.hold(x)
+			b.hold(x, depth)
 		} else {
 			b.drop(x)
 		}
@@ -498,40 +500,57 @@ func (b *Bus) suspenders() []Suspender {
 	return out
 }
 
-// hold is a display sent n Suspends not yet resumed.
+// hold is a display sent Suspends not yet resumed, with how many it was
+// sent at each depth of suspension, the outermost first: a display listed
+// more than once in Options.Sinks is sent one for each time it is listed.
 type hold struct {
 	display Suspender
-	n       int
+	levels  []level
 }
 
-// hold counts a Suspend that x returned from. b.suspending is held.
-func (b *Bus) hold(x Suspender) {
-	for _, h := range b.holds {
-		if h.display == x {
-			h.n++
-			return
-		}
+// level is the n Suspends a display returned from at one depth.
+type level struct {
+	depth, n int
+}
+
+// hold counts a Suspend that x returned from at depth. b.suspending is
+// held.
+func (b *Bus) hold(x Suspender, depth int) {
+	i := slices.IndexFunc(b.holds, func(h *hold) bool { return h.display == x })
+	if i < 0 {
+		b.holds = append(b.holds, &hold{display: x})
+		i = len(b.holds) - 1
 	}
-	b.holds = append(b.holds, &hold{display: x, n: 1})
+	h := b.holds[i]
+	if last := len(h.levels) - 1; last >= 0 && h.levels[last].depth == depth {
+		h.levels[last].n++
+		return
+	}
+	h.levels = append(h.levels, level{depth: depth, n: 1})
 }
 
-// release resumes every display that holds more suspensions than the depth
-// the Bus is left suspended at, outside b.mu, whether or not it is still
-// on the Bus: one taken off for panicking while suspended would otherwise
-// keep the terminal from its own output. A display that panics when
-// resumed is taken off and called no more. b.suspending is held.
+// release resumes every display sent Suspends deeper than the depth the
+// Bus is left suspended at, once for each, outside b.mu, whether or not it
+// is still on the Bus: one taken off for panicking while suspended would
+// otherwise keep the terminal from its own output. A display that panics
+// when resumed is taken off and called no more. b.suspending is held.
 func (b *Bus) release(depth int) {
 	for _, h := range b.holds {
-		if h.n <= depth {
+		last := len(h.levels) - 1
+		if h.levels[last].depth <= depth {
 			continue
 		}
-		h.n--
-		if !b.safely(h.display.Resume) {
-			b.drop(h.display)
-			h.n = 0
+		n := h.levels[last].n
+		h.levels = h.levels[:last]
+		for range n {
+			if !b.safely(h.display.Resume) {
+				b.drop(h.display)
+				h.levels = nil
+				break
+			}
 		}
 	}
-	b.holds = slices.DeleteFunc(b.holds, func(h *hold) bool { return h.n == 0 })
+	b.holds = slices.DeleteFunc(b.holds, func(h *hold) bool { return len(h.levels) == 0 })
 }
 
 // drop takes the display x off the Bus. b.mu is not held.
