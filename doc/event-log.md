@@ -42,7 +42,7 @@ runs that write to a pipe or to NFS at once each need a file of their own.
 | `run` | The run, 16 hexadecimal digits drawn for each `Log` unless `LogOptions.Run` names it, the same on every line of the run |
 | `trace` | The trace the run's spans belong to, 32 hexadecimal digits |
 | `parent`, `traceFlags`, `traceState` | When the run continues a trace another program began, as `ParseTraceContext` reads it from a W3C `traceparent` and `tracestate`: the span of that program's the run works under, 16 hexadecimal digits; the trace flags, two; and the tracestate as it was given |
-| `program`, `version` | The program that wrote the log and its version, as `LogOptions` name them |
+| `program`, `version` | The program that wrote the log and its version, as `LogOptions` name them; the program is the Bus's, `BusOptions.Program`, when `LogOptions` names none |
 
 ## An event
 

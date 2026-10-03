@@ -5,6 +5,7 @@ package progress
 
 import (
 	"bytes"
+	"cmp"
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
@@ -104,7 +105,8 @@ var errBehind = errors.New("the lines were not written as fast as the work went 
 // LogOptions configure a Log.
 type LogOptions struct {
 	// Program names the program that writes the log, which its first line
-	// names as "program"; empty leaves the key out.
+	// names as "program"; empty takes it from the Bus, BusOptions.Program,
+	// and leaves the key out when that is empty too.
 	Program string
 	// Version is the version of the program that writes the log, which its
 	// first line names.
@@ -195,12 +197,15 @@ type logEvent struct {
 	Dropped int    `json:"dropped,omitempty"`
 }
 
-// Begin writes the trace the events belong to, the log's first line.
-func (l *Log) Begin(tc TraceContext) {
+// Begin writes the run the events belong to, the log's first line: its
+// trace, and the program, LogOptions.Program or else r.Program.
+func (l *Log) Begin(r Run) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
+	tc := r.Trace
 	l.trace = tc.Trace.String()
-	line := logTrace{V: LogVersion, Type: "trace", Run: l.run, Trace: l.trace, Program: l.o.Program, Version: l.o.Version}
+	line := logTrace{V: LogVersion, Type: "trace", Run: l.run, Trace: l.trace,
+		Program: cmp.Or(l.o.Program, r.Program), Version: l.o.Version}
 	if tc.Parent != 0 {
 		line.Parent = tc.Parent.String()
 		line.TraceFlags = fmt.Sprintf("%02x", tc.Flags)

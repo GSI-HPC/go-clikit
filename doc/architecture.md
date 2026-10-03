@@ -145,7 +145,7 @@ The kit knows no program. What depends on one is a parameter or a hook:
 | What | Where |
 | --- | --- |
 | The program's name, in the line that says a sink, a display or a pool's work panicked, and in the error a panic becomes | `progress.BusOptions.Program`, `display.Terminal.Program`, `fanout.MapOptions.Program`, `fanout.Recovered` |
-| The program's name and version on the event log's first line | `progress.LogOptions` |
+| The program's name and version on the event log's first line | `progress.BusOptions.Program`, which the Bus hands the log in `progress.Run`, or `progress.LogOptions.Program` in its place; `progress.LogOptions.Version` |
 | The class of an error that says none of its own, such as the program's rule for its exit codes | `progress.BusOptions.Classify`, `fanout.MapOptions.Classify`, `progresstest.Classify` |
 | The error a pool's step ends with, such as the program's exit code on the kit's summary | `fanout.MapOptions.Summarize`, with `fanout.Failure` as the default |
 | The noun for the targets, "1 host" and "480 hosts" | `display.PlainOptions.Noun`, `fanout.Failure` |
