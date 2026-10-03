@@ -48,15 +48,15 @@
 // # Widths
 //
 // RuneWidth and Width approximate the columns a terminal gives text. East
-// Asian wide and fullwidth characters take two columns. Combining marks
-// and format characters take none, save the soft hyphen, the prepended
+// Asian wide and fullwidth characters take two columns. Combining marks and
+// format characters take none, save the soft hyphen, the prepended
 // concatenation marks such as U+0600, and the Ahom medial ra U+1171E (a
 // spacing mark since Unicode 16.0), which are drawn and take one column.
-// Every other character takes one. Width counts a character followed by
-// the variation selector U+FE0F, which asks for its emoji picture, as two
-// columns, as terminals draw it. Beyond that it does not cluster
-// graphemes, so a sequence joined with U+200D, a skin tone modifier or a
-// flag is counted as the sum of its runes, which may be more than a
+// NUL takes none, and every other character one. Width counts a character
+// followed by the variation selector U+FE0F, which asks for its emoji
+// picture, as two columns, as terminals draw it. Beyond that it does not
+// cluster graphemes, so a sequence joined with U+200D, a skin tone modifier
+// or a flag is counted as the sum of its runes, which may be more than a
 // terminal shows. The widths are meant never to be less than a terminal
 // shows, so that a row Truncate cut does not wrap, but they follow Unicode
 // up to version 18.0: a wide character assigned later is counted as one
