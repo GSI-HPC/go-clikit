@@ -510,10 +510,11 @@ tag names later.
   no commit for, since nothing then says which commit was withdrawn.
 - A tag pushed as a release is still never moved or deleted, with two
   exceptions. A tag that was not pushed as a release, such as one an
-  intruder moved, or deleted and pushed again, is restored to what the
-  proxy fetched or deleted. A bad tag of a retracted version whose commit
-  nothing records is deleted, even one pushed as a release, since the
-  retraction can acknowledge only a version without a tag then.
+  intruder moved, or deleted and pushed again, is restored to the pinned tag
+  object for a pinned release, or to the tag the proxy fetched, or deleted.
+  A bad tag of a retracted version whose commit nothing records is deleted,
+  even one pushed as a release, since the retraction can acknowledge only a
+  version without a tag then.
 
 `doc/release.md` says how the audit is read, and how a release is pinned
 and withdrawn.
