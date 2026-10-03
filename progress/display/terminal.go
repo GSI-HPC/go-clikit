@@ -334,9 +334,7 @@ func (t *Terminal) draw(rows []string) {
 	// drawn changes nothing about the command.
 	var b strings.Builder
 	b.WriteString(eraseLine)
-	for range len(t.rows) - 1 {
-		b.WriteString(eraseLineAbove)
-	}
+	b.WriteString(strings.Repeat(eraseLineAbove, max(t.regionLines(width)-1, 0)))
 	b.WriteString(held)
 	b.WriteString(strings.Join(cutRows, "\n"))
 	_, _ = io.WriteString(t.w, b.String())
@@ -349,8 +347,40 @@ func (t *Terminal) erase() {
 	if len(t.rows) == 0 {
 		return
 	}
-	_, _ = io.WriteString(t.w, eraseLine+strings.Repeat(eraseLineAbove, len(t.rows)-1))
+	_, _ = io.WriteString(t.w, eraseLine+strings.Repeat(eraseLineAbove, t.regionLines(t.widthNow())-1))
 	t.rows = nil
+}
+
+// regionLines returns how many lines of a terminal width columns wide the
+// rows of the region take. Each row was cut to fit the terminal when it
+// was drawn, but most terminals, made narrower since, reflow a row wider
+// than they now are onto as many lines as it takes, which all have to come
+// off. A terminal that cuts such a row instead, as xterm does, loses as
+// many lines above the region as the count goes past. A width of 0 or
+// less is one line a row. t.mu is held.
+func (t *Terminal) regionLines(width int) int {
+	n := 0
+	for _, row := range t.rows {
+		n++
+		if width > 0 {
+			n += max(termtext.Width(row)-1, 0) / width
+		}
+	}
+	return n
+}
+
+// widthNow returns the width of the terminal, as dims does, for the region
+// to be taken off by: 0, one line a row, if size panics, which the display
+// reports itself once it draws, and which must not reach a write of the
+// command's or the recovery from that very panic.
+func (t *Terminal) widthNow() (width int) {
+	defer func() {
+		if recover() != nil {
+			width = 0
+		}
+	}()
+	width, _ = t.dims()
+	return width
 }
 
 // release writes the lines a display holds, and then those of the Lines
