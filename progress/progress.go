@@ -330,6 +330,11 @@ type Fields struct {
 	// Node is what a display folds finished targets by: the target as the
 	// program names it, such as a host, a container, a file or a port. It
 	// may be a node set, such as the nodes of a batch.
+	//
+	// For a target, a display folds by Name when Node is empty. Set Node
+	// all the same, so that the event log carries "node", and because
+	// Name is cut to MaxField while Node never is. A batch is folded by
+	// its Node alone.
 	Node string
 	// Host is the address the work goes to, and Role the target's role,
 	// as the program names it.
