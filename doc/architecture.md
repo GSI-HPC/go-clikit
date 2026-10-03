@@ -122,9 +122,10 @@ keeps it without a line of the caller's.
   did, rather than pass for done, and loses nothing else that broke the
   item. The end of the context, an interrupt or a deadline alike, ends the
   items it left out, and those whose acquire or work then gave up with an
-  error other than a skip, canceled, with the context's error, while each outcome keeps the
-  error it was given. A panic or a call of `runtime.Goexit` is a bug, and
-  fails its item even once the context has ended. An item its acquire
+  error other than a skip, canceled, with the context's error, while each
+  outcome keeps the error it was given, so only the context tells an
+  interrupt from a deadline. A panic or a call of `runtime.Goexit` is a
+  bug, and fails its item even once the context has ended. An item its acquire
   refused ends at once, before it gives its place up, as every target
   does. What an item acquired is released before its target ends, so that
   a panic in the release is the target's failure; the next item can so
