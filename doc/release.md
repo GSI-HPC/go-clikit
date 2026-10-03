@@ -40,6 +40,10 @@ build metadata.
 If the publishing job fails, run it again: it fetches the version once more
 and leaves a GitHub release that an earlier attempt created as it is.
 
+Once the release is published, pin it: add the line the summary of the
+publishing job shows to `RELEASE_VERIFIED_TAGS`, as under *Pinning releases
+and retiring a key*.
+
 ## The daily audit
 
 A tag push runs the Release workflow as the tagged commit has it. A tag on a
@@ -60,10 +64,31 @@ The audit finds a bad release, up to a day late; it does not prevent one.
 What prevents one is the tag ruleset under *Setting up verification*, which
 lets only the maintainers create `v*` tags and nobody delete them.
 
-Because the audit checks old tags against today's keys, a key that signed a
-release stays listed after it is retired. Give a retired SSH key a
-`valid-before` option in `RELEASE_ALLOWED_SIGNERS` instead of removing it,
-and extend an OpenPGP key's expiry date before it expires.
+## Pinning releases and retiring a key
+
+The audit checks a tag against today's keys unless the
+`RELEASE_VERIFIED_TAGS` repository variable pins it. A pin is one line: the
+tag and the id of the tag object the Release workflow verified when the tag
+was pushed, which the summary of the publishing job shows, and which
+`git rev-parse v0.2.0` prints as well. Lines that start with `#` are
+comments.
+
+```
+v0.2.0 3f1c2a9d0e4b8c7f6a5d4e3c2b1a09f8e7d6c5b4
+```
+
+A pinned tag passes the audit while it names that object, whatever the
+keys, and fails it once it names another or is gone. Pin each release once
+it is published.
+
+To retire a key, pin every release it signed and then remove the key from
+`RELEASE_ALLOWED_SIGNERS` or `RELEASE_ALLOWED_PGP_KEYS`. A key that may have
+leaked is removed at once, and only the releases known to be genuine are
+pinned. Do not retire an SSH key with a `valid-before` option instead: git
+checks it against the date in the tag, which whoever holds the key writes,
+so a tag dated before it verifies. An OpenPGP key that expires stops
+verifying the tags it signed earlier as well as new ones, so pin its
+releases before it expires.
 
 ## Withdrawing a release
 
@@ -82,7 +107,8 @@ publishes nothing while both are empty. They are variables rather than files,
 because a file in the tagged commit could name its own signers. Set them
 under *Settings → Secrets and variables → Actions → Variables*. A variable is
 no secret, since a workflow can print it and GitHub does not mask it in the
-log, so these hold public keys only.
+log, so these hold public keys only. A third variable,
+`RELEASE_VERIFIED_TAGS`, pins the published releases for the daily audit.
 
 `RELEASE_ALLOWED_SIGNERS` lists the SSH keys, one line per signer in the
 format of git's `gpg.ssh.allowedSignersFile`:
@@ -103,8 +129,8 @@ block after the other, as `gpg --armor --export <fingerprint>` prints them.
 Any key in it may sign, however gpg would otherwise trust it. The workflow
 knows only what the variable holds: a key that has expired no longer
 verifies, but a revoked key verifies until the variable holds its
-revocation, so export the key again after revoking it, or remove it. Sign
-with the key:
+revocation, so export the key again after revoking it, or remove it, having
+pinned its releases first. Sign with the key:
 
 ```console
 $ git config gpg.format openpgp
