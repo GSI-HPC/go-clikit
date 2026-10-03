@@ -22,8 +22,10 @@ type BatchOptions struct {
 	// as few batches as that allows, so ten nodes at 8 go as 5 and 5, not
 	// 8 and 2. Below one, the set is one batch.
 	Size int
-	// Limit is how many targets of a batch are worked on at once, for a
-	// display; zero says nothing.
+	// Limit is the most targets run works on at once in a batch. Batches
+	// does not enforce it, but records it on each batch's span, where a
+	// display shows it and progresstest.Check holds run to it. Zero
+	// records none.
 	Limit int
 	// Pause is how long to wait between two batches. The wait ends early,
 	// and its timer is stopped, when the context ends.
@@ -50,10 +52,11 @@ type Batch struct {
 }
 
 // ErrNotTried is the error of a batch left out because an earlier one
-// failed. The batch's span ends skipped, but the error is no skip:
-// errors.Is does not find progress.ErrSkipped in it, since it says that
-// work was left out because of a failure, not on purpose, and a command
-// that counts the work that failed counts it.
+// failed, as Batch.Err holds it. The batch's span ends skipped, so that a
+// display counts its nodes as done, but the error is no skip: errors.Is
+// does not find progress.ErrSkipped in it, since it says that work was
+// left out because of a failure, not on purpose, and a command that
+// counts the work that failed, as err != nil and not a skip, counts it.
 var ErrNotTried = errors.New("not tried: an earlier batch failed")
 
 // Batches runs a set of nodes in batches, one after the other, and returns
@@ -71,7 +74,9 @@ var ErrNotTried = errors.New("not tried: an earlier batch failed")
 // out are left out for that, even after one that failed: the failure of a
 // batch the interrupt cut short is no reason of its own. Before and
 // BeforePause are called on the calling goroutine, for the notes a command
-// prints.
+// prints, and so is run. Batches recovers no panic: one in run, Before or
+// BeforePause goes up the calling goroutine, and progress.Bus.Close ends
+// the spans it left open canceled.
 //
 // The work is reported under the span ctx carries as a step, o.Step, whose
 // Total is every node of the set, with a span for each batch, all of them

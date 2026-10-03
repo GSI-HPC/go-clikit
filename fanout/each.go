@@ -1,19 +1,30 @@
 // SPDX-FileCopyrightText: 2026 GSI Helmholtz Centre for Heavy Ion Research GmbH <http://www.gsi.de>
 // SPDX-License-Identifier: Apache-2.0
 
-// Package fanout works on many items at once, a bounded number at a time,
-// and reports each as a target of the progress package: Each is the one
-// bounded loop, Map works on items and reports them as a step with a
-// target each, and Batches works on a node set in batches, one after the
-// other, with a pause between them.
+// Package fanout works on many items at once, a bounded number at a time.
+// Each is the one bounded loop, which reports nothing; Map works on items
+// and reports them as a step of the progress package with a target each;
+// and Batches works on a node set in batches, one after the other, with a
+// pause between them, and reports them as a step with a span for each
+// batch, under which the work of a batch reports its targets.
 //
-// Every pool keeps the promises progresstest.Check holds an emitter to:
-// every target is announced queued before the first runs, each is ended
-// before its place is given up, and those never started end too, canceled
-// when the context left them out, so that a display's count reaches its
-// total however the work ends. A panic in the work for one item becomes
-// that item's error. The package knows no program: its name, the rule
-// that tells an error's class and the error a step ends with are MapOptions.
+// Map and Batches keep the promises progresstest.Check holds an emitter
+// to: every target or batch is announced queued before the first runs,
+// each is ended before its place is given up, and those never started end
+// too, canceled when the context left them out, so that a display's count
+// reaches its total however the work ends.
+//
+// Only Map recovers a panic: one in the work for an item, or in what it
+// acquires and releases for it, becomes that item's error, a *PanicError.
+// Each recovers nothing, so a panic in its work ends the process, as in
+// any goroutine, unless the work recovers it, as with Recovered. A panic
+// in a batch's run, in Before or in BeforePause goes up the goroutine
+// that called Batches, and progress.Bus.Close ends the spans it left open
+// canceled.
+//
+// The package knows no program: its name, its panic log and the rule that
+// tells an error's class are the Bus's, which MapOptions may override, and
+// the error a step ends with is MapOptions.Summarize's.
 package fanout
 
 import (
