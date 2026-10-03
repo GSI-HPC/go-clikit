@@ -11,13 +11,14 @@ import (
 
 // RuneWidth returns how many columns a terminal gives r: two for a
 // character whose East Asian Width is wide or fullwidth, as CJK, kana,
-// Hangul and the emoji drawn as pictures are; none for a mark that
-// combines with the character before it or a character that only formats,
-// such as a zero-width joiner; and one for everything else. The soft hyphen
-// U+00AD and the prepended concatenation marks, such as U+0600, format but
-// are drawn, and take one column, as does the Ahom medial ra U+1171E, which
-// combines in the Unicode tables of Go but is a spacing mark since Unicode
-// 16.0.
+// Hangul and the emoji drawn as pictures are; none for NUL, for a mark that
+// combines with the character before it, even one whose East Asian Width
+// is wide, such as the ideographic tone marks U+302A to U+302D, and for a
+// character that only formats, such as a zero-width joiner; and one for
+// everything else. The soft hyphen U+00AD and the prepended concatenation
+// marks, such as U+0600, format but are drawn, and take one column, as does
+// the Ahom medial ra U+1171E, which combines in the Unicode tables of Go but
+// is a spacing mark since Unicode 16.0.
 //
 // The East Asian Widths are those of golang.org/x/text, with the characters
 // that later versions of Unicode, up to 18.0, made wide added. A character
