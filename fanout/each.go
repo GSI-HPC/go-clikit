@@ -21,8 +21,8 @@ import (
 	"sync"
 )
 
-// DefaultMax is how many items a pool works on at once when nothing says.
-const DefaultMax = 16
+// DefaultLimit is how many items a pool works on at once when nothing says.
+const DefaultLimit = 16
 
 // Each calls work with every index below n, at most limit at a time, and
 // returns once every call has returned. When ctx ends, no further call is
