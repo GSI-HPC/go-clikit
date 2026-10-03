@@ -320,3 +320,26 @@ func TestTreeListsATargetThatRanTwice(t *testing.T) {
 		t.Errorf("fold of a name given twice = %q", got)
 	}
 }
+
+// Siblings whose numbers differ only in leading zeros are drawn in the
+// same order whichever started first.
+func TestTreeOrdersNamesThatDifferInLeadingZeros(t *testing.T) {
+	t.Parallel()
+
+	draw := func(names ...string) string {
+		es := events{}
+		for i, name := range names {
+			es = es.add(start, progress.SpanID(i+1), 0, call, func(e *progress.Event) { e.Name = name })
+		}
+		for i := range names {
+			es = es.add(end, progress.SpanID(i+1), 0, call)
+		}
+		return tree(es)
+	}
+	if a, b := draw("x01", "x1"), draw("x1", "x01"); a != b {
+		t.Errorf("the order depends on which started first:\n%s\nand:\n%s", a, b)
+	}
+	if a, b := fold([]string{"port 01", "port 1"}), fold([]string{"port 1", "port 01"}); a != b {
+		t.Errorf("the names listed depend on their order: %q and %q", a, b)
+	}
+}
