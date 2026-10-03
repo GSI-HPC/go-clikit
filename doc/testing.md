@@ -92,7 +92,9 @@ Three fuzz targets check what must hold for any text a remote host sends:
 - `termtext.FuzzEscape`: neither escaper leaves a rune its policy names, and
   escaping twice changes nothing;
 - `termtext.FuzzTruncate`: a cut row is a prefix of the text, cut on a rune,
-  that fits its columns, and text that fits already is left as it is;
+  that fits its columns and is the longest that does, text that fits
+  already is left as it is, and `Width` keeps to the bounds the widths of
+  the runes set;
 - `progress.FuzzSanitize`: what comes out is UTF-8, holds nothing a terminal
   would act on, keeps to its bound and is the same when sanitised again.
 
