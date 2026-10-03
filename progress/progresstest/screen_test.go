@@ -39,6 +39,14 @@ func TestScreenShowsWhatATerminalWould(t *testing.T) {
 		{"an escape that starts no sequence", 0, []string{"\x1b7saved\n"}, "^[7saved\n"},
 		{"a wide rune takes two columns", 0, []string{"失败\rX\n"}, "X败\n"},
 		{"a wide rune wraps when one column is left", 4, []string{"a失败"}, "a失\n败\n"},
+		{"an escape not ended shows", 0, []string{"done\x1b"}, "done^[\n"},
+		{"a sequence not ended shows", 0, []string{"done\x1b[1"}, "done^[[1\n"},
+		{"a rune not ended shows", 0, []string{"done\xe2\x9c"}, "done\ufffd\ufffd\n"},
+		{"a sequence cut by a newline", 0, []string{"a\x1b[\n12/34\n"}, "a^[[\n12/34\n"},
+		{"a sequence cut by an escape", 0, []string{"a\x1b[1\x1b[K\n"}, "a^[[1\n"},
+		{"an escape before a newline", 0, []string{"x\x1b\ny", "\x1b[2K"}, "x^[\n"},
+		{"an escape before an escape", 0, []string{"x\x1b\x1by"}, "x^[^[y\n"},
+		{"an escape before a rune", 0, []string{"x\x1b✓"}, "x^[✓\n"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			s := &Screen{Width: tc.width}
@@ -51,5 +59,20 @@ func TestScreenShowsWhatATerminalWould(t *testing.T) {
 				t.Errorf("screen:\n%q\nwant:\n%q", got, tc.want)
 			}
 		})
+	}
+}
+
+// What String shows of a sequence the output ends in the middle of is a
+// view: the next write still completes the sequence.
+func TestScreenCompletesWhatItShowedUnfinished(t *testing.T) {
+	t.Parallel()
+	s := &Screen{}
+	io.WriteString(s, "ab\r\x1b")
+	if got, want := s.String(), "^[\n"; got != want {
+		t.Errorf("screen before the sequence ends: %q, want %q", got, want)
+	}
+	io.WriteString(s, "[2Kc")
+	if got, want := s.String(), "c\n"; got != want {
+		t.Errorf("screen after it ends: %q, want %q", got, want)
 	}
 }
