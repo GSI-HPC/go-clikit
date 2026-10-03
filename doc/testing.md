@@ -61,7 +61,9 @@ other control character as text, so that a test sees it, as it does a
 sequence cut short and an escape, a sequence or a rune that the output ends
 in the middle of. It keeps what has
 scrolled off the top, and with `Width` set wraps a row the way a terminal
-does, so a row drawn too wide shows as the two it would be. A test compares
+does, so a row drawn too wide shows as the two it would be. A wide rune
+takes two columns, and writing over half of one blanks the other, as a
+terminal does. A test compares
 what a person would see, frame by frame.
 
 The tests of each display cover a wide fan-out, failures that group, a hidden
