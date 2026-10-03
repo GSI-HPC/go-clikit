@@ -405,7 +405,9 @@ type Sink interface {
 }
 
 // LineSink is a Sink that may ask for the lines of output, which are only
-// produced when a sink asks. The Bus asks once, when it is made.
+// produced when a sink asks. The Bus asks once, when it is made. A Sink that
+// is not a LineSink asks for none, as Log does, though it is sent the lines
+// another sink asked for.
 type LineSink interface {
 	// WantsLines reports whether the sink wants the lines of output.
 	WantsLines() bool

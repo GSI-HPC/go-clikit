@@ -59,8 +59,8 @@ const (
 // value is zero or empty is left out. A line of output is written without
 // its text, which never leaves the process: the event says only which
 // stream it came from and how many lines before it were not sent; and since
-// the log asks for no lines, there are line events only while a display
-// asks for them.
+// the log is no LineSink, and so asks for no lines, there are line events
+// only while a display asks for them.
 //
 // The lines are written by a goroutine of the log's own, never under the
 // Bus's lock, in pieces of whole lines of at most 64 KiB, a longer line on
@@ -259,10 +259,6 @@ func (l *Log) Handle(e Event) {
 		l.due()
 	}
 }
-
-// WantsLines says that the log asks for no lines of output: it never
-// writes their text.
-func (l *Log) WantsLines() bool { return false }
 
 // write keeps v as a line, whole, for the goroutine that writes, and has it
 // written once 64 KiB wait. l.mu is held.
