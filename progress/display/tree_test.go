@@ -340,6 +340,42 @@ bmc power off: failed in 2.0s: 0 ok, 8 failed
 `)
 }
 
+// A target's name that holds an address, as the name of the processor of
+// a host often does, is read as {} whole, with the port after it kept, and
+// not as the address inside it: such targets still fail alike.
+func TestTheTreeReadsANameThatHoldsAnAddressAsTheTargets(t *testing.T) {
+	t.Parallel()
+	f := newTreeFixture(t, "bmc power off", treeSetup{})
+	ctx, step := progress.Start(f.ctx, progress.KindStep, "power off",
+		progress.WithFlags(progress.Fold), progress.Total(4), progress.Limit(4))
+	failures := map[string]string{
+		"bmc-10.0.0.7":    "dial tcp bmc-10.0.0.7:623: connection refused",
+		"bmc-10.0.0.8":    "dial tcp bmc-10.0.0.8:623: connection refused",
+		"10.0.0.7.nip.io": "dial tcp 10.0.0.7.nip.io:443 via 10.1.1.1:53: refused",
+		"10.0.0.8.nip.io": "dial tcp 10.0.0.8.nip.io:443 via 10.1.1.2:53: refused",
+	}
+	order := []string{"bmc-10.0.0.7", "bmc-10.0.0.8", "10.0.0.7.nip.io", "10.0.0.8.nip.io"}
+	var spans []*progress.Span
+	for _, node := range order {
+		_, span := progress.Start(ctx, progress.KindTarget, node, progress.Queued(), progress.Node(node))
+		spans = append(spans, span)
+	}
+	for _, span := range spans {
+		span.Run()
+	}
+	f.draw(2 * time.Second)
+	for i, span := range spans {
+		span.End(unreachable("%s", failures[order[i]]))
+	}
+	step.End(errors.New("4 of 4 failed"))
+	checkScreen(t, f.end(errors.New("4 of 4 failed")), `
+✗ power off  2.0s  0 ok, 4 failed
+  ✗ bmc-10.0.0.[7-8]  transport: dial tcp {}:623: connection refused
+  ✗ 10.0.0.[7-8].nip.io  transport: dial tcp {}:443 via {}: refused
+bmc power off: failed in 2.0s: 0 ok, 4 failed
+`)
+}
+
 // Plumbing is hidden: a lookup is drawn only once it has taken a second,
 // and leaves a line only if it took that long or failed.
 func TestTheTreeRevealsASlowHiddenSpan(t *testing.T) {
