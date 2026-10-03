@@ -122,7 +122,9 @@ keeps it without a line of the caller's.
   which holds them, whole lines only and bounded, while a question is asked
   or the command has a line open. The lines a display leaves for good are
   written above the region, ahead of whatever the command writes after the
-  events they tell of.
+  events they tell of. A `Terminal` carries one display, from the
+  constructor that makes it to its `Close`, after which the writers pass
+  bytes through; making a second display on it panics.
 - **The pools.** `fanout.Each` is the one loop every pool runs on: at most
   its limit at a time, and nothing started once the context has ended, so an
   interrupt stops every pool the same way. `Map` returns what each item came

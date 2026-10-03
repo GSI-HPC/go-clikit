@@ -59,6 +59,11 @@ const defaultWidth = 80
 
 // Terminal is the terminal a display draws on, shared with the command's
 // own output. It is safe for concurrent use.
+//
+// A Terminal carries one display, from the NewTree, NewCounter or NewPlain
+// that makes it to its Close. After that it draws no more, and its writers
+// go on passing bytes through. Making a second display on a Terminal, even
+// once the first has been closed, panics: make a Terminal for each.
 type Terminal struct {
 	w          io.Writer
 	size       func() (cols, rows int, err error)
@@ -76,7 +81,9 @@ type Terminal struct {
 	open bool
 	// suspended counts the Suspends not yet resumed.
 	suspended int
-	closed    bool
+	// attached says a display was made on the terminal, and closed that
+	// it was closed.
+	attached, closed bool
 	// held, when a display leaves lines for good, plain lines or the
 	// tree's finished steps, returns the lines it has not written yet,
 	// and forgets them.
@@ -120,6 +127,19 @@ type TerminalOptions struct {
 // keeps what o says, which nothing changes after.
 func NewTerminal(w io.Writer, o TerminalOptions) *Terminal {
 	return &Terminal{w: w, size: o.Size, foreground: o.Foreground, panicLog: o.PanicLog, program: o.Program}
+}
+
+// attach makes the display being made the terminal's one, whose lines,
+// when it leaves lines for good, held returns; nil is a display that
+// leaves none. It panics if the terminal has carried a display before.
+func (t *Terminal) attach(held func() string) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if t.attached {
+		panic("display: a Terminal carries one display; make a Terminal for each")
+	}
+	t.attached = true
+	t.held = held
 }
 
 // recovered, deferred by the goroutine a display draws from, keeps a panic
@@ -296,14 +316,14 @@ func trimColours(p []byte) []byte {
 // and otherwise with the next frame, above it. It holds them while a
 // question is asked, between progress.Suspend and its resume, and while
 // the command has a line open, such as a question it asks itself; the next
-// frame, the write that ends the open line, the resume and Close write
-// them, in order, and so does a write of the command's, before its own
-// bytes. A write of the command's that ends a line and then sets the
-// colours (ESC [ … m), the last of them ESC [ 0 m, which sets them back,
-// leaves no line open; one that ends in a colour not set back leaves the
-// line open. A line that does not end waits for its
-// end, and Close ends it. What waits is bounded, 256 KiB: a line past that
-// is left out, and a line written with the others says how many were.
+// frame, the write that ends the open line, the resume and the display's
+// Close write them, in order, and so does a write of the command's, before
+// its own bytes. A write of the command's that ends a line and then sets
+// the colours (ESC [ … m), the last of them ESC [ 0 m, which sets them
+// back, leaves no line open; one that ends in a colour not set back leaves
+// the line open. A line that does not end waits for its end, and the
+// display's Close ends it. What waits is bounded, 256 KiB: a line past
+// that is left out, and a line written with the others says how many were.
 //
 // w may be a writer of the Terminal's own, such as its Writer of standard
 // error: the lines then go to the stream under it. What is written is not

@@ -172,17 +172,16 @@ type treeSpan struct {
 }
 
 // NewTree returns a tree that draws on term once Start is called. The time
-// on its first row is counted from now.
+// on its first row is counted from now. It panics if term has carried a
+// display before.
 func NewTree(term *Terminal, o TreeOptions) *Tree {
 	t := &Tree{term: term, now: o.Now, g: glyphsFor(o.ASCII), interrupted: o.Interrupted, spans: map[progress.SpanID]*treeSpan{}}
 	if t.now == nil {
 		t.now = time.Now
 	}
-	t.counter = NewCounter(term, CounterOptions{Now: t.now, ASCII: o.ASCII})
+	term.attach(t.take)
+	t.counter = newCounter(term, CounterOptions{Now: t.now, ASCII: o.ASCII})
 	t.start = t.now()
-	term.mu.Lock()
-	term.held = t.take
-	term.mu.Unlock()
 	return t
 }
 

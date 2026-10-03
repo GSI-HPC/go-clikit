@@ -69,8 +69,16 @@ type CounterOptions struct {
 }
 
 // NewCounter returns a counter that draws on term once Start is called. The
-// time on its line is counted from now.
+// time on its line is counted from now. It panics if term has carried a
+// display before.
 func NewCounter(term *Terminal, o CounterOptions) *Counter {
+	term.attach(nil)
+	return newCounter(term, o)
+}
+
+// newCounter returns a counter on term without making it term's display,
+// as the Tree draws one in its place on a small terminal.
+func newCounter(term *Terminal, o CounterOptions) *Counter {
 	c := &Counter{term: term, now: o.Now, g: glyphsFor(o.ASCII)}
 	if c.now == nil {
 		c.now = time.Now

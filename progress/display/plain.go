@@ -112,7 +112,8 @@ type PlainOptions struct {
 }
 
 // NewPlain returns a display of plain lines on term, which counts the time
-// in front of its lines from now.
+// in front of its lines from now. It panics if term has carried a display
+// before.
 func NewPlain(term *Terminal, o PlainOptions) *Plain {
 	p := &Plain{term: term, now: o.Now, spans: map[progress.SpanID]*plainSpan{}, between: " › ", noun: o.Noun, wake: make(chan struct{}, 1)}
 	if o.ASCII {
@@ -124,10 +125,8 @@ func NewPlain(term *Terminal, o PlainOptions) *Plain {
 	if p.noun == nil {
 		p.noun = targets
 	}
+	term.attach(p.take)
 	p.start = p.now()
-	term.mu.Lock()
-	term.held = p.take
-	term.mu.Unlock()
 	return p
 }
 

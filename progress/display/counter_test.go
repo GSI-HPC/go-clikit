@@ -548,9 +548,11 @@ func TestADisplayThatPanicsWhileItDrawsStops(t *testing.T) {
 			var d interface {
 				Start()
 				Close()
-			} = display.NewCounter(term, display.CounterOptions{Now: c.Now})
+			}
 			if name == "tree" {
 				d = display.NewTree(term, display.TreeOptions{Now: c.Now})
+			} else {
+				d = display.NewCounter(term, display.CounterOptions{Now: c.Now})
 			}
 			c.Add(2 * time.Second)
 			d.Start()
