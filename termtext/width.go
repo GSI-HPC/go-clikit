@@ -9,7 +9,7 @@ import (
 	"golang.org/x/text/width"
 )
 
-// RuneWidth returns how many columns a terminal gives r: two for a
+// runeWidth returns how many columns a terminal gives r: two for a
 // character whose East Asian Width is wide or fullwidth, as CJK, kana,
 // Hangul and the emoji drawn as pictures are; none for NUL, for a mark that
 // combines with the character before it, even one whose East Asian Width
@@ -24,7 +24,10 @@ import (
 // that later versions of Unicode, up to 18.0, made wide added. A character
 // assigned after that takes one column, as does a combining mark newer than
 // the Unicode tables of Go.
-func RuneWidth(r rune) int {
+//
+// It is not exported: added up over text, the widths of runes alone fall
+// short of Width wherever U+FE0F follows a rune of one column.
+func runeWidth(r rune) int {
 	switch {
 	case r == 0:
 		return 0
@@ -54,7 +57,7 @@ const emojiPresentation = 0xfe0f
 // advance returns the columns r adds to text whose last rune that took
 // columns took last of them, and what last becomes. U+FE0F after a rune of
 // one column makes that rune two columns, as a terminal draws its emoji
-// picture; any other rune adds its RuneWidth.
+// picture; any other rune adds its runeWidth.
 func advance(r rune, last int) (cols, next int) {
 	if r == emojiPresentation {
 		if last == 1 {
@@ -62,7 +65,7 @@ func advance(r rune, last int) (cols, next int) {
 		}
 		return 0, last
 	}
-	cols = RuneWidth(r)
+	cols = runeWidth(r)
 	if cols == 0 {
 		return 0, last
 	}
@@ -72,7 +75,8 @@ func advance(r rune, last int) (cols, next int) {
 // Width returns how many columns s takes on a terminal: the widths of its
 // runes added up, except that a rune of one column followed by U+FE0F is
 // counted as two, since a terminal draws it as an emoji picture, as it does
-// a keycap such as 1, U+FE0F, U+20E3.
+// a keycap such as 1, U+FE0F, U+20E3. The width of one rune is
+// Width(string(r)).
 func Width(s string) int {
 	n, last := 0, 0
 	for _, r := range s {
