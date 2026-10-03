@@ -76,7 +76,7 @@ func ExampleBatches() {
 		return nil
 	})
 	for _, b := range batches {
-		fmt.Println(b.Nodes, b.Ran, b.Err)
+		fmt.Println(b.Nodes, b.Started, b.Err)
 	}
 	// Output:
 	// batch 1 of 3: exe[01-04]

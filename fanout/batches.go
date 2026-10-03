@@ -41,8 +41,8 @@ type BatchOptions struct {
 type Batch struct {
 	// Nodes are the nodes of the batch.
 	Nodes *nodeset.NodeSet
-	// Ran says whether the batch was run.
-	Ran bool
+	// Started says whether the batch was run.
+	Started bool
 	// Err is what running the batch returned. For a batch that was not
 	// run it is the context's error when the context had ended by its
 	// turn, whether an earlier batch failed or not, and ErrNotTried when
@@ -141,7 +141,7 @@ func Batches(ctx context.Context, nodes *nodeset.NodeSet, o BatchOptions, run fu
 		}
 		spans[i].Run()
 		err = run(ctxs[i], chunk)
-		out[i].Ran, out[i].Err = true, err
+		out[i].Started, out[i].Err = true, err
 		spans[i].End(err)
 	}
 	step.End(err)

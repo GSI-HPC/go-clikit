@@ -103,7 +103,7 @@ func TestBatchesSplitTheSetEvenly(t *testing.T) {
 			batches := fanout.Batches(context.Background(), set(t, tc.set), s.options(tc.size, 0), s.run)
 			var got []string
 			for _, b := range batches {
-				if !b.Ran || b.Err != nil {
+				if !b.Started || b.Err != nil {
 					t.Errorf("batch %s = %+v, want it run without an error", b.Nodes, b)
 				}
 				got = append(got, b.Nodes.String())
@@ -168,11 +168,11 @@ func TestBatchesStopAfterAFailedBatch(t *testing.T) {
 	}
 	for i, b := range batches {
 		switch {
-		case i == 0 && (!b.Ran || b.Err != nil):
+		case i == 0 && (!b.Started || b.Err != nil):
 			t.Errorf("batch 1 = %+v, want it run without an error", b)
-		case i == 1 && (!b.Ran || b.Err == nil || !strings.Contains(b.Err.Error(), "exe4")):
+		case i == 1 && (!b.Started || b.Err == nil || !strings.Contains(b.Err.Error(), "exe4")):
 			t.Errorf("batch 2 = %+v, want it run with exe4's error", b)
-		case i > 1 && (b.Ran || !errors.Is(b.Err, fanout.ErrNotTried)):
+		case i > 1 && (b.Started || !errors.Is(b.Err, fanout.ErrNotTried)):
 			t.Errorf("batch %d = %+v, want it not tried", i+1, b)
 		}
 	}
@@ -200,7 +200,7 @@ func TestBatchesStopWhenInterrupted(t *testing.T) {
 			t.Errorf("got:\n%s\nwant:\n%s", got, want)
 		}
 		for i, b := range batches[1:] {
-			if b.Ran || !errors.Is(b.Err, context.Canceled) {
+			if b.Started || !errors.Is(b.Err, context.Canceled) {
 				t.Errorf("batch %d = %+v, want it left out as cancelled", i+2, b)
 			}
 		}
@@ -217,11 +217,11 @@ func TestBatchesStopWhenInterrupted(t *testing.T) {
 		if got, want := strings.Join(s.log, "\n"), "note: exe[1-2] (1 of 3)\nrun exe[1-2]"; got != want {
 			t.Errorf("got:\n%s\nwant:\n%s", got, want)
 		}
-		if !batches[0].Ran {
+		if !batches[0].Started {
 			t.Errorf("batch 1 = %+v, want it run", batches[0])
 		}
 		for i, b := range batches[1:] {
-			if b.Ran || !errors.Is(b.Err, context.Canceled) {
+			if b.Started || !errors.Is(b.Err, context.Canceled) {
 				t.Errorf("batch %d = %+v, want it left out as cancelled", i+2, b)
 			}
 		}
