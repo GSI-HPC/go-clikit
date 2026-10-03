@@ -37,6 +37,8 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"unicode"
+	"unicode/utf8"
 
 	"github.com/GSI-HPC/go-clikit/progress"
 	"github.com/GSI-HPC/go-clikit/termtext"
@@ -130,7 +132,8 @@ func newBus(c *Capture, opts []Option) *progress.Bus {
 //	  target exe3: failed (transport): {}: no answer
 //
 // Nothing in it depends on how concurrent work was scheduled. Targets that
-// read the same once their own node and host are written {} are folded into
+// read the same once their own node and host are written {}, where they
+// stand as names of their own rather than inside a word, are folded into
 // one line naming them as a node set, or listing them when a name is no
 // node or a node is named twice, alone or in another name's node set, as it
 // is for a target that ran twice; siblings are sorted by what they read,
@@ -187,15 +190,9 @@ func blocks(siblings []*node, repl func(string) string) []string {
 			out = append(out, draw(n, repl))
 			continue
 		}
-		var pairs []string
 		// The host first, since it usually holds the node's name.
-		for _, own := range []string{n.last.Host, n.last.Node, n.start.Name} {
-			if own != "" {
-				pairs = append(pairs, own, "{}")
-			}
-		}
-		own := strings.NewReplacer(pairs...)
-		block := draw(n, func(s string) string { return own.Replace(repl(s)) })
+		own := []string{n.last.Host, n.last.Node, n.start.Name}
+		block := draw(n, func(s string) string { return ownNames(repl(s), own) })
 		folded[block] = append(folded[block], cmp.Or(n.last.Node, n.start.Name))
 	}
 	for block, names := range folded {
@@ -203,6 +200,47 @@ func blocks(siblings []*node, repl func(string) string) []string {
 	}
 	slices.SortFunc(out, order)
 	return out
+}
+
+// ownNames writes each of names in text as {} where it stands as a name of
+// its own, with no letter or digit right before or after it, the first
+// given where two start at the same place: a target named "c" leaves
+// "context canceled" as it is, and one named "exe1" leaves "exe10" but
+// writes "exe1-bmc" as "{}-bmc".
+func ownNames(text string, names []string) string {
+	var b strings.Builder
+	for i := 0; i < len(text); {
+		if n := ownNameAt(text, i, names); n > 0 {
+			b.WriteString("{}")
+			i += n
+			continue
+		}
+		b.WriteByte(text[i])
+		i++
+	}
+	return b.String()
+}
+
+// ownNameAt returns the length of the first of names that stands as a name
+// of its own at text[i:], or 0.
+func ownNameAt(text string, i int, names []string) int {
+	if r, _ := utf8.DecodeLastRuneInString(text[:i]); inName(r) {
+		return 0
+	}
+	for _, name := range names {
+		if name == "" || !strings.HasPrefix(text[i:], name) {
+			continue
+		}
+		if r, _ := utf8.DecodeRuneInString(text[i+len(name):]); !inName(r) {
+			return len(name)
+		}
+	}
+	return 0
+}
+
+// inName reports whether r can be part of a name it stands next to.
+func inName(r rune) bool {
+	return unicode.IsLetter(r) || unicode.IsDigit(r)
 }
 
 // draw draws one span and those under it.

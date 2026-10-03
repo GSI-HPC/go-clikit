@@ -403,3 +403,41 @@ func TestCheckHoldsTheBatchesOfEveryStep(t *testing.T) {
 		t.Errorf("violations of batches announced up front: %q", problems)
 	}
 }
+
+// A target's name is written {} only where it stands as a name of its own,
+// with no letter or digit right before or after it, not inside a word: a
+// target named "c" leaves "context canceled" as it is, and "exe1" leaves
+// "exe10" but writes "exe1-bmc" as "{}-bmc".
+func TestTreeWritesANameAsItsOwnOnlyWhereItStandsAlone(t *testing.T) {
+	t.Parallel()
+
+	capture := &Capture{}
+	bus := progress.NewBus(progress.Options{Sinks: []progress.Sink{capture}})
+	ctx, step := progress.Start(progress.WithBus(context.Background(), bus), progress.KindStep, "s", progress.WithFlags(progress.Fold), progress.Total(4))
+	errs := map[string]error{
+		"c":     errors.New("context deadline exceeded"),
+		"e":     errors.New("i/o timeout"),
+		"exe1":  errors.New("exe1-bmc: exe10 answered for exe1"),
+		"exe10": errors.New("no answer"),
+	}
+	var targets []*progress.Span
+	for _, name := range []string{"c", "e", "exe1", "exe10"} {
+		_, s := progress.Start(ctx, progress.KindTarget, name, progress.Queued(), progress.Node(name))
+		targets = append(targets, s)
+	}
+	for i, name := range []string{"c", "e", "exe1", "exe10"} {
+		targets[i].Run()
+		targets[i].End(errs[name])
+	}
+	step.End(nil)
+	bus.Close()
+	want := `step s total=4 [fold]: ok
+  target c: failed (target): context deadline exceeded
+  target e: failed (target): i/o timeout
+  target exe1: failed (target): {}-bmc: exe10 answered for {}
+  target exe10: failed (target): no answer
+`
+	if got := capture.Tree(); got != want {
+		t.Errorf("tree:\n%s\nwant:\n%s", got, want)
+	}
+}
