@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/GSI-HPC/go-clikit/progress"
+	"github.com/GSI-HPC/go-nodeset"
 )
 
 // Summary is the one line a display leaves behind once the command has
@@ -25,9 +26,11 @@ import (
 // the ways its targets ended below the counted steps: failed, then
 // canceled, then skipped, then ok, so that a node reset after its boot
 // override was set is one node, not two. A batch left out, after one that
-// failed or for an interrupt, counts as its Total. A command that counted
-// no targets says only how it ended. The line says nothing of why a target
-// failed: the command's error says that, once, after it.
+// failed or for an interrupt, counts as its nodes, each once with the
+// rest, when its Node names as many as its Total, and otherwise as its
+// Total. A command that counted no targets says only how it ended. The
+// line says nothing of why a target failed: the command's error says that,
+// once, after it.
 //
 // A Summary is a progress.Sink; its methods are safe for concurrent use.
 type Summary struct {
@@ -96,23 +99,43 @@ func (s *Summary) finish(e progress.Event, count progress.Count, counted bool) {
 	}
 	delete(s.under, e.Span)
 	if e.Kind == progress.KindTarget {
-		node := cmp.Or(e.Node, e.Name)
-		if was, seen := s.nodes[node]; !seen || worse(e.Status, was) {
-			s.nodes[node] = e.Status
-		}
+		s.node(cmp.Or(e.Node, e.Name), e.Status)
 		s.roots[root].add(e.Status, 1)
 	}
-	if root != e.Span || !counted {
+	if !counted {
 		return
 	}
-	// What the root counted that no target ended as was left out: the
-	// Total of a batch or a Fold step below it that never ran. A root
-	// left out whole counts nothing of its own, as Tally has it.
+	if root != e.Span {
+		// A batch or a Fold step left out before any target of its own
+		// started counts as its Total, as Tally has it: as its nodes,
+		// each once with the others, when it names as many as that.
+		if left := e.Status == progress.StatusSkipped || e.Status == progress.StatusCanceled; left && count.Targets == 0 {
+			if set, err := nodeset.Parse(e.Node); err == nil && set.Len() == count.Total {
+				for _, node := range set.Expand() {
+					s.node(node, e.Status)
+				}
+				s.roots[root].add(e.Status, count.Total)
+			}
+		}
+		return
+	}
+	// What the root counted that no target, nor node of a span left out,
+	// ended as was left out too: the Total of a batch or a Fold step below
+	// it that never ran and named no nodes. A root left out whole counts
+	// nothing of its own, as Tally has it.
 	seen := s.roots[root]
 	s.left.failed += count.Failed - seen.failed
 	s.left.canceled += count.Canceled - seen.canceled
 	s.left.skipped += count.Skipped - seen.skipped
 	delete(s.roots, root)
+}
+
+// node counts in that a target of node ended with status, the worst of
+// those of its targets.
+func (s *Summary) node(node string, status progress.Status) {
+	if was, seen := s.nodes[node]; !seen || worse(status, was) {
+		s.nodes[node] = status
+	}
 }
 
 func (o *outcomes) add(status progress.Status, n int) {
