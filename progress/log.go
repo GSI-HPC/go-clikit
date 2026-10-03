@@ -71,12 +71,12 @@ const (
 // their own, or one writer that takes their lines whole. The lines are
 // written once 64 KiB wait, as a step, a batch or the command ends, and a
 // second after a line came at the latest, so that a log followed as it
-// grows, or one of a run killed, falls little behind. A write that fails stops the log, and so does a writer
-// that falls 8 MiB behind, a pipe whose reader has stopped: the log never
-// holds the work up. A log that falls behind still writes the lines it had
-// taken, and leaves out those that come after. Close writes what is left,
-// waiting five seconds at most, and says why the log stops short when it
-// does.
+// grows, or one of a run killed, falls little behind. A write that fails
+// stops the log, and so does a writer that falls 8 MiB behind, a pipe
+// whose reader has stopped: the log never holds the work up. A log that
+// falls behind still writes the lines it had taken, and leaves out those
+// that come after. Close writes what is left, waiting five seconds at
+// most, and says why the log stops short when it does.
 type Log struct {
 	w   io.Writer
 	o   LogOptions
