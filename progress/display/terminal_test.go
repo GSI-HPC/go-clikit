@@ -476,10 +476,11 @@ func TestALongLineInSmallWritesCostsLittle(t *testing.T) {
 	}
 }
 
-// A terminal made narrower reflows a row of the region drawn wider than it
-// now is onto more than one line; the region is taken off whole all the
-// same, every line of every row.
-func TestTheRegionComesOffWholeAfterTheTerminalNarrows(t *testing.T) {
+// A terminal made narrower may reflow a row of the region drawn wider than
+// it now is onto more than one line, or cut it; the region is taken off
+// one line a row all the same, as it was drawn, so that no line above it,
+// the command's own, is taken off a terminal that cuts.
+func TestTheRegionComesOffByItsRowsAfterTheTerminalNarrows(t *testing.T) {
 	t.Parallel()
 	var mu sync.Mutex
 	width := 120
@@ -504,8 +505,7 @@ func TestTheRegionComesOffWholeAfterTheTerminalNarrows(t *testing.T) {
 	if w := termtext.Width(row); w <= 80 || w >= 120 {
 		t.Fatalf("the row drawn, %q, is %d columns wide, want between 80 and 120", row, w)
 	}
-	lines := (termtext.Width(row) + 39) / 40
-	want := "\r\x1b[2K" + strings.Repeat("\x1b[1A\x1b[2K", lines-1)
+	const want = "\r\x1b[2K"
 
 	setWidth(40)
 	out.Reset()
@@ -522,7 +522,7 @@ func TestTheRegionComesOffWholeAfterTheTerminalNarrows(t *testing.T) {
 	out.Reset()
 	c.Add(time.Second)
 	counter.Draw()
-	if got := out.String(); !strings.HasPrefix(got, want) || strings.Count(got, "\x1b[1A") != lines-1 {
-		t.Errorf("the next frame is drawn with %q, want it to begin %q", got, want)
+	if got := out.String(); !strings.HasPrefix(got, want) || strings.Contains(got, "\x1b[1A") {
+		t.Errorf("the next frame is drawn with %q, want it to begin %q and move up no line", got, want)
 	}
 }

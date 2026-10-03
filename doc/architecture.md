@@ -102,8 +102,11 @@ keeps it without a line of the caller's.
 - **One order for the terminal.** The command's own writes go through
   `Terminal.Writer`, which takes the display's region off first and lets it
   back only once a line has ended, so a question that waits for its answer is
-  never drawn over. Lines from goroutines beside the command, a log line or
-  the stack of a panic a pool recovered from, go through `Terminal.Lines`,
+  never drawn over. The region comes off one line a row, as it was drawn,
+  so a line of the command's is never cleared, even on a terminal made
+  narrower since (decision 9). Lines from goroutines beside the command,
+  a log line or the stack of a panic a pool recovered from, go through
+  `Terminal.Lines`,
   which holds them, whole lines only and bounded, while a question is asked
   or the command has a line open. The lines a display leaves for good are
   written above the region, ahead of whatever the command writes after the

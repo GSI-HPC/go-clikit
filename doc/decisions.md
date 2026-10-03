@@ -17,6 +17,7 @@ edited: a later one supersedes it, and the earlier one's status names it.
 | [6](#6-the-pools-are-the-kits-own) | The pools are the kit's own | accepted |
 | [7](#7-escapes-are-for-a-reader-not-for-decoding) | Escapes are for a reader, not for decoding | accepted |
 | [8](#8-widths-err-wide-and-follow-unicode-180) | Widths err wide, and follow Unicode 18.0 | accepted |
+| [9](#9-the-region-comes-off-one-line-a-row) | The region comes off one line a row | accepted |
 
 ## 1. Apache-2.0, and GSI holds the copyright
 
@@ -430,3 +431,39 @@ joined emoji sequence is.
   than `Width` counts, and a row holding one is cut a column short there.
 - A joined emoji sequence is counted wider than it is drawn, and a row
   holding one is cut shorter than it need be.
+
+## 9. The region comes off one line a row
+
+Status: accepted
+
+### Context
+
+A display takes its region off the terminal by moving the cursor up and
+clearing a line at a time, before every write the command makes and
+before every frame. It cannot ask the terminal where the region now is.
+Each row is cut to fit the terminal when it is drawn, but a terminal made
+narrower since does one of two things with a row wider than it now is.
+Most, VTE, Konsole, iTerm2, Terminal.app, Windows Terminal and tmux among
+them, reflow it onto as many lines as it takes; xterm, the Linux console
+and GNU screen cut it, and it stays one line. Neither says which it does.
+
+Counting the lines a row takes at the new width takes the region off whole
+on a reflowing terminal, but on a cutting one it clears as many lines
+above the region as the count goes past, and those are the command's own
+output. Counting one line a row takes the region off whole on a cutting
+terminal, and on a reflowing one leaves the first lines of each such row
+above the region.
+
+### Decision
+
+- The region comes off one line for each of its rows, as they were drawn,
+  whatever the width is now. The region is all a display owns: it never
+  clears a line it cannot be sure is its own.
+- The frames drawn after a resize are cut to the new width, so the region
+  is exact again from the next frame on.
+
+### Costs
+
+- On a reflowing terminal made narrower under a drawn region, the first
+  lines of each row wider than the new width stay on the terminal, above
+  the next frame and the command's output, until they scroll away.
