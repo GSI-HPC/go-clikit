@@ -116,7 +116,10 @@ stopped: the log never holds the work up. A log that falls behind still
 writes the lines it had taken, should its writer take them after all, and
 leaves out those that come after, so that what is written is the start of
 the run without a gap. `Close` writes what is left, waiting five seconds at
-most, and returns the error that stopped the log short, if one did.
+most, and returns the error that stopped the log short, if one did. Once
+it has given up waiting, the log starts no write; one already under way
+cannot be stopped, so `Close` says so, and `Done` is closed once that write
+has returned, after which the writer may be closed.
 
 ## The golden log
 
