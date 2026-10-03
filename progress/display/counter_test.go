@@ -74,7 +74,7 @@ type fixture struct {
 func newFixture(t *testing.T, command string, size func() (int, int, error)) *fixture {
 	t.Helper()
 	f := &fixture{screen: &screen{}, clock: &clock{now: time.Date(2026, 9, 26, 12, 0, 0, 0, time.UTC)}}
-	f.term = display.NewTerminal(f.screen, size)
+	f.term = display.NewTerminal(f.screen, display.TerminalOptions{Size: size})
 	f.counter = display.NewCounter(f.term, display.CounterOptions{Now: f.clock.Now})
 	capture := &progresstest.Capture{}
 	bus := progress.NewBus(progress.BusOptions{Sinks: []progress.Sink{capture, f.counter}, Now: f.clock.Now})
@@ -131,7 +131,7 @@ func TestTheCounterReadsTheRealClock(t *testing.T) {
 	t.Parallel()
 	synctest.Test(t, func(t *testing.T) {
 		s := &screen{}
-		counter := display.NewCounter(display.NewTerminal(s, nil), display.CounterOptions{})
+		counter := display.NewCounter(display.NewTerminal(s, display.TerminalOptions{}), display.CounterOptions{})
 		counter.Start()
 		time.Sleep(999 * time.Millisecond)
 		synctest.Wait()
@@ -366,7 +366,7 @@ func TestTheCounterOfAStepWithNothingToNameIt(t *testing.T) {
 	t.Parallel()
 	s := &screen{}
 	c := &clock{now: time.Date(2026, 9, 26, 12, 0, 0, 0, time.UTC)}
-	counter := display.NewCounter(display.NewTerminal(s, nil), display.CounterOptions{Now: c.Now})
+	counter := display.NewCounter(display.NewTerminal(s, display.TerminalOptions{}), display.CounterOptions{Now: c.Now})
 	bus := progress.NewBus(progress.BusOptions{Sinks: []progress.Sink{counter}, Now: c.Now})
 	fanout.Map(progress.WithBus(context.Background(), bus), []string{"exe1"}, fanout.MapOptions[string]{},
 		func(context.Context, string) (struct{}, error) {
@@ -487,17 +487,22 @@ func TestADisplayThatPanicsWhileItDrawsStops(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			var log screen
-			term := display.NewTerminal(&screen{}, func() (int, int, error) { panic("the size of the terminal") })
-			term.PanicLog = &log
+			o := display.TerminalOptions{
+				Size:     func() (int, int, error) { panic("the size of the terminal") },
+				PanicLog: &log,
+			}
+			prefix := ""
+			if name == "tree" {
+				o.Program, prefix = "sind", "sind: "
+			}
+			term := display.NewTerminal(&screen{}, o)
 			c := &clock{now: time.Date(2026, 9, 26, 12, 0, 0, 0, time.UTC)}
 			var d interface {
 				Start()
 				Close()
 			} = display.NewCounter(term, display.CounterOptions{Now: c.Now})
-			prefix := ""
 			if name == "tree" {
 				d = display.NewTree(term, display.TreeOptions{Now: c.Now})
-				term.Program, prefix = "sind", "sind: "
 			}
 			c.Add(2 * time.Second)
 			d.Start()
@@ -527,12 +532,11 @@ func TestNothingIsDrawnInTheBackground(t *testing.T) {
 	var mu sync.Mutex
 	inFront := false
 	s := &screen{}
-	term := display.NewTerminal(s, nil)
-	term.Foreground = func() bool {
+	term := display.NewTerminal(s, display.TerminalOptions{Foreground: func() bool {
 		mu.Lock()
 		defer mu.Unlock()
 		return inFront
-	}
+	}})
 	c := &clock{now: time.Date(2026, 9, 26, 12, 0, 0, 0, time.UTC)}
 	counter := display.NewCounter(term, display.CounterOptions{Now: c.Now})
 	c.Add(2 * time.Second)

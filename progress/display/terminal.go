@@ -59,8 +59,11 @@ const defaultWidth = 80
 // Terminal is the terminal a display draws on, shared with the command's
 // own output. It is safe for concurrent use.
 type Terminal struct {
-	w    io.Writer
-	size func() (w, h int, err error)
+	w          io.Writer
+	size       func() (cols, rows int, err error)
+	foreground func() bool
+	panicLog   io.Writer
+	program    string
 
 	mu sync.Mutex
 	// rows are what the display has on the terminal, the region, with
@@ -87,32 +90,41 @@ type Terminal struct {
 	droppedTo    io.Writer
 	// liners are the Lines writers, whose unfinished lines Close ends.
 	liners []*lines
+}
 
-	// PanicLog receives the stack of a display that panicked while it
-	// drew, the front end's diagnostics; nil is the terminal itself. It
-	// may be one of the Terminal's own writers.
-	PanicLog io.Writer
-	// Program names the program in the line that says a display stopped,
-	// "prog: …", so that it is not read as the command's own; empty
-	// leaves the name out.
-	Program string
+// TerminalOptions configure a Terminal.
+type TerminalOptions struct {
+	// Size tells how many columns and rows the terminal has, and is asked
+	// at each frame; nil, or a Size that fails or says no columns, is a
+	// terminal 80 columns wide, of a height not known.
+	Size func() (cols, rows int, err error)
 	// Foreground, when it is set, reports whether the process is the job
 	// in the terminal's foreground. A job in the background draws nothing:
 	// the shell's prompt and what is typed at it are on the rows a frame
 	// would erase.
 	Foreground func() bool
+	// PanicLog receives the stack of a display that panicked while it
+	// drew, the front end's diagnostics; nil is the terminal itself. The
+	// stack goes through the Terminal's Lines, so that it waits while a
+	// question is asked.
+	PanicLog io.Writer
+	// Program names the program in the line that says a display stopped,
+	// and in the one that says how many lines the Lines writers left out,
+	// "prog: …", so that neither is read as the command's own; empty
+	// leaves the name out.
+	Program string
 }
 
-// NewTerminal returns the terminal w is, whose width and height size tells;
-// nil size is a terminal 80 columns wide.
-func NewTerminal(w io.Writer, size func() (w, h int, err error)) *Terminal {
-	return &Terminal{w: w, size: size}
+// NewTerminal returns the terminal w is, as o configures it. The Terminal
+// keeps what o says, which nothing changes after.
+func NewTerminal(w io.Writer, o TerminalOptions) *Terminal {
+	return &Terminal{w: w, size: o.Size, foreground: o.Foreground, panicLog: o.PanicLog, program: o.Program}
 }
 
 // recovered, deferred by the goroutine a display draws from, keeps a panic
 // there from ending the process, as the Bus keeps one in a sink from: the
 // display draws no more, its region comes off the terminal at once, the
-// lines it holds are written, then the stack to PanicLog, and the command
+// lines it holds are written, then the stack to the panic log, and the command
 // goes on. Close still writes what the display left.
 func (t *Terminal) recovered() {
 	p := recover()
@@ -128,13 +140,13 @@ func (t *Terminal) recovered() {
 	t.erase()
 	t.release(false)
 	t.mu.Unlock()
-	log := t.PanicLog
+	log := t.panicLog
 	if log == nil {
 		log = t.w
 	}
 	prefix := ""
-	if t.Program != "" {
-		prefix = t.Program + ": "
+	if t.program != "" {
+		prefix = t.program + ": "
 	}
 	// The stack is a courtesy; one that cannot be written changes nothing.
 	// It is a line from beside the command, which may be asking a
@@ -326,8 +338,8 @@ func (t *Terminal) writeWaiting() {
 	t.waiting, t.waitingBytes = nil, 0
 	if t.dropped > 0 {
 		prefix := ""
-		if t.Program != "" {
-			prefix = t.Program + ": "
+		if t.program != "" {
+			prefix = t.program + ": "
 		}
 		_, _ = fmt.Fprintf(t.droppedTo, "%s%d lines were left out while the terminal was busy\n", prefix, t.dropped)
 		t.dropped, t.droppedTo = 0, nil
@@ -348,7 +360,7 @@ func (t *Terminal) draw(rows []string) {
 		t.erase()
 		t.writeWaiting()
 	}
-	if t.Foreground != nil && !t.Foreground() {
+	if t.foreground != nil && !t.foreground() {
 		// The rows drawn before are the shell's now, to write over.
 		t.rows = nil
 		return
@@ -437,8 +449,8 @@ func (t *Terminal) flush() {
 // known, 0. It needs no lock.
 func (t *Terminal) dims() (width, height int) {
 	if t.size != nil {
-		if w, h, err := t.size(); err == nil && w > 0 {
-			return w, max(h, 0)
+		if cols, rows, err := t.size(); err == nil && cols > 0 {
+			return cols, max(rows, 0)
 		}
 	}
 	return defaultWidth, 0

@@ -41,7 +41,7 @@ func startTargets(ctx context.Context, nodes ...string) []*progress.Span {
 // targets, which are nodes here.
 func ExampleNewPlain() {
 	clock := newExampleClock()
-	term := display.NewTerminal(os.Stdout, nil)
+	term := display.NewTerminal(os.Stdout, display.TerminalOptions{})
 	plain := display.NewPlain(term, display.PlainOptions{
 		Now: clock.Now,
 		Noun: func(n int) string {
@@ -87,7 +87,7 @@ func ExampleNewPlain() {
 func ExampleNewTree() {
 	clock := newExampleClock()
 	screen := &progresstest.Screen{Width: 60}
-	term := display.NewTerminal(screen, func() (int, int, error) { return 60, 24, nil })
+	term := display.NewTerminal(screen, display.TerminalOptions{Size: func() (int, int, error) { return 60, 24, nil }})
 	tree := display.NewTree(term, display.TreeOptions{Now: clock.Now})
 	bus := progress.NewBus(progress.BusOptions{Sinks: []progress.Sink{tree}, Now: clock.Now})
 	ctx, command := progress.Start(progress.WithBus(context.Background(), bus), progress.KindCommand, "power on")
@@ -137,7 +137,7 @@ func ExampleNewTree() {
 func ExampleNewCounter() {
 	clock := newExampleClock()
 	screen := &progresstest.Screen{}
-	term := display.NewTerminal(screen, nil)
+	term := display.NewTerminal(screen, display.TerminalOptions{})
 	counter := display.NewCounter(term, display.CounterOptions{Now: clock.Now})
 	bus := progress.NewBus(progress.BusOptions{Sinks: []progress.Sink{counter}, Now: clock.Now})
 	ctx, command := progress.Start(progress.WithBus(context.Background(), bus), progress.KindCommand, "uptime")
