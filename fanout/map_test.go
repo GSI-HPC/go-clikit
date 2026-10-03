@@ -614,6 +614,45 @@ func TestMapFailsAnItemWhoseReleasePanickedWhateverTheWorkReturned(t *testing.T)
 	}
 }
 
+// A panic is a bug, and fails its item even once the context has ended,
+// whether it was in Acquire or in the work: neither passes for canceled.
+func TestMapFailsAnItemThatPanickedAfterTheContextEnded(t *testing.T) {
+	t.Parallel()
+
+	for _, in := range []string{"acquire", "work"} {
+		t.Run(in, func(t *testing.T) {
+			t.Parallel()
+
+			cause, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			ctx, tree := progresstest.Watch(cause, t)
+			outcomes := fanout.Map(ctx, nodes(1), fanout.Options[string]{
+				Step: "check", Limit: 1, PanicLog: io.Discard,
+				Acquire: func(context.Context, string) (func(), error) {
+					if in == "acquire" {
+						cancel()
+						panic(in)
+					}
+					return func() {}, nil
+				},
+			}, func(context.Context, string) (struct{}, error) {
+				cancel()
+				panic(in)
+			})
+			var p *fanout.PanicError
+			if o := outcomes[0]; !errors.As(o.Err, &p) || p.Value != in {
+				t.Errorf("exe1 = %+v, want its panic", o)
+			}
+			want := `step check total=1 limit=1 [fold]: failed (target): 1 of 1 failed: exe1
+  target exe1: failed (target): the program panicked; this is a bug, please report it: "` + in + `"
+`
+			if got := tree(); got != want {
+				t.Errorf("tree:\n%s\nwant:\n%s", got, want)
+			}
+		})
+	}
+}
+
 // Work that ends its goroutine with runtime.Goexit, as t.FailNow does,
 // never returns: the item failed, whichever of the work, Acquire or the
 // release did it, and the release is still called.
