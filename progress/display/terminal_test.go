@@ -319,6 +319,49 @@ func TestLinesStayWholeUnderInterleaving(t *testing.T) {
 	}
 }
 
+// A display that panics after it has drawn takes its region off the
+// terminal at once, and writes its stack then, not only once the command
+// next writes or the display is closed: the frame it left would otherwise
+// stay, its time stopped, and a process killed meanwhile would never write
+// the stack.
+func TestThePanicOfADisplayTakesItsRegionOff(t *testing.T) {
+	t.Parallel()
+	synctest.Test(t, func(t *testing.T) {
+		var log progresstest.Screen
+		s := &progresstest.Screen{}
+		var mu sync.Mutex
+		broken := false
+		term := display.NewTerminal(s, func() (int, int, error) {
+			mu.Lock()
+			defer mu.Unlock()
+			if broken {
+				panic("the size of the terminal")
+			}
+			return 80, 24, nil
+		})
+		term.PanicLog = &log
+		counter := display.NewCounter(term, display.CounterOptions{})
+		counter.Start()
+		time.Sleep(2 * time.Second)
+		synctest.Wait()
+		if got := s.String(); got == "" {
+			t.Fatal("nothing drawn before the panic")
+		}
+		mu.Lock()
+		broken = true
+		mu.Unlock()
+		time.Sleep(time.Second)
+		synctest.Wait()
+		if got := s.String(); got != "" {
+			t.Errorf("after the panic, the screen shows %q, want the region off", got)
+		}
+		if !strings.HasPrefix(log.String(), "the progress display stopped: the size of the terminal\n") {
+			t.Errorf("after the panic, before Close, the log has %q", log.String())
+		}
+		counter.Close()
+	})
+}
+
 // A write that ends a line and then sets the colour back, as a coloured
 // line written whole often does, has left no line open: the counter is
 // drawn again, and the lines of the Lines writers are not held.
