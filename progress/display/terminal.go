@@ -29,6 +29,7 @@
 package display
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"runtime/debug"
@@ -170,8 +171,9 @@ func (w writer) Write(p []byte) (int, error) {
 // the command has a line open, such as a question it asks itself; the next
 // frame, the write that ends the open line, the resume and Close write
 // them, in order, and so does a write of the command's, before its own
-// bytes. A line that does not end waits for its end, and Close ends it. What waits is bounded, 256 KiB: a line past that is
-// left out, and a line written with the others says how many were.
+// bytes. A line that does not end waits for its end, and Close ends it.
+// What waits is bounded, 256 KiB: a line past that is left out, and a line
+// written with the others says how many were.
 //
 // w must not be a writer of the Terminal's own. What is written is not
 // changed, and Write reports it all written: the lines are a courtesy.
@@ -187,7 +189,8 @@ func (t *Terminal) Lines(w io.Writer) io.Writer {
 type lines struct {
 	t *Terminal
 	w io.Writer
-	// partial is the line begun and not yet ended. t.mu guards it.
+	// partial is the line begun and not yet ended, which holds no
+	// newline. t.mu guards it.
 	partial []byte
 }
 
@@ -201,11 +204,15 @@ func (l *lines) Write(p []byte) (int, error) {
 	t := l.t
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	l.partial = append(l.partial, p...)
+	// Only p is searched for the end of a line, since partial holds none:
+	// a line written a byte at a time costs each write its byte, not the
+	// line so far.
 	var text string
-	if end := strings.LastIndexByte(string(l.partial), '\n') + 1; end > 0 {
-		text = string(l.partial[:end])
-		l.partial = slices.Clone(l.partial[end:])
+	if end := bytes.LastIndexByte(p, '\n') + 1; end > 0 {
+		text = string(l.partial) + string(p[:end])
+		l.partial = append(l.partial[:0], p[end:]...)
+	} else {
+		l.partial = append(l.partial, p...)
 	}
 	if len(l.partial) >= maxWaiting {
 		// A line that does not end within the bound is cut, and ends.
