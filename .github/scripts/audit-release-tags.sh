@@ -218,7 +218,7 @@ for tag in "${tags[@]}"; do
 done
 
 if [ "$failed" -ne 0 ]; then
-  echo "::error::$failed of ${#tags[@]} release tag(s) are neither pinned nor signed by a listed signer; see doc/release.md"
+  echo "::error::$failed of ${#tags[@]} release tag(s) failed: a pinned tag that is not its pinned tag object, or a tag neither pinned nor signed by a listed signer; see doc/release.md"
 fi
 if [ "$untagged" -ne 0 ]; then
   echo "::error::$untagged version(s) on the module proxy have no tag; see doc/release.md"

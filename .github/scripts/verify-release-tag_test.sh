@@ -447,7 +447,7 @@ AUDIT_MOD="$scratch/retract.mod" expect 'an audit of a retracted pinned release 
   'the tag of a retracted pinned release still has to be the tag object pinned for it' \
   audit "$listed" '' "v0.0.8 $(printf '%040d' 0)"
 AUDIT_MOD="$scratch/retract.mod" expect 'an audit counting a retracted pinned release pushed again' fail \
-  '1 of 2 release tag(s) are neither pinned nor signed' audit "$listed" '' "v0.0.8 $(printf '%040d' 0)"
+  '1 of 2 release tag(s) failed: a pinned tag that is not its pinned tag object' audit "$listed" '' "v0.0.8 $(printf '%040d' 0)"
 rm "$PROXY_INFO/v0.0.8.info"
 printf 'v1.0.0\n' > "$PROXY_LIST"
 git tag -d v0.0.8 > /dev/null
