@@ -6,6 +6,8 @@ package progress_test
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -87,8 +89,8 @@ func TestTheEventLogWritesEveryEventOnALineOfItsOwn(t *testing.T) {
 	clock := newClock()
 	log, events := logged(t, progress.Options{
 		Now: clock.Now, Trace: tc.Trace, Parent: tc.Parent, TraceFlags: tc.Flags, TraceState: tc.State,
-	}, func(ctx context.Context) {
-		ctx, cmd := progress.Start(ctx, progress.KindCommand, "exec", progress.WithFlags(progress.DryRun))
+	}, func(busCtx context.Context) {
+		ctx, cmd := progress.Start(busCtx, progress.KindCommand, "exec", progress.WithFlags(progress.DryRun))
 		_, cred := progress.Start(ctx, progress.KindCall, "credential bmc", progress.WithFlags(progress.Hidden), progress.Source("env"))
 		cred.End(nil)
 		stepCtx, step := progress.Start(ctx, progress.KindStep, "run",
@@ -140,7 +142,12 @@ func TestTheEventLogWritesEveryEventOnALineOfItsOwn(t *testing.T) {
 		waitCtx, wait := progress.Start(ctx, progress.KindWait, "confirm", progress.Message("reset 2 hosts"))
 		progress.Suspend(waitCtx)()
 		wait.Skip("dry run: nothing was done")
+		cmd.End(nil)
 
+		// The lines above are those version 1 was first released with, and
+		// stay as they are: what the fixture says since is added after
+		// them, by a second command on the same Bus.
+		ctx, status := progress.Start(busCtx, progress.KindCommand, "status")
 		// Lookups answered from each place a cache can answer from.
 		for _, cache := range []string{"hit", "miss", "memory", "disk"} {
 			_, lookup := progress.Start(ctx, progress.KindCall, "inventory", progress.WithFlags(progress.Hidden))
@@ -152,7 +159,7 @@ func TestTheEventLogWritesEveryEventOnALineOfItsOwn(t *testing.T) {
 		solCtx, sol := progress.Start(ctx, progress.KindCall, "sol", progress.WithFlags(progress.ShowLines))
 		_, _ = io.WriteString(progress.Tee(solCtx, io.Discard, progress.Stdout, nil), strings.Repeat("the secret console\n", 22))
 		sol.End(nil)
-		cmd.End(nil)
+		status.End(nil)
 	})
 
 	if *update {
@@ -172,6 +179,37 @@ func TestTheEventLogWritesEveryEventOnALineOfItsOwn(t *testing.T) {
 	}
 	if strings.Contains(log, "secret") {
 		t.Errorf("the log holds the text of a line:\n%s", log)
+	}
+}
+
+// releasedLines is how many lines the fixture had when version 1 was first
+// released, the trace and 47 events, and releasedSum the SHA-256 of them.
+const (
+	releasedLines = 48
+	releasedSum   = "77a0022057971a5a026b06b63cd9241dadc18832d5e9865a4a2b44f939475b88"
+)
+
+// The fixture is changed only by adding to it: the lines version 1 was
+// first released with are its first lines, byte for byte, so that a
+// rewrite with -update that changes one of them fails here.
+func TestTheGoldenLogKeepsTheLinesFirstReleased(t *testing.T) {
+	t.Parallel()
+	data, err := os.ReadFile(logFixture)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var released []byte
+	n := 0
+	for line := range strings.Lines(string(data)) {
+		if n == releasedLines {
+			break
+		}
+		released = append(released, line...)
+		n++
+	}
+	sum := sha256.Sum256(released)
+	if n != releasedLines || hex.EncodeToString(sum[:]) != releasedSum {
+		t.Errorf("the first %d lines of %s are not those version 1 was released with: add to the file, do not change it", releasedLines, logFixture)
 	}
 }
 
