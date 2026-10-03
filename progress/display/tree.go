@@ -975,7 +975,7 @@ func (f *frame) took(s, inner *treeSpan) string {
 }
 
 // describe says what a span is doing, in few words: the method and path of
-// a Redfish request, or the name of a span with the node it is for, when
+// an HTTP request, or the name of a span with the node it is for, when
 // that is not of, the target it is made for, and its message.
 func describe(s, of *treeSpan) string {
 	fl := s.fields
