@@ -32,7 +32,10 @@ what it reports. `Capture` is a sink that keeps the events of a Bus, and
 `Checked` gives a test a Bus whose events are checked when the test ends,
 and `Watch` one whose events are checked, and drawn as a tree, when the test
 asks. Both check before the Bus is closed, which would end a span left open
-and hide it. `Capture.Tree` draws the spans as an indented tree that does not
+and hide it. Their options are opaque: `Classify` gives the Bus the
+program's rule for the class of an error, and `Sinks` puts more sinks on
+it, such as a display drawing on a `Screen`, ahead of the `Capture`, which
+no option can take off. `Capture.Tree` draws the spans as an indented tree that does not
 depend on how concurrent work was scheduled: targets that read the same are
 folded into one line naming them as a node set, or listing them when one is
 no node or a node is named twice, alone or in another name's node set, as

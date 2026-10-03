@@ -125,6 +125,38 @@ func TestClassifySetsTheFallbackOfTheBus(t *testing.T) {
 	}
 }
 
+// sinkFunc is a sink that calls itself with every event.
+type sinkFunc func(progress.Event)
+
+func (f sinkFunc) Handle(e progress.Event) { f(e) }
+
+// Sinks puts sinks on the Bus of Checked and Watch, each use adding to
+// the ones before, ahead of the Capture, which no option takes off; the
+// slice given is left as it was.
+func TestSinksAddsSinksAheadOfTheCapture(t *testing.T) {
+	t.Parallel()
+
+	var order []string
+	first := sinkFunc(func(progress.Event) { order = append(order, "first") })
+	untouched := &Capture{}
+	given := []progress.Sink{first, untouched}
+	ctx, tree := Watch(context.Background(), t,
+		Sinks(given[:1]...), Classify(nil), Sinks(sinkFunc(func(progress.Event) {
+			order = append(order, "third")
+		})))
+	if given[1] != untouched {
+		t.Error("Sinks wrote into the slice it was given")
+	}
+	_, span := progress.Start(ctx, progress.KindCall, "ssh")
+	if want := []string{"first", "third"}; !slices.Equal(order, want) {
+		t.Errorf("the sinks given saw the start in the order %q, want %q", order, want)
+	}
+	span.End(nil)
+	if got, want := tree(), "call ssh: ok\n"; got != want {
+		t.Errorf("the Capture drew\n%s\nwant\n%s", got, want)
+	}
+}
+
 // Every string field of an Event, its Fields among them, is checked for
 // escapes by Check and drawn by Tree, so that a field added to either is
 // not left out of both without a decision. Text is left out of the tree on
