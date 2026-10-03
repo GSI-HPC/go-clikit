@@ -21,14 +21,19 @@ import (
 	"sync"
 )
 
-// DefaultLimit is how many items a pool works on at once when nothing says.
+// DefaultLimit is how many items a pool works on at once when nothing says:
+// a limit below one, given to Each or as MapOptions.Limit.
 const DefaultLimit = 16
 
 // Each calls work with every index below n, at most limit at a time, and
-// returns once every call has returned. When ctx ends, no further call is
-// started, so an interrupt stops a fan-out the same way wherever it is; the
-// caller tells what was left out by what work did not record.
+// returns once every call has returned; a limit below one is DefaultLimit,
+// as it is for Map. When ctx ends, no further call is started, so an
+// interrupt stops a fan-out the same way wherever it is; the caller tells
+// what was left out by what work did not record.
 func Each(ctx context.Context, n, limit int, work func(i int)) {
+	if limit < 1 {
+		limit = DefaultLimit
+	}
 	sem := make(chan struct{}, max(1, min(limit, n)))
 	var wg sync.WaitGroup
 	for i := range n {
