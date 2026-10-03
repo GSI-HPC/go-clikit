@@ -142,15 +142,30 @@ func TestTruncate(t *testing.T) {
 }
 
 // FuzzTruncate checks that Truncate returns a prefix of its input, cut on a
-// rune boundary, that fits in the columns given, and the input itself when
-// that fits already.
+// rune boundary, that fits in the columns given and is the longest that
+// does, and the input itself when that fits already. It holds Width to
+// bounds of its own too: no less than the RuneWidth of its runes added up,
+// and no more than that with one column for each U+FE0F.
 func FuzzTruncate(f *testing.F) {
-	for _, seed := range []string{"", "exe0001", "失败了", "a\u200db", "😀 done"} {
+	for _, seed := range []string{
+		"", "exe0001", "失败了", "a\u200db", "😀 done", "e\u0301e\u0301",
+		"\u2764\ufe0f\u2764\ufe0f", "1\ufe0f\u20e3", "\u00ad\u0600ok", "\U0001FAE9 new",
+	} {
 		f.Add(seed, 4)
 	}
 	f.Fuzz(func(t *testing.T, in string, cols int) {
 		if !utf8.ValidString(in) {
 			t.Skip("Truncate takes text that is already escaped")
+		}
+		low, selectors := 0, 0
+		for _, r := range in {
+			low += termtext.RuneWidth(r)
+			if r == 0xfe0f {
+				selectors++
+			}
+		}
+		if w := termtext.Width(in); w < low || w > low+selectors {
+			t.Fatalf("Width(%q) = %d, though its runes take %d and it holds %d U+FE0F", in, w, low, selectors)
 		}
 		got := termtext.Truncate(in, cols)
 		if !strings.HasPrefix(in, got) || !utf8.ValidString(got) {
@@ -161,6 +176,12 @@ func FuzzTruncate(f *testing.F) {
 		}
 		if cols > 0 && termtext.Width(in) <= cols && got != in {
 			t.Fatalf("Truncate(%q, %d) = %q, though the text fits", in, cols, got)
+		}
+		if cols > 0 && got != in {
+			_, size := utf8.DecodeRuneInString(in[len(got):])
+			if longer := in[:len(got)+size]; termtext.Width(longer) <= cols {
+				t.Fatalf("Truncate(%q, %d) = %q, though %q fits too", in, cols, got, longer)
+			}
 		}
 	})
 }
