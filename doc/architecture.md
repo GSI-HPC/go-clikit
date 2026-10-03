@@ -154,6 +154,12 @@ The kit knows no program. What depends on one is a parameter or a hook:
 | The trace another program handed on | `progress.BusOptions.Trace`, as `progress.ParseTraceContext` reads it from the values the program read from `TRACEPARENT` and `TRACESTATE` |
 | Where a panic's stack goes | the `PanicLog` options |
 
+A Bus hands on what it was told: `Bus.Program`, `Bus.PanicLog` and
+`Bus.Classify` answer for the Bus that `progress.BusFrom` finds in a
+context, and for a nil Bus with the defaults, so that a library that runs
+work of its own names the program, writes its panics and classes its errors
+as the Bus does.
+
 What stays in the program: its flags and environment variables, which display
 to draw and whether the terminal can show one, its exit codes, and reading
 the environment. The kit reads no variable and sets nothing process-wide, so

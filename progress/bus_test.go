@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -1138,4 +1139,42 @@ func TestAnEndLeavesOtherSpansOpen(t *testing.T) {
 	b.End(nil)
 	child.End(nil)
 	bus.Close()
+}
+
+// The Bus hands on what it was told of the program, so that a pool or a
+// library that reports to it names the program, writes its panics and
+// classes its errors as the Bus does; a nil Bus, which is what BusFrom
+// returns for a context that carries none, answers with the defaults.
+func TestTheBusTellsWhatItKnowsOfTheProgram(t *testing.T) {
+	t.Parallel()
+
+	var log bytes.Buffer
+	for _, tc := range []struct {
+		name    string
+		bus     *progress.Bus
+		program string
+		log     io.Writer
+		class   progress.Class
+	}{
+		{"a nil Bus", nil, "", nil, progress.ClassTarget},
+		{"a Bus told nothing", progress.NewBus(progress.BusOptions{}), "", os.Stderr, progress.ClassTarget},
+		{"a Bus told everything", progress.NewBus(progress.BusOptions{PanicLog: &log, Program: "sind", Classify: byCode}),
+			"sind", &log, progress.ClassTransport},
+	} {
+		if got := tc.bus.Program(); got != tc.program {
+			t.Errorf("%s: Program() = %q, want %q", tc.name, got, tc.program)
+		}
+		if got := tc.bus.PanicLog(); got != tc.log {
+			t.Errorf("%s: PanicLog() = %v, want %v", tc.name, got, tc.log)
+		}
+		if got := tc.bus.Classify(errUnreachable); got != tc.class {
+			t.Errorf("%s: Classify(%v) = %s, want %s", tc.name, errUnreachable, got, tc.class)
+		}
+		if got := tc.bus.Classify(context.Canceled); got != progress.ClassCanceled {
+			t.Errorf("%s: Classify(context.Canceled) = %s, want canceled", tc.name, got)
+		}
+		if tc.bus != nil {
+			tc.bus.Close()
+		}
+	}
 }

@@ -132,6 +132,37 @@ func (b *Bus) Trace() TraceID { return b.trace.Trace }
 // came from.
 func (b *Bus) TraceContext() TraceContext { return b.trace }
 
+// Program returns the program's name the Bus was given in
+// BusOptions.Program, or "" for a nil Bus, so that a pool or a library
+// that reports to the Bus of BusFrom names the program as the Bus does.
+func (b *Bus) Program() string {
+	if b == nil {
+		return ""
+	}
+	return b.program
+}
+
+// PanicLog returns where the Bus writes the stack of a sink that
+// panicked, BusOptions.PanicLog or the process's standard error, or nil
+// for a nil Bus, so that a library that recovers its own goroutines can
+// write their stacks to the same place.
+func (b *Bus) PanicLog() io.Writer {
+	if b == nil {
+		return nil
+	}
+	return b.panicLog
+}
+
+// Classify tells why work failed from err as End does for the spans of
+// the Bus: Classify with BusOptions.Classify as the fallback. A nil Bus
+// has no fallback.
+func (b *Bus) Classify(err error) Class {
+	if b == nil {
+		return Classify(err, nil)
+	}
+	return Classify(err, b.classify)
+}
+
 // begin tells the sinks that record the trace which one it is, and removes
 // one that panics. b.mu is held.
 func (b *Bus) begin() {

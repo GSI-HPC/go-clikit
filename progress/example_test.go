@@ -186,3 +186,27 @@ func ExampleSanitize() {
 	// copying 100%\x1b[K
 	// a line longer
 }
+
+// A library that runs work of its own learns from the Bus in its context
+// what the program said of itself: its name, where panics go, and its rule
+// for classes. Without a Bus the answers are the defaults.
+func ExampleBus_Classify() {
+	byCode := func(err error) progress.Class {
+		if exit := (exitError{}); errors.As(err, &exit) && exit.code == 3 {
+			return progress.ClassTransport
+		}
+		return progress.ClassTarget
+	}
+	bus := progress.NewBus(progress.BusOptions{Program: "sind", Classify: byCode})
+	defer bus.Close()
+	for _, ctx := range []context.Context{
+		progress.WithBus(context.Background(), bus),
+		context.Background(),
+	} {
+		b := progress.BusFrom(ctx)
+		fmt.Printf("%q %s\n", b.Program(), b.Classify(exitError{3}))
+	}
+	// Output:
+	// "sind" transport
+	// "" target
+}
