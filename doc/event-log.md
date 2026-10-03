@@ -108,9 +108,11 @@ whole lines: once 64 KiB wait, as the command, a step or a batch ends, and a
 second after a line came at the latest, so that a log followed as it grows,
 or that of a run killed, falls little behind. A write that fails stops the
 log, and so does a writer that falls 8 MiB behind, a pipe whose reader has
-stopped: the log never holds the work up. `Close` writes what is left,
-waiting five seconds at most, and returns the error that stopped the log
-short, if one did.
+stopped: the log never holds the work up. A log that falls behind still
+writes the lines it had taken, should its writer take them after all, and
+leaves out those that come after, so that what is written is the start of
+the run without a gap. `Close` writes what is left, waiting five seconds at
+most, and returns the error that stopped the log short, if one did.
 
 ## The golden log
 
