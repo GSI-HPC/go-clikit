@@ -18,7 +18,7 @@ import (
 // back to the start of the line and what follows overwrites what was
 // there, so "50%\r100%" reads "100%", "abcdef\r12" reads "12cdef", and a
 // line that ends in "\r\n" loses nothing. What is left is escaped by
-// termtext.EscapeCell, the one escaper, which shows every other control
+// termtext.Escape, the one escaper, which shows every other control
 // character, an escape sequence's introducer, a bidirectional control, a
 // newline and bytes that are not UTF-8 as a visible escape such as \x1b.
 // The result is cut on a rune boundary.
@@ -31,7 +31,7 @@ func Sanitize(s string, limit int) string {
 	if limit > 0 && len(s) > limit {
 		s = s[:runeCut(s, limit)]
 	}
-	s = termtext.EscapeCell(s)
+	s = termtext.Escape(s)
 	if limit > 0 && len(s) > limit {
 		s = s[:runeCut(s, limit)]
 	}
@@ -58,7 +58,7 @@ func foldCR(s string, limit int) string {
 }
 
 // foldLine folds the carriage returns of one line. A cell is one rune, or
-// one byte that is not UTF-8, which stays as it is for EscapeCell to show.
+// one byte that is not UTF-8, which stays as it is for Escape to show.
 // Every cell takes at least a byte, so no cell past the first limit columns
 // can reach the first limit bytes, and none is kept.
 func foldLine(line string, limit int) string {

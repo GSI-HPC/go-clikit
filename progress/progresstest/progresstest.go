@@ -382,7 +382,7 @@ func digits(s string) int {
 //     always reaches its total, even after an interrupt.
 //  4. No more targets run at once below a span than its Limit.
 //  5. Every Suspend is followed by one Resume.
-//  6. No text holds anything termtext.EscapeCell would escape, and none is
+//  6. No text holds anything termtext.Escape would escape, and none is
 //     longer than its bound. Hidden and ShowLines are passed down.
 func Check(t testing.TB, events []progress.Event) {
 	t.Helper()
@@ -615,7 +615,7 @@ func checkText(e progress.Event, bad func(string, ...any)) {
 		{"error", e.Err, progress.MaxErr},
 		{"text", e.Text, progress.MaxText},
 	} {
-		if termtext.EscapeCell(f.text) != f.text {
+		if termtext.Escape(f.text) != f.text {
 			bad("event %d has a %s that is not escaped: %q", e.Seq, f.name, f.text)
 		}
 		if f.max > 0 && len(f.text) > f.max {

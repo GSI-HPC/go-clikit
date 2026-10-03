@@ -16,7 +16,7 @@ import (
 // OSC 52 to write the clipboard.
 const hostile = "ok\r\x1b[1Aexe0001: \x1b]52;c;ZXZpbA==\x07evil"
 
-func TestEscapeText(t *testing.T) {
+func TestEscapeLines(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct{ in, want string }{
@@ -33,13 +33,13 @@ func TestEscapeText(t *testing.T) {
 		{"grüße", "grüße"},
 	}
 	for _, tc := range tests {
-		if got := termtext.EscapeText(tc.in); got != tc.want {
-			t.Errorf("EscapeText(%q) = %q, want %q", tc.in, got, tc.want)
+		if got := termtext.EscapeLines(tc.in); got != tc.want {
+			t.Errorf("EscapeLines(%q) = %q, want %q", tc.in, got, tc.want)
 		}
 	}
 }
 
-func TestEscapeCell(t *testing.T) {
+func TestEscape(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct{ in, want string }{
@@ -52,22 +52,22 @@ func TestEscapeCell(t *testing.T) {
 		{`C:\temp\x1b`, `C:\temp\x1b`},
 	}
 	for _, tc := range tests {
-		if got := termtext.EscapeCell(tc.in); got != tc.want {
-			t.Errorf("EscapeCell(%q) = %q, want %q", tc.in, got, tc.want)
+		if got := termtext.Escape(tc.in); got != tc.want {
+			t.Errorf("Escape(%q) = %q, want %q", tc.in, got, tc.want)
 		}
 	}
 }
 
 // FuzzEscape checks what the escapers promise of any input: the result is
-// valid UTF-8 and holds no rune the policy escapes, EscapeCell's result is
+// valid UTF-8 and holds no rune the policy escapes, Escape's result is
 // one line, and text that needs no escape comes back unchanged.
 func FuzzEscape(f *testing.F) {
 	for _, seed := range []string{"", "plain", hostile, "a\nb\tc", "\xff\xfe", "\u009b", "\u2028", "\u202e", "失败"} {
 		f.Add(seed)
 	}
 	f.Fuzz(func(t *testing.T, in string) {
-		text, cell := termtext.EscapeText(in), termtext.EscapeCell(in)
-		for name, got := range map[string]string{"EscapeText": text, "EscapeCell": cell} {
+		line, lines := termtext.Escape(in), termtext.EscapeLines(in)
+		for name, got := range map[string]string{"Escape": line, "EscapeLines": lines} {
 			if !utf8.ValidString(got) {
 				t.Fatalf("%s(%q) = %q, not UTF-8", name, in, got)
 			}
@@ -79,17 +79,17 @@ func FuzzEscape(f *testing.F) {
 				}
 			}
 		}
-		if strings.ContainsAny(cell, "\n\t") {
-			t.Fatalf("EscapeCell(%q) = %q, not one line", in, cell)
+		if strings.ContainsAny(line, "\n\t") {
+			t.Fatalf("Escape(%q) = %q, not one line", in, line)
 		}
-		if termtext.EscapeCell(cell) != cell {
-			t.Fatalf("EscapeCell(%q) = %q, which EscapeCell changes again", in, cell)
+		if termtext.Escape(line) != line {
+			t.Fatalf("Escape(%q) = %q, which Escape changes again", in, line)
 		}
-		if termtext.EscapeText(text) != text {
-			t.Fatalf("EscapeText(%q) = %q, which EscapeText changes again", in, text)
+		if termtext.EscapeLines(lines) != lines {
+			t.Fatalf("EscapeLines(%q) = %q, which EscapeLines changes again", in, lines)
 		}
-		if cell == in && text != in {
-			t.Fatalf("EscapeText(%q) = %q, though EscapeCell changes nothing", in, text)
+		if line == in && lines != in {
+			t.Fatalf("EscapeLines(%q) = %q, though Escape changes nothing", in, lines)
 		}
 	})
 }
