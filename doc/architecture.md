@@ -143,7 +143,11 @@ keeps it without a line of the caller's.
   acquired is released before its target ends, so that a panic in the
   release is the target's failure; the next item can so take it and run
   before that target has ended. `Batches` runs one batch after the other,
-  with a pause between them, and stops after one that failed.
+  with a pause between them, and stops after one that failed; a batch whose
+  run returns a skip ends skipped and does not stop it. A skip is
+  `progress.ErrSkipped`, which the pools test with `errors.Is`; the error
+  of a batch not tried, `fanout.ErrNotTried`, is none, since a failure left
+  that batch out, not a purpose (decision 13).
 
 ## What a program fills in
 

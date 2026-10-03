@@ -91,7 +91,7 @@ func TestTheSummary(t *testing.T) {
 			return down
 		}, "exec: failed in 18m03s: 1 ok, 1 failed, 1 canceled"},
 		{"each node as the worst of its targets, when the worse come later", func(ctx context.Context, c *clock) error {
-			step(ctx, "power on", three, map[string]error{"exe1": fanout.Skip("powered on already"), "exe2": fanout.Skip("in maintenance")})
+			step(ctx, "power on", three, map[string]error{"exe1": progress.Skip("powered on already"), "exe2": progress.Skip("in maintenance")})
 			step(ctx, "boot", three, map[string]error{"exe1": context.Canceled, "exe2": context.Canceled})
 			step(ctx, "check", three, map[string]error{"exe1": down})
 			c.Add(time.Second)

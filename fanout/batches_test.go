@@ -274,6 +274,39 @@ func TestBatchesReportTheirWork(t *testing.T) {
 		}
 	})
 
+	// A batch whose run returns a skip ends skipped, and the run goes on:
+	// nothing failed, so nothing is left out for it, and the step ends ok.
+	t.Run("a skipped batch", func(t *testing.T) {
+		t.Parallel()
+		ctx, tree := progresstest.Watch(context.Background(), t)
+		s := &sender{}
+		run := func(ctx context.Context, batch *nodeset.NodeSet) error {
+			if batch.Contains("exe3") {
+				return fmt.Errorf("%s: %w", batch, progress.Skip("in maintenance"))
+			}
+			return s.run(ctx, batch)
+		}
+		batches := fanout.Batches(ctx, set(t, "exe[1-6]"), s.options(2, 5*time.Second), run)
+		if b := batches[1]; !b.Started || !errors.Is(b.Err, progress.ErrSkipped) {
+			t.Errorf("batch 2 = %+v, want it run and skipped", b)
+		}
+		if b := batches[2]; !b.Started || b.Err != nil {
+			t.Errorf("batch 3 = %+v, want it run without an error", b)
+		}
+		want := `step power on total=6 [fold]: ok
+  batch 1/3 node=exe[1-2] batch=1/3 total=2 limit=2: ok
+    target exe[1-2]: ok
+  batch 2/3 node=exe[3-4] batch=2/3 total=2 limit=2: skipped: exe[3-4]: in maintenance
+  batch 3/3 node=exe[5-6] batch=3/3 total=2 limit=2: ok
+    target exe[5-6]: ok
+  wait stagger timeout=5s: ok
+  wait stagger timeout=5s: ok
+`
+		if got := tree(); got != want {
+			t.Errorf("tree:\n%s\nwant:\n%s", got, want)
+		}
+	})
+
 	// A batch the interrupt cut short fails, but the batches after it were
 	// left out for the interrupt, not for that failure.
 	t.Run("an interrupt during a batch", func(t *testing.T) {
