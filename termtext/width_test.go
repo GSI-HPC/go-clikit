@@ -35,6 +35,25 @@ func TestTheWidthOfTextOnATerminal(t *testing.T) {
 	}
 }
 
+// Of the format characters, the soft hyphen and the prepended concatenation
+// marks are drawn, one column wide; the others take none.
+func TestTheFormatCharactersATerminalDraws(t *testing.T) {
+	t.Parallel()
+	for _, r := range []rune{0x00ad, 0x0600, 0x0605, 0x06dd, 0x070f, 0x0890, 0x0891, 0x08e2, 0x110bd, 0x110cd} {
+		if got := termtext.RuneWidth(r); got != 1 {
+			t.Errorf("RuneWidth(%U) = %d, want 1", r, got)
+		}
+	}
+	for _, r := range []rune{0, 0x200b, 0x200d, 0xfeff, 0x2060, 0x180e, 0xe0041} {
+		if got := termtext.RuneWidth(r); got != 0 {
+			t.Errorf("RuneWidth(%U) = %d, want 0", r, got)
+		}
+	}
+	if got := termtext.Width(strings.Repeat("\u00ad", 200) + "ok"); got != 202 {
+		t.Errorf("Width(200 soft hyphens and ok) = %d, want 202", got)
+	}
+}
+
 // Truncate never lets text reach past the columns given, and leaves out a
 // wide character whole rather than split it.
 func TestTruncate(t *testing.T) {
@@ -55,6 +74,7 @@ func TestTruncate(t *testing.T) {
 		{"a失败", 2, "a"},
 		{"失败", 1, ""},
 		{"e\u0301e\u0301", 1, "e\u0301"},
+		{"\u00ad\u00ad\u00adok", 2, "\u00ad\u00ad"},
 	} {
 		got := termtext.Truncate(tc.text, tc.cols)
 		if got != tc.want {

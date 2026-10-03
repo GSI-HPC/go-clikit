@@ -40,9 +40,11 @@
 //
 // RuneWidth and Width approximate the columns a terminal gives text, one
 // rune at a time: two for East Asian wide and fullwidth characters, none for
-// combining marks and format characters, one for the rest. They do not
-// cluster graphemes, so a sequence joined with U+200D, a skin tone modifier,
-// a variation selector that turns a character into an emoji, or a flag is
-// counted as the sum of its runes, which may be more than a terminal shows.
-// Truncate shortens text to a number of columns with the same widths.
+// combining marks and format characters, save the soft hyphen and the
+// prepended concatenation marks such as U+0600, which are drawn, and one for
+// the rest. They do not cluster graphemes, so a sequence joined with U+200D,
+// a skin tone modifier, a variation selector that turns a character into an
+// emoji, or a flag is counted as the sum of its runes, which may be more
+// than a terminal shows. Truncate shortens text to a number of columns with
+// the same widths.
 package termtext
