@@ -45,8 +45,9 @@ A test that sets up its own Bus with a `Capture` calls `Check` before it
 closes the Bus. `Watch`'s options are opaque: `Classify` gives the Bus the
 program's rule for the class of an error, and `Sinks` puts more sinks on
 it, such as a display drawing on a `Screen`, ahead of the `Capture`, which
-no option can take off. `Capture.Tree` draws the spans as an indented tree that does not
-depend on how concurrent work was scheduled: targets that read the same are
+no option can take off. `Capture.Tree` draws the spans as an indented tree
+that does not depend on how concurrent work was scheduled: targets that
+read the same are
 folded into one line naming them as a node set, or listing them when one is
 no node or a node is named twice, alone or in another name's node set, as
 for a target that ran twice under one name or for exe1 next to exe[1-2],
