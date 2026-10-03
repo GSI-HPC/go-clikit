@@ -2,9 +2,10 @@
 # SPDX-FileCopyrightText: 2026 GSI Helmholtz Centre for Heavy Ion Research GmbH <http://www.gsi.de>
 # SPDX-License-Identifier: Apache-2.0
 #
-# Tests verify-release-tag.sh against tags made in a scratch repository, one
-# case per way a tag has been shown to pass that should not. The release
-# workflow runs only on a tag push, so this is where its first step is tested.
+# Tests the scripts of the release workflow against tags made in a scratch
+# repository, one case per way a tag has been shown to pass that should not:
+# verify-release-tag.sh and check-release-version.sh. The release workflow
+# runs only on a tag push, so this is where its steps are tested.
 #
 # Needs git, ssh-keygen and gpg. Run from anywhere:
 #
@@ -12,7 +13,8 @@
 
 set -euo pipefail
 
-check="$(cd "$(dirname "$0")" && pwd)/verify-release-tag.sh"
+scripts="$(cd "$(dirname "$0")" && pwd)"
+check="$scripts/verify-release-tag.sh"
 scratch="$(mktemp -d)"
 cleanup() {
   local home
@@ -163,6 +165,47 @@ run 'a tag signed by an unlisted OpenPGP key' fail v1.7.1 "$first" "$listed" "$p
 # The OpenPGP list holds public keys and nothing else.
 run 'an OpenPGP list holding a private key' fail v1.7.0 "$first" '' "$pgp_unlisted_private" 'private key'
 run 'an OpenPGP list holding no key' fail v1.7.0 "$first" '' 'not a key' 'cannot import'
+
+# expect <name> <want: pass|fail> <pattern in output, or ''> <command...>
+expect() {
+  local name="$1" want="$2" pattern="$3" out got=pass
+  shift 3
+  out="$("$@" 2>&1)" || got=fail
+  if [ "$got" != "$want" ]; then
+    echo "FAIL $name: want $want, got $got"
+    printf '%s\n' "$out" | sed 's/^/    /'
+    failures=$((failures + 1))
+  elif [ -n "$pattern" ] && ! grep -qF -- "$pattern" <<< "$out"; then
+    echo "FAIL $name: output does not say '$pattern'"
+    printf '%s\n' "$out" | sed 's/^/    /'
+    failures=$((failures + 1))
+  else
+    echo "ok   $name"
+  fi
+}
+
+# The version: one the go command takes for this module, or none.
+printf 'module example.org/kit\n\ngo 1.26.0\n' > "$scratch/go.mod"
+printf 'module example.org/kit/v2\n\ngo 1.26.0\n' > "$scratch/go-v2.mod"
+v1mod="$scratch/go.mod"
+v2mod="$scratch/go-v2.mod"
+version() {
+  TAG="$1" GO_MOD="$2" "$scripts/check-release-version.sh"
+}
+expect 'a release version' pass '' version v1.2.3 "$v1mod"
+expect 'a pre-release version' pass '' version v0.1.0-rc.1 "$v1mod"
+expect 'a pre-release identifier of zero' pass '' version v0.1.0-0 "$v1mod"
+expect 'alphanumeric identifiers starting with zero' pass '' version v0.1.0-01a.0a "$v1mod"
+expect 'hyphens in pre-release identifiers' pass '' version v0.1.0-rc-1.x-y "$v1mod"
+expect 'a numeric pre-release identifier with a leading zero' fail 'leading zero' version v0.1.0-rc.01 "$v1mod"
+expect 'a leading zero in the first pre-release identifier' fail 'leading zero' version v0.1.0-00 "$v1mod"
+expect 'a leading zero in the major version' fail 'not a semantic version' version v01.2.3 "$v1mod"
+expect 'a version without its patch number' fail 'not a semantic version' version v1.2 "$v1mod"
+expect 'an empty pre-release identifier' fail 'not a semantic version' version v1.2.3-rc..1 "$v1mod"
+expect 'build metadata' fail 'not a semantic version' version v1.2.3+build "$v1mod"
+expect 'v2 in a module path without /v2' fail 'does not match the module path' version v2.0.0 "$v1mod"
+expect 'v2 in a module path ending in /v2' pass '' version v2.0.0 "$v2mod"
+expect 'v1 in a module path ending in /v2' fail 'does not match the module path' version v1.0.0 "$v2mod"
 
 if [ "$failures" -ne 0 ]; then
   echo "$failures case(s) failed"

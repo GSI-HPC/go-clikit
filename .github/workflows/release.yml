@@ -39,25 +39,10 @@ jobs:
           ALLOWED_PGP_KEYS: ${{ vars.RELEASE_ALLOWED_PGP_KEYS }}
         run: .github/scripts/verify-release-tag.sh
 
-      # The go command accepts only a semantic version, and from v2 on only
-      # in a module path that ends in the major version.
       - name: Refuse a version the go command would not accept
         env:
           TAG: ${{ github.ref_name }}
-        run: |
-          set -euo pipefail
-          semver='^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$'
-          if ! [[ "$TAG" =~ $semver ]]; then
-            echo "::error::$TAG is not a semantic version such as v1.2.3 or v1.2.3-rc.1"
-            exit 1
-          fi
-          major="${BASH_REMATCH[1]}"
-          module="$(sed -n 's/^module //p' go.mod)"
-          suffix="$(sed -n 's#^.*/v\([0-9][0-9]*\)$#\1#p' <<< "$module")"
-          if { [ "$major" -ge 2 ] && [ "$suffix" != "$major" ]; } || { [ "$major" -lt 2 ] && [ -n "$suffix" ]; }; then
-            echo "::error::$TAG does not match the module path $module"
-            exit 1
-          fi
+        run: .github/scripts/check-release-version.sh
 
   test:
     name: Test (Go ${{ matrix.line }})

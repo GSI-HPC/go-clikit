@@ -30,9 +30,12 @@ maintainers create tags.
    $ git push origin v0.2.0
    ```
 
-The Release workflow verifies the tag, tests the tagged commit on both Go
-lines, publishes the GitHub release and fetches the version through the
-module proxy, after which pkg.go.dev lists it.
+The Release workflow verifies the tag and its version, tests the tagged
+commit on both Go lines, publishes the GitHub release and fetches the version
+through the module proxy, after which pkg.go.dev lists it. The version is
+one the go command accepts: `vX.Y.Z`, optionally with a pre-release such as
+`-rc.1`, with no leading zeros in any number, `-rc.01` included, and no
+build metadata.
 
 ## Withdrawing a release
 
