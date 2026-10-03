@@ -319,6 +319,36 @@ func TestLinesStayWholeUnderInterleaving(t *testing.T) {
 	}
 }
 
+// A write that ends a line and then sets the colour back, as a coloured
+// line written whole often does, has left no line open: the counter is
+// drawn again, and the lines of the Lines writers are not held.
+func TestAColourAfterTheEndOfALineLeavesNoLineOpen(t *testing.T) {
+	t.Parallel()
+	f := newTerminalFixture(t)
+	out := f.term.Writer(f.screen)
+	diag := f.term.Lines(f.screen)
+	f.counter.Draw()
+	_, _ = io.WriteString(out, "\x1b[31mred line\n")
+	_, _ = io.WriteString(out, "\x1b[0m")
+	_, _ = io.WriteString(diag, "a log line\n")
+	f.counter.Draw()
+	// The Screen shows a colour as text, where a terminal shows nothing.
+	f.shows(t, "after the colour is set back", "^[[31mred line\n^[[0ma log line\n0:02\n")
+
+	// A colour alone leaves the line as it was: open, here.
+	_, _ = io.WriteString(out, "Continue? \x1b[1m")
+	_, _ = io.WriteString(out, "\x1b[;0m")
+	f.counter.Draw()
+	f.shows(t, "with a question open", "^[[31mred line\n^[[0ma log line\nContinue? ^[[1m^[[;0m\n")
+	// A sequence that is not a colour's counts as the line's text.
+	_, _ = io.WriteString(out, "y\n\x1b[5C")
+	f.counter.Draw()
+	f.shows(t, "after a move of the cursor", "^[[31mred line\n^[[0ma log line\nContinue? ^[[1m^[[;0my\n^[[5C\n")
+	_, _ = io.WriteString(out, "\n\x1b[1;xm")
+	f.counter.Draw()
+	f.shows(t, "after a sequence that is no colour", "^[[31mred line\n^[[0ma log line\nContinue? ^[[1m^[[;0my\n^[[5C\n^[[1;xm\n")
+}
+
 // A line that comes in many small writes costs each write the bytes it
 // adds, not the line written so far: a byte more allocates nothing.
 func TestALongLineInSmallWritesCostsLittle(t *testing.T) {
