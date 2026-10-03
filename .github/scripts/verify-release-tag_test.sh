@@ -245,7 +245,7 @@ info() {
     "$1" "$2" "$1" > "$PROXY_INFO/$1.info"
 }
 audit() {
-  PATH="$scratch/proxy-bin:$PATH" GO_MOD="$scratch/audit.mod" \
+  PATH="$scratch/proxy-bin:$PATH" GO_MOD="${AUDIT_MOD:-$scratch/audit.mod}" \
     MODULE_PROXY=https://proxy.example.org ALLOWED_SIGNERS="$1" ALLOWED_PGP_KEYS="$2" \
     VERIFIED_TAGS="${3:-}" GITHUB_OUTPUT="$scratch/output" "$scripts/audit-release-tags.sh"
 }
@@ -317,6 +317,45 @@ expect 'an audit of a version list with CRLF line ends' pass '' audit "$listed" 
 printf 'v0.0.4\nv1.0.0\n' > "$PROXY_LIST"
 expect 'an audit finding a version on the module proxy whose tag was deleted' fail \
   'the module proxy serves v0.0.4, but there is no tag v0.0.4' audit "$listed" ''
+# A bad version is withdrawn by retracting it in go.mod, which acknowledges
+# the alarm for that version, and for no other.
+retracting() {
+  printf 'module github.com/Example-Org/kit\n\ngo 1.26.0\n\n%s\n' "$1" > "$scratch/retract.mod"
+}
+retracting 'retract v0.0.4 // Pushed by someone else.'
+AUDIT_MOD="$scratch/retract.mod" expect 'an audit of a version on the module proxy that go.mod retracts' pass \
+  'retract.mod retracts v0.0.4, which acknowledges this' audit "$listed" ''
+AUDIT_MOD="$scratch/retract.mod" expect 'an audit saying how many problems are acknowledged' pass \
+  '1 problem(s) are acknowledged' audit "$listed" ''
+retracting "$(printf 'retract (\n\tv0.0.3 // Tagged from the wrong commit.\n\t"v0.0.4" // Pushed by someone else.\n)')"
+AUDIT_MOD="$scratch/retract.mod" expect 'an audit of a version go.mod retracts in a block' pass '' audit "$listed" ''
+retracting 'retract [v0.0.1, v0.0.9] // Pushed by someone else.'
+AUDIT_MOD="$scratch/retract.mod" expect 'an audit of a version go.mod retracts in a range' fail \
+  'the module proxy serves v0.0.4, but there is no tag v0.0.4' audit "$listed" ''
+retracting 'retract v0.0.3 // Tagged from the wrong commit.'
+AUDIT_MOD="$scratch/retract.mod" expect 'an audit of a version go.mod does not retract' fail \
+  '1 version(s) on the module proxy have no tag' audit "$listed" ''
+# go.mod comments are no retractions.
+retracting '// retract v0.0.4'
+AUDIT_MOD="$scratch/retract.mod" expect 'an audit of a go.mod naming a version in a comment' fail \
+  'no tag v0.0.4' audit "$listed" ''
+printf 'v1.0.0\n' > "$PROXY_LIST"
+info v1.0.0 "$old"
+retracting 'retract v1.0.0 // Pushed again on another commit.'
+AUDIT_MOD="$scratch/retract.mod" expect 'an audit of a version served from another commit that go.mod retracts' pass \
+  'retracts v1.0.0, which acknowledges this' audit "$listed" ''
+info v1.0.0 "$released"
+git tag -a v0.0.6 -m 'release v0.0.6' "$old"
+retracting 'retract v0.0.6 // Not signed.'
+AUDIT_MOD="$scratch/retract.mod" expect 'an audit of an unsigned tag that go.mod retracts' pass \
+  '::warning::v0.0.6 is not signed by a key' audit "$listed" ''
+git tag -a v0.0.7 -m 'release v0.0.7' "$old"
+AUDIT_MOD="$scratch/retract.mod" expect 'an audit of an unsigned tag next to one that go.mod retracts' fail \
+  '1 of 3 release tag(s)' audit "$listed" ''
+git tag -d v0.0.6 v0.0.7 > /dev/null
+retracting 'retract v0.0.8 // Deleted.'
+AUDIT_MOD="$scratch/retract.mod" expect 'an audit of a pinned release whose tag is gone that go.mod retracts' pass \
+  'retracts v0.0.8' audit "$listed" '' "v0.0.8 $(printf '%040d' 0)"
 PROXY_STATUS=404 expect 'an audit of a module the proxy has not fetched' pass '' audit "$listed" ''
 PROXY_STATUS=410 expect 'an audit of a module the proxy refuses as gone' pass '' audit "$listed" ''
 PROXY_STATUS=500 expect 'an audit when the module proxy fails' fail 'answered 500' audit "$listed" ''

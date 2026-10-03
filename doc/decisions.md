@@ -198,7 +198,10 @@ unpublish it.
   never by `valid-before`, which git checks against the date in the tag,
   a date the signer writes.
 - A tag is never moved or deleted. A broken release is withdrawn with a
-  `retract` directive in `go.mod`, which ships in the next release.
+  `retract` directive in `go.mod`, which ships in the next release. A
+  version retracted on its own line acknowledges the alarm: the audit
+  reports what is wrong with it as a warning, so that it fails again only
+  for a version nobody has dealt with.
 - The module stays at v0 while its API settles, and a v0 minor release may
   break it; the release notes say how. A new package arrives in a minor
   release. v1.0.0 is a decision of its own, once programs have used the kit

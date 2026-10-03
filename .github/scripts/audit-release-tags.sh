@@ -21,20 +21,26 @@
 #
 # A pinned release is held to the tag object verified when it was pushed
 # rather than to today's keys, so that a key is retired by removing it
-# without failing the releases it signed. Run in a checkout with all tags:
+# without failing the releases it signed.
+#
+# A bad version can be withdrawn but never removed, so a version the go.mod
+# retracts on its own, not as part of a range, acknowledges the alarm: what
+# is wrong with it is a warning, and passes. Run in a checkout with all tags:
 #
 #   ALLOWED_SIGNERS, ALLOWED_PGP_KEYS  as for verify-release-tag.sh
 #   VERIFIED_TAGS  the pinned releases, from the RELEASE_VERIFIED_TAGS
 #                  repository variable: one line each, the tag and the id
 #                  of its tag object; # starts a comment line, after
 #                  any blanks
-#   GO_MOD, MODULE_PROXY  as for module-proxy.sh
+#   GO_MOD, MODULE_PROXY  as for module-proxy.sh; the retractions are
+#                  read from GO_MOD
 
 set -euo pipefail
 
 scripts="$(cd "$(dirname "$0")" && pwd)"
 verify="$scripts/verify-release-tag.sh"
 module_proxy="$scripts/module-proxy.sh"
+go_mod="${GO_MOD:-go.mod}"
 
 fail() {
   echo "::error::$*"
@@ -64,6 +70,46 @@ while IFS= read -r tag; do
   tags+=("$tag")
 done < <(git for-each-ref --format='%(refname:strip=2)' 'refs/tags/v*')
 
+# The versions go.mod retracts one by one, in a retract directive or block;
+# a range acknowledges none of the versions in it.
+declare -A retracts=()
+while IFS= read -r version; do
+  retracts["$version"]=1
+done < <(awk '
+  { sub(/\/\/.*/, ""); gsub(/"/, "") }
+  block && $1 == ")" { block = 0; next }
+  block { if (NF == 1 && $1 ~ /^v/) print $1; next }
+  ($1 == "retract" && $2 == "(" && NF == 2) || ($1 == "retract(" && NF == 1) { block = 1; next }
+  $1 == "retract" && NF == 2 && $2 ~ /^v/ { print $2 }
+' "$go_mod")
+
+# problem <message>: reports a problem, for check.
+problem() {
+  echo "::error::$*"
+  return 1
+}
+
+# check <version> <command...>: runs a check of a version, and fails as it
+# fails, unless go.mod retracts the version. A retraction is how a bad
+# version is withdrawn, and it acknowledges the alarm: the errors of the
+# check are then warnings, and it passes.
+acknowledged=0
+check() {
+  local version="$1" out
+  shift
+  if out="$("$@" 2>&1)"; then
+    printf '%s\n' "$out"
+    return 0
+  fi
+  if [ -z "${retracts[$version]+retracted}" ]; then
+    printf '%s\n' "$out"
+    return 1
+  fi
+  printf '%s\n' "$out" | sed 's/^::error::/::warning::/'
+  echo "::warning::$go_mod retracts $version, which acknowledges this"
+  acknowledged=$((acknowledged + 1))
+}
+
 # The versions the module proxy serves: each has a tag, and the proxy serves
 # it from the commit its tag names. A failure to read the list leaves that
 # part of the audit undone, and fails it once the tags are verified.
@@ -79,21 +125,18 @@ moved=0
 while IFS= read -r version; do
   [ -n "$version" ] || continue
   if ! git rev-parse --verify --quiet "refs/tags/$version" > /dev/null; then
-    echo "::error::the module proxy serves $version, but there is no tag $version"
-    untagged=$((untagged + 1))
+    check "$version" problem "the module proxy serves $version, but there is no tag $version" ||
+      untagged=$((untagged + 1))
     continue
   fi
   commit="$(git rev-parse --verify --quiet "refs/tags/$version^{commit}")" || commit="(none)"
-  if ! "$module_proxy" check "$version" "$commit"; then
-    moved=$((moved + 1))
-  fi
+  check "$version" "$module_proxy" check "$version" "$commit" || moved=$((moved + 1))
 done <<< "$versions"
 
 gone=0
 for pin in "${!pins[@]}"; do
   if ! git rev-parse --verify --quiet "refs/tags/$pin" > /dev/null; then
-    echo "::error::$pin is pinned, but there is no tag $pin"
-    gone=$((gone + 1))
+    check "$pin" problem "$pin is pinned, but there is no tag $pin" || gone=$((gone + 1))
   fi
 done
 
@@ -109,17 +152,16 @@ for tag in "${tags[@]}"; do
     if [ "$(git rev-parse --verify "refs/tags/$tag")" = "${pins[$tag]}" ]; then
       echo "::notice::$tag is the tag object verified at its release"
     else
-      echo "::error::$tag is not the tag object verified at its release, ${pins[$tag]}"
-      failed=$((failed + 1))
+      check "$tag" problem "$tag is not the tag object verified at its release, ${pins[$tag]}" ||
+        failed=$((failed + 1))
     fi
     continue
   fi
   # The commit a tag names is the one it is verified against; a tag that
   # names none fails in verify-release-tag.sh.
   commit="$(git rev-parse --verify --quiet "refs/tags/$tag^{commit}")" || commit="$tag"
-  if ! GITHUB_REF_NAME="$tag" GITHUB_SHA="$commit" GITHUB_OUTPUT='' "$verify"; then
+  check "$tag" env GITHUB_REF_NAME="$tag" GITHUB_SHA="$commit" GITHUB_OUTPUT='' "$verify" ||
     failed=$((failed + 1))
-  fi
 done
 
 if [ "$failed" -ne 0 ]; then
@@ -140,5 +182,10 @@ fi
 if [ "$failed" -ne 0 ] || [ "$untagged" -ne 0 ] || [ "$moved" -ne 0 ] || [ "$gone" -ne 0 ] ||
   [ "$unread" -ne 0 ]; then
   exit 1
+fi
+if [ "$acknowledged" -ne 0 ]; then
+  echo "::warning::$acknowledged problem(s) are acknowledged by the versions $go_mod retracts"
+  echo "::notice::all ${#tags[@]} release tag(s) but the retracted versions are pinned or signed by a listed signer, and the module proxy serves no other version or commit"
+  exit 0
 fi
 echo "::notice::all ${#tags[@]} release tag(s) are pinned or signed by a listed signer, and the module proxy serves no other version or commit"
