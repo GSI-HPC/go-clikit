@@ -77,7 +77,7 @@ func TestMapKeepsToItsLimit(t *testing.T) {
 	}{
 		{"one at a time", 1, 4, 1},
 		{"three at a time", 3, 9, 3},
-		{"no limit given", 0, fanout.DefaultMax + 2, fanout.DefaultMax},
+		{"no limit given", 0, fanout.DefaultLimit + 2, fanout.DefaultLimit},
 		{"more room than items", 8, 3, 3},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

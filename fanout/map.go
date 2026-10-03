@@ -23,7 +23,7 @@ type MapOptions[T any] struct {
 	// work whose output is the product.
 	Flags progress.Flags
 	// Limit is how many items are worked on at once; below one is
-	// DefaultMax.
+	// DefaultLimit.
 	Limit int
 	// Describe says what a display names an item by: the node, or
 	// whatever else the item is, the host the work goes to and its role.
@@ -136,7 +136,7 @@ type Outcome[R any] struct {
 func Map[T, R any](ctx context.Context, items []T, o MapOptions[T], fn func(ctx context.Context, item T) (R, error)) []Outcome[R] {
 	limit := o.Limit
 	if limit < 1 {
-		limit = DefaultMax
+		limit = DefaultLimit
 	}
 	stepCtx, step := progress.Start(ctx, progress.KindStep, o.Step,
 		progress.WithFlags(progress.Fold|o.Flags), progress.Total(len(items)), progress.Limit(limit))
