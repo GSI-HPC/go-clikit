@@ -57,7 +57,8 @@ hand, and call `Draw` for a frame where a display would draw from its ticker.
 So a frame shows the same counts and times on every run, and no test waits
 for a display's first second, a heartbeat's ten or a tick. The few tests that
 start a display's own goroutine run in a `testing/synctest` bubble, whose
-fake clock passes at once. The pause between two batches is `After`, which a
+fake clock passes at once, and so do those of the event log's second and of
+the five seconds its `Close` waits, which are not options. The pause between two batches is `After`, which a
 test replaces.
 
 ## The terminal

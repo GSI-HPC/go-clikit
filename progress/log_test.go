@@ -23,6 +23,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/GSI-HPC/go-clikit/progress"
@@ -516,57 +517,60 @@ func written(w *writes) string {
 	return string(bytes.Join(w.each, nil))
 }
 
-// soon waits for what w has been written to hold want, and fails the test
-// when it does not within five seconds.
-func soon(t *testing.T, w *writes, want, what string) {
-	t.Helper()
-	deadline := time.Now().Add(5 * time.Second)
-	for !strings.Contains(written(w), want) {
-		if time.Now().After(deadline) {
-			t.Fatalf("%s was not written within 5s: %q", what, written(w))
-		}
-		time.Sleep(5 * time.Millisecond)
-	}
-}
-
-// A line is written within FlushEvery, whatever comes after it, and as
-// soon as a step, a batch or the command ends, so that a log followed as it
+// A line is written within a second, whatever comes after it, and as soon
+// as a step, a batch or the command ends, so that a log followed as it
 // grows, or that of a run killed, is never far behind.
 func TestTheLogIsWrittenSoonAfterEachLine(t *testing.T) {
 	t.Parallel()
 
-	t.Run("within FlushEvery", func(t *testing.T) {
+	t.Run("within a second", func(t *testing.T) {
 		t.Parallel()
-		w := &writes{}
-		log := progress.NewLog(w, progress.LogOptions{Run: "0123456789abcdef", FlushEvery: 20 * time.Millisecond})
-		bus := progress.NewBus(progress.BusOptions{Sinks: []progress.Sink{log}})
-		_, cmd := progress.Start(progress.WithBus(context.Background(), bus), progress.KindCommand, "exec")
-		soon(t, w, `"kind":"command"`, "the command's start")
-		cmd.End(nil)
-		bus.Close()
-		if err := log.Close(); err != nil {
-			t.Fatal(err)
-		}
+		synctest.Test(t, func(t *testing.T) {
+			w := &writes{}
+			log := progress.NewLog(w, progress.LogOptions{Run: "0123456789abcdef"})
+			bus := progress.NewBus(progress.BusOptions{Sinks: []progress.Sink{log}})
+			_, cmd := progress.Start(progress.WithBus(context.Background(), bus), progress.KindCommand, "exec")
+			synctest.Wait()
+			if got := written(w); got != "" {
+				t.Fatalf("written before the second was up: %q", got)
+			}
+			time.Sleep(time.Second)
+			synctest.Wait()
+			if got := written(w); !strings.Contains(got, `"kind":"command"`) {
+				t.Fatalf("the command's start was not written within a second: %q", got)
+			}
+			cmd.End(nil)
+			bus.Close()
+			if err := log.Close(); err != nil {
+				t.Fatal(err)
+			}
+		})
 	})
 
 	t.Run("as a step ends", func(t *testing.T) {
 		t.Parallel()
-		w := &writes{}
-		// Nothing but the end of the step has the lines written here.
-		log := progress.NewLog(w, progress.LogOptions{Run: "0123456789abcdef", FlushEvery: time.Hour})
-		bus := progress.NewBus(progress.BusOptions{Sinks: []progress.Sink{log}})
-		ctx, cmd := progress.Start(progress.WithBus(context.Background(), bus), progress.KindCommand, "exec")
-		_, step := progress.Start(ctx, progress.KindStep, "run")
-		step.End(nil)
-		soon(t, w, `"type":"end","span"`, "the end of the step")
-		cmd.End(nil)
-		bus.Close()
-		if err := log.Close(); err != nil {
-			t.Fatal(err)
-		}
-		if n := strings.Count(written(w), "\n"); n != 5 {
-			t.Errorf("%d lines written, want the trace and 4 events:\n%s", n, written(w))
-		}
+		synctest.Test(t, func(t *testing.T) {
+			w := &writes{}
+			log := progress.NewLog(w, progress.LogOptions{Run: "0123456789abcdef"})
+			bus := progress.NewBus(progress.BusOptions{Sinks: []progress.Sink{log}})
+			ctx, cmd := progress.Start(progress.WithBus(context.Background(), bus), progress.KindCommand, "exec")
+			_, step := progress.Start(ctx, progress.KindStep, "run")
+			step.End(nil)
+			// No time passes: nothing but the end of the step has the
+			// lines written.
+			synctest.Wait()
+			if got := written(w); !strings.Contains(got, `"type":"end","span"`) {
+				t.Fatalf("the end of the step was not written as it ended: %q", got)
+			}
+			cmd.End(nil)
+			bus.Close()
+			if err := log.Close(); err != nil {
+				t.Fatal(err)
+			}
+			if n := strings.Count(written(w), "\n"); n != 5 {
+				t.Errorf("%d lines written, want the trace and 4 events:\n%s", n, written(w))
+			}
+		})
 	})
 }
 
@@ -581,36 +585,38 @@ func (s stalled) Write(p []byte) (int, error) {
 
 // A log whose writer has stopped taking its lines holds nothing up: the
 // events go on as fast as the work makes them, and Close gives up once it
-// has waited CloseWait, saying that the log stops short.
+// has waited five seconds, saying that the log stops short.
 func TestALogThatStallsHoldsNothingUp(t *testing.T) {
 	t.Parallel()
-	w := stalled{release: make(chan struct{})}
-	defer close(w.release)
-	log := progress.NewLog(w, progress.LogOptions{FlushEvery: time.Millisecond, CloseWait: 50 * time.Millisecond})
-	bus := progress.NewBus(progress.BusOptions{Sinks: []progress.Sink{log}})
-	ctx := progress.WithBus(context.Background(), bus)
-	done := make(chan struct{})
-	go func() {
-		defer close(done)
-		for i := range 20000 {
-			_, s := progress.Start(ctx, progress.KindCall, "ssh", progress.Node(fmt.Sprintf("exe%05d", i)))
-			s.End(nil)
+	synctest.Test(t, func(t *testing.T) {
+		w := stalled{release: make(chan struct{})}
+		defer close(w.release)
+		log := progress.NewLog(w, progress.LogOptions{})
+		bus := progress.NewBus(progress.BusOptions{Sinks: []progress.Sink{log}})
+		ctx := progress.WithBus(context.Background(), bus)
+		done := make(chan struct{})
+		go func() {
+			defer close(done)
+			for i := range 20000 {
+				_, s := progress.Start(ctx, progress.KindCall, "ssh", progress.Node(fmt.Sprintf("exe%05d", i)))
+				s.End(nil)
+			}
+		}()
+		select {
+		case <-done:
+		case <-time.After(30 * time.Second):
+			t.Fatal("the events waited for a writer that took nothing")
 		}
-	}()
-	select {
-	case <-done:
-	case <-time.After(30 * time.Second):
-		t.Fatal("the events waited for a writer that took nothing")
-	}
-	bus.Close()
-	start := time.Now()
-	err := log.Close()
-	if err == nil || !strings.Contains(err.Error(), "were not written") {
-		t.Errorf("Close = %v, want it to say the log stops short", err)
-	}
-	if elapsed := time.Since(start); elapsed > 5*time.Second {
-		t.Errorf("Close took %v, want about CloseWait", elapsed)
-	}
+		bus.Close()
+		start := time.Now()
+		err := log.Close()
+		if err == nil || !strings.Contains(err.Error(), "were not written") {
+			t.Errorf("Close = %v, want it to say the log stops short", err)
+		}
+		if elapsed := time.Since(start); elapsed != 5*time.Second {
+			t.Errorf("Close took %v, want five seconds", elapsed)
+		}
+	})
 }
 
 // gate is a writer that takes nothing until it is opened, as a pipe does
@@ -631,22 +637,31 @@ func (g *gate) Write(p []byte) (int, error) {
 // fitted in 8 MiB, and Close says why the rest are missing.
 func TestALogThatFallsBehindKeepsWhatItHad(t *testing.T) {
 	t.Parallel()
-	w := &gate{open: make(chan struct{})}
-	log := progress.NewLog(w, progress.LogOptions{Run: "0123456789abcdef", FlushEvery: time.Millisecond, CloseWait: time.Minute})
-	bus := progress.NewBus(progress.BusOptions{Sinks: []progress.Sink{log}})
-	ctx := progress.WithBus(context.Background(), bus)
+	// The calls, a start and an end each, overflow the 8 MiB.
 	const n = 50000
-	for i := range n {
-		_, s := progress.Start(ctx, progress.KindCall, "ssh", progress.Node(fmt.Sprintf("exe%05d", i)))
-		s.End(nil)
-	}
-	close(w.open)
-	bus.Close()
-	err := log.Close()
+	var (
+		out string
+		err error
+	)
+	// In a bubble, no time passes while the writer works, so Close never
+	// gives up on it.
+	synctest.Test(t, func(*testing.T) {
+		w := &gate{open: make(chan struct{})}
+		log := progress.NewLog(w, progress.LogOptions{Run: "0123456789abcdef"})
+		bus := progress.NewBus(progress.BusOptions{Sinks: []progress.Sink{log}})
+		ctx := progress.WithBus(context.Background(), bus)
+		for i := range n {
+			_, s := progress.Start(ctx, progress.KindCall, "ssh", progress.Node(fmt.Sprintf("exe%05d", i)))
+			s.End(nil)
+		}
+		close(w.open)
+		bus.Close()
+		err = log.Close()
+		out = written(&w.writes)
+	})
 	if err == nil || !strings.Contains(err.Error(), "not written as fast as the work went on") {
 		t.Errorf("Close = %v, want it to say the log fell behind", err)
 	}
-	out := written(&w.writes)
 	if len(out) < 7<<20 {
 		t.Errorf("%d bytes written, want the 8 MiB the log had taken before it fell behind", len(out))
 	}
@@ -781,16 +796,18 @@ func TestTwoRunsAppendingToOneFileCanBeToldApart(t *testing.T) {
 // that its last lines were not written.
 func TestALogThatCannotFinishSaysSo(t *testing.T) {
 	t.Parallel()
-	w := stalled{release: make(chan struct{})}
-	defer close(w.release)
-	log := progress.NewLog(w, progress.LogOptions{FlushEvery: time.Millisecond, CloseWait: 20 * time.Millisecond})
-	bus := progress.NewBus(progress.BusOptions{Sinks: []progress.Sink{log}})
-	_, s := progress.Start(progress.WithBus(context.Background(), bus), progress.KindCall, "ssh")
-	s.End(nil)
-	bus.Close()
-	if err := log.Close(); err == nil || !strings.Contains(err.Error(), "not written within 20ms") {
-		t.Errorf("Close = %v, want it to say the last lines were not written within 20ms", err)
-	}
+	synctest.Test(t, func(t *testing.T) {
+		w := stalled{release: make(chan struct{})}
+		defer close(w.release)
+		log := progress.NewLog(w, progress.LogOptions{})
+		bus := progress.NewBus(progress.BusOptions{Sinks: []progress.Sink{log}})
+		_, s := progress.Start(progress.WithBus(context.Background(), bus), progress.KindCall, "ssh")
+		s.End(nil)
+		bus.Close()
+		if err := log.Close(); err == nil || !strings.Contains(err.Error(), "not written within 5s") {
+			t.Errorf("Close = %v, want it to say the last lines were not written within 5s", err)
+		}
+	})
 }
 
 // counted is a writer whose first write waits until it is released, and
@@ -823,35 +840,34 @@ func (c *counted) Writes() int {
 // so that the writer can then be closed.
 func TestALogStartsNoWriteOnceCloseHasGivenUp(t *testing.T) {
 	t.Parallel()
-	w := &counted{release: make(chan struct{})}
-	log := progress.NewLog(w, progress.LogOptions{FlushEvery: time.Hour, CloseWait: 20 * time.Millisecond})
-	bus := progress.NewBus(progress.BusOptions{Sinks: []progress.Sink{log}})
-	ctx := progress.WithBus(context.Background(), bus)
-	// Well over the 64 KiB at which the log writes, so that the first write
-	// is under way and more lines wait behind it.
-	for i := range 2000 {
-		_, s := progress.Start(ctx, progress.KindCall, fmt.Sprintf("ssh %d", i))
-		s.End(nil)
-	}
-	bus.Close()
-	err := log.Close()
-	if err == nil || !strings.Contains(err.Error(), "may still be under way") {
-		t.Errorf("Close = %v, want it to say a write may still be under way", err)
-	}
-	select {
-	case <-log.Done():
-		t.Fatal("Done was closed while a write was under way")
-	default:
-	}
-	close(w.release)
-	select {
-	case <-log.Done():
-	case <-time.After(5 * time.Second):
-		t.Fatal("Done was not closed once the write had returned")
-	}
-	if n := w.Writes(); n != 1 {
-		t.Errorf("the log made %d writes, want only the one under way when Close gave up", n)
-	}
+	synctest.Test(t, func(t *testing.T) {
+		w := &counted{release: make(chan struct{})}
+		log := progress.NewLog(w, progress.LogOptions{})
+		bus := progress.NewBus(progress.BusOptions{Sinks: []progress.Sink{log}})
+		ctx := progress.WithBus(context.Background(), bus)
+		// Well over the 64 KiB at which the log writes, so that the first
+		// write is under way and more lines wait behind it.
+		for i := range 2000 {
+			_, s := progress.Start(ctx, progress.KindCall, fmt.Sprintf("ssh %d", i))
+			s.End(nil)
+		}
+		bus.Close()
+		err := log.Close()
+		if err == nil || !strings.Contains(err.Error(), "may still be under way") {
+			t.Errorf("Close = %v, want it to say a write may still be under way", err)
+		}
+		synctest.Wait()
+		select {
+		case <-log.Done():
+			t.Fatal("Done was closed while a write was under way")
+		default:
+		}
+		close(w.release)
+		<-log.Done()
+		if n := w.Writes(); n != 1 {
+			t.Errorf("the log made %d writes, want only the one under way when Close gave up", n)
+		}
+	})
 }
 
 // The first line names the program that wrote the log when the log was
