@@ -17,8 +17,9 @@ import (
 //  3. context.DeadlineExceeded, or an error that reports Timeout, such as
 //     a network timeout, is ClassTimeout;
 //  4. what fallback says of the error, the program's own rule, such as
-//     one that reads the exit code the error asks for; a nil fallback
-//     says ClassTarget.
+//     one that reads the exit code the error asks for, unless fallback
+//     is nil or answers ClassNone;
+//  5. ClassTarget.
 //
 // A nil error is ClassNone, and fallback is not asked.
 //
@@ -42,8 +43,10 @@ func Classify(err error, fallback func(error) Class) Class {
 	if errors.Is(err, context.DeadlineExceeded) || errors.As(err, &t) && t.Timeout() {
 		return ClassTimeout
 	}
-	if fallback == nil {
-		return ClassTarget
+	if fallback != nil {
+		if class := fallback(err); class != ClassNone {
+			return class
+		}
 	}
-	return fallback(err)
+	return ClassTarget
 }
