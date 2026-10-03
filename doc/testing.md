@@ -29,10 +29,14 @@ what it reports. `Capture` is a sink that keeps the events of a Bus, and
 - and no text holds anything `termtext.Escape` would escape, or is
   longer than its bound.
 
-`Checked` gives a test a Bus whose events are checked when the test ends,
-and `Watch` one whose events are checked, and drawn as a tree, when the test
-asks. Both check before the Bus is closed, which would end a span left open
-and hide it. Their options are opaque: `Classify` gives the Bus the
+`Watch` gives a test a Bus of its own and a `Watcher`, whose `Finish`
+checks the events, closes the Bus and draws them as a tree. It checks
+before the Bus is closed, which would end a span left open and hide it,
+and a test that never calls `Finish` is checked the same way when it ends.
+The Bus asks for lines of output, as a live display does, so they are
+checked too; `Events` and `Tree` read the events so far and check nothing.
+A test that sets up its own Bus with a `Capture` calls `Check` before it
+closes the Bus. `Watch`'s options are opaque: `Classify` gives the Bus the
 program's rule for the class of an error, and `Sinks` puts more sinks on
 it, such as a display drawing on a `Screen`, ahead of the `Capture`, which
 no option can take off. `Capture.Tree` draws the spans as an indented tree that does not

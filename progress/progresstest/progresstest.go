@@ -6,11 +6,11 @@
 // and checks that they keep the promises the progress package makes to
 // every sink.
 //
-// Checked and Watch give a test a context with a Bus of its own. Both keep
-// one rule: Check runs on the events as the work left them, before the Bus
-// is closed, since Close would end a span the work left open as canceled
-// and hide that it never ended. Checked runs it when the test ends; Watch
-// when the test asks for the tree.
+// Watch gives a test a context with a Bus of its own, and a Watcher that
+// keeps one rule: Check runs on the events as the work left them, before
+// the Bus is closed, since Close would end a span the work left open as
+// canceled and hide that it never ended. It runs when the test calls
+// Finish for the tree, or else when the test ends.
 //
 // # What Check holds an emitter to
 //
@@ -46,7 +46,8 @@ import (
 )
 
 // Capture is a sink that keeps every event it is sent. It is safe for
-// concurrent use.
+// concurrent use. To check the events, use Watch, or call Check before the
+// Bus is closed.
 type Capture struct {
 	// Lines makes the capture ask for lines of output, as a live display
 	// does, so that progress.Tee produces them.
@@ -73,7 +74,7 @@ func (c *Capture) Events() []progress.Event {
 	return slices.Clone(c.events)
 }
 
-// An Option sets up the Bus that Checked and Watch make.
+// An Option sets up the Bus that Watch makes.
 type Option func(*config)
 
 // config is what the options set.
@@ -97,36 +98,49 @@ func Sinks(s ...progress.Sink) Option {
 	return func(c *config) { c.sinks = append(c.sinks, s...) }
 }
 
-// Checked returns ctx with a Bus of its own, whose events a Capture keeps
-// and Check checks when the test ends, before the Bus is closed. The
-// Capture asks for the lines of output, as a live display does, so that
-// they are checked too; it is returned for a test that reads the events,
-// or their Tree, while the work is under way.
-func Checked(ctx context.Context, t testing.TB, opts ...Option) (context.Context, *Capture) {
+// Watch returns ctx with a Bus of its own, whose events a Capture keeps,
+// and the Watcher that checks them. The Capture asks for the lines of
+// output, as a live display does, so that they are checked too. If the
+// test does not call Finish, Watch calls it when the test ends, so the
+// events are checked and the Bus is closed either way.
+func Watch(ctx context.Context, t testing.TB, opts ...Option) (context.Context, *Watcher) {
 	t.Helper()
-	c := &Capture{Lines: true}
-	bus := newBus(c, opts)
-	t.Cleanup(func() {
-		Check(t, c.Events())
-		bus.Close()
-	})
-	return progress.WithBus(ctx, bus), c
+	w := &Watcher{t: t, capture: &Capture{Lines: true}}
+	w.bus = newBus(w.capture, opts)
+	t.Cleanup(func() { w.Finish() })
+	return progress.WithBus(ctx, w.bus), w
 }
 
-// Watch returns ctx with a Bus of its own, whose events a Capture keeps,
-// and a function to call once the work is done: it runs Check on the
-// events, closes the Bus and returns their Tree. The Capture asks for no
-// lines.
-func Watch(ctx context.Context, t testing.TB, opts ...Option) (context.Context, func() string) {
-	t.Helper()
-	c := &Capture{}
-	bus := newBus(c, opts)
-	return progress.WithBus(ctx, bus), func() string {
-		t.Helper()
-		Check(t, c.Events())
-		bus.Close()
-		return c.Tree()
+// A Watcher checks the events of the Bus that Watch made. It is safe for
+// concurrent use.
+type Watcher struct {
+	t       testing.TB
+	capture *Capture
+	bus     *progress.Bus
+
+	mu       sync.Mutex
+	finished bool
+}
+
+// Events returns a copy of the events so far, and checks nothing.
+func (w *Watcher) Events() []progress.Event { return w.capture.Events() }
+
+// Tree draws the events so far, as Capture.Tree does, and checks nothing.
+func (w *Watcher) Tree() string { return w.capture.Tree() }
+
+// Finish is called once the work is done: it runs Check on the events,
+// then closes the Bus, and returns the Tree of the events. Called again,
+// it checks nothing more and returns the Tree.
+func (w *Watcher) Finish() string {
+	w.t.Helper()
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if !w.finished {
+		w.finished = true
+		Check(w.t, w.capture.Events())
+		w.bus.Close()
 	}
+	return w.capture.Tree()
 }
 
 func newBus(capture *Capture, opts []Option) *progress.Bus {

@@ -237,7 +237,7 @@ func TestBatchesReportTheirWork(t *testing.T) {
 
 	t.Run("a failed batch", func(t *testing.T) {
 		t.Parallel()
-		ctx, tree := progresstest.Watch(context.Background(), t)
+		ctx, w := progresstest.Watch(context.Background(), t)
 		s := &sender{fail: map[string]bool{"exe5": true}}
 		fanout.Batches(ctx, set(t, "exe[1-7]"), s.options(3, 5*time.Second), s.run)
 		want := `step power on total=7 [fold]: failed (target): exe5: no answer
@@ -249,14 +249,14 @@ func TestBatchesReportTheirWork(t *testing.T) {
   batch 3/3 node=exe[6-7] batch=3/3 total=2 limit=2: skipped: not tried: an earlier batch failed
   wait stagger timeout=5s: ok
 `
-		if got := tree(); got != want {
+		if got := w.Finish(); got != want {
 			t.Errorf("tree:\n%s\nwant:\n%s", got, want)
 		}
 	})
 
 	t.Run("an interrupt during a pause", func(t *testing.T) {
 		t.Parallel()
-		ctx, tree := progresstest.Watch(context.Background(), t)
+		ctx, w := progresstest.Watch(context.Background(), t)
 		ctx, cancel := context.WithCancel(ctx)
 		s := &sender{}
 		o := s.options(2, 5*time.Second)
@@ -269,7 +269,7 @@ func TestBatchesReportTheirWork(t *testing.T) {
   batch 3/3 node=exe[5-6] batch=3/3 total=2 limit=2: canceled (canceled): context canceled
   wait stagger timeout=5s: canceled (canceled): context canceled
 `
-		if got := tree(); got != want {
+		if got := w.Finish(); got != want {
 			t.Errorf("tree:\n%s\nwant:\n%s", got, want)
 		}
 	})
@@ -278,7 +278,7 @@ func TestBatchesReportTheirWork(t *testing.T) {
 	// nothing failed, so nothing is left out for it, and the step ends ok.
 	t.Run("a skipped batch", func(t *testing.T) {
 		t.Parallel()
-		ctx, tree := progresstest.Watch(context.Background(), t)
+		ctx, w := progresstest.Watch(context.Background(), t)
 		s := &sender{}
 		run := func(ctx context.Context, batch *nodeset.NodeSet) error {
 			if batch.Contains("exe3") {
@@ -302,7 +302,7 @@ func TestBatchesReportTheirWork(t *testing.T) {
   wait stagger timeout=5s: ok
   wait stagger timeout=5s: ok
 `
-		if got := tree(); got != want {
+		if got := w.Finish(); got != want {
 			t.Errorf("tree:\n%s\nwant:\n%s", got, want)
 		}
 	})
@@ -311,7 +311,7 @@ func TestBatchesReportTheirWork(t *testing.T) {
 	// left out for the interrupt, not for that failure.
 	t.Run("an interrupt during a batch", func(t *testing.T) {
 		t.Parallel()
-		ctx, tree := progresstest.Watch(context.Background(), t)
+		ctx, w := progresstest.Watch(context.Background(), t)
 		ctx, cancel := context.WithCancel(ctx)
 		s := &sender{fail: map[string]bool{"exe4": true}}
 		run := func(ctx context.Context, batch *nodeset.NodeSet) error {
@@ -333,7 +333,7 @@ func TestBatchesReportTheirWork(t *testing.T) {
   batch 3/3 node=exe[5-6] batch=3/3 total=2 limit=2: canceled (canceled): context canceled
   wait stagger timeout=5s: ok
 `
-		if got := tree(); got != want {
+		if got := w.Finish(); got != want {
 			t.Errorf("tree:\n%s\nwant:\n%s", got, want)
 		}
 	})
@@ -342,7 +342,7 @@ func TestBatchesReportTheirWork(t *testing.T) {
 	// interrupt does: canceled, counted as their Total, not failed.
 	t.Run("a deadline during a pause", func(t *testing.T) {
 		t.Parallel()
-		ctx, tree := progresstest.Watch(context.Background(), t)
+		ctx, w := progresstest.Watch(context.Background(), t)
 		ctx, cancel := context.WithDeadline(ctx, time.Now().Add(time.Hour))
 		defer cancel()
 		deadline, stop := context.WithTimeout(ctx, 0)
@@ -357,7 +357,7 @@ func TestBatchesReportTheirWork(t *testing.T) {
   batch 2/2 node=exe[3-4] batch=2/2 total=2 limit=2: canceled (canceled): context deadline exceeded
   wait stagger timeout=5s: failed (timeout): context deadline exceeded
 `
-		if got := tree(); got != want {
+		if got := w.Finish(); got != want {
 			t.Errorf("tree:\n%s\nwant:\n%s", got, want)
 		}
 	})

@@ -36,29 +36,34 @@ func reset(ctx context.Context, nodes []string) error {
 	return err
 }
 
-// A test watches the work it runs: Watch checks every promise the events
+// A test watches the work it runs: Finish checks every promise the events
 // make, and the tree they draw reads the same however the work was
-// scheduled.
+// scheduled. A test that never calls Finish is checked when it ends.
 func ExampleWatch() {
 	_ = func(t *testing.T) {
-		ctx, tree := progresstest.Watch(t.Context(), t)
+		ctx, w := progresstest.Watch(t.Context(), t)
 		_ = reset(ctx, []string{"exe1", "exe2", "exe3"})
 		want := `step reset the machines total=3 [fold]: failed (target): exe3: no answer
   target exe3: failed (target): {}: no answer
   target exe[1-2]: ok
 `
-		if got := tree(); got != want {
+		if got := w.Finish(); got != want {
 			t.Errorf("the work reported\n%s\nwant\n%s", got, want)
 		}
 	}
 }
 
 // A Capture keeps the events of a Bus; its Tree draws them, targets that
-// read the same folded into one line.
+// read the same folded into one line. Check runs before the Bus is closed,
+// which would end a span the work left open and hide it.
 func ExampleCapture() {
 	capture := &progresstest.Capture{}
 	bus := progress.NewBus(progress.BusOptions{Sinks: []progress.Sink{capture}})
 	_ = reset(progress.WithBus(context.Background(), bus), []string{"exe1", "exe2", "exe3", "exe10"})
+	// In a test, check the events before the Bus is closed.
+	_ = func(t *testing.T) {
+		progresstest.Check(t, capture.Events())
+	}
 	bus.Close()
 	fmt.Print(capture.Tree())
 	// Output:
