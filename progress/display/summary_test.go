@@ -126,6 +126,36 @@ func TestTheSummary(t *testing.T) {
 			c.Add(time.Second)
 			return batches[1].Err
 		}, "exec: failed in 1.0s: 3 ok, 1 failed, 2 skipped"},
+		{"nodes in a batch left out count once with what counted them before", func(ctx context.Context, c *clock) error {
+			nodes := nodeset.MustParse("exe[1-4]")
+			step(ctx, "power off", nodes.Expand(), nil)
+			batches := fanout.Batches(ctx, nodes, fanout.BatchOptions{Step: "power on", Size: 2},
+				func(ctx context.Context, batch *nodeset.NodeSet) error {
+					var err error
+					if batch.Contains("exe1") {
+						err = down
+					}
+					step(ctx, "power on", batch.Expand(), map[string]error{"exe1": err})
+					return err
+				})
+			c.Add(5 * time.Second)
+			return batches[0].Err
+		}, "exec: failed in 5.0s: 1 ok, 1 failed, 2 skipped"},
+		{"a batch left out that names no nodes counts as its Total", func(ctx context.Context, c *clock) error {
+			stepCtx, s := progress.Start(ctx, progress.KindStep, "power on",
+				progress.WithFlags(progress.Fold), progress.Total(5))
+			firstCtx, first := progress.Start(stepCtx, progress.KindBatch, "1/2", progress.Queued(), progress.Batch(1, 2), progress.Total(1))
+			_, second := progress.Start(stepCtx, progress.KindBatch, "2/2", progress.Queued(), progress.Batch(2, 2), progress.Total(4))
+			first.Run()
+			_, target := progress.Start(firstCtx, progress.KindTarget, "exe1", progress.Queued(), progress.Node("exe1"))
+			target.Run()
+			target.End(nil)
+			first.End(nil)
+			second.Skip("not tried")
+			s.End(nil)
+			c.Add(time.Second)
+			return nil
+		}, "exec: done in 1.0s: 1 ok, 4 skipped"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
