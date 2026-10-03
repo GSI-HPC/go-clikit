@@ -415,3 +415,28 @@ func TestALineOfASpanThatEndedWhileItWasParsedIsNotShown(t *testing.T) {
 		t.Errorf("lines shown after the End: %q", got)
 	}
 }
+
+// A long line without an end costs as much as the same output in lines: a
+// piece cut from it does not copy what is left of it each time.
+func TestALongLineWithoutAnEndIsCutInLinearTime(t *testing.T) {
+	t.Parallel()
+
+	ctx, call, _ := showing(t, progress.Options{})
+	w := progress.Tee(ctx, io.Discard, progress.Stdout, nil)
+	const size = 8 << 20
+	unended := bytes.Repeat([]byte("x"), size)
+	lined := bytes.Repeat(append(bytes.Repeat([]byte("x"), 4<<10-1), '\n'), size/(4<<10))
+	timed := func(p []byte) time.Duration {
+		start := time.Now()
+		if n, err := w.Write(p); n != len(p) || err != nil {
+			t.Fatalf("Write = %d, %v", n, err)
+		}
+		return time.Since(start)
+	}
+	inLines := timed(lined)
+	inOne := timed(unended)
+	call.End(nil)
+	if inOne > 10*inLines+200*time.Millisecond {
+		t.Errorf("8 MiB without an end took %s, in lines %s", inOne, inLines)
+	}
+}

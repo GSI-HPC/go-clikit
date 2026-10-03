@@ -149,12 +149,7 @@ func (t *tee) frame(p []byte) {
 			}
 		}
 		if span != nil {
-			t.shown = append(t.shown, part...)
-			for len(t.shown) >= cutLine {
-				k := runeCut(t.shown, cutLine)
-				shown = append(shown, string(t.shown[:k]))
-				t.shown = append(t.shown[:0], t.shown[k:]...)
-			}
+			shown = t.pieces(shown, part)
 		}
 		if i < 0 {
 			break
@@ -178,6 +173,24 @@ func (t *tee) frame(p []byte) {
 	}
 	if span != nil {
 		span.show(t.stream, shown)
+	}
+}
+
+// pieces adds part to the line so far, and appends to lines the pieces of
+// 4 KiB it is cut into. The line so far is filled to one byte past a piece,
+// which is all runeCut looks at, and never holds more: so a long write is
+// copied once, not once for each piece cut from it. t.mu is held.
+func (t *tee) pieces(lines []string, part []byte) []string {
+	for {
+		n := min(cutLine+1-len(t.shown), len(part))
+		t.shown = append(t.shown, part[:n]...)
+		part = part[n:]
+		if len(t.shown) < cutLine {
+			return lines
+		}
+		k := runeCut(t.shown, cutLine)
+		lines = append(lines, string(t.shown[:k]))
+		t.shown = append(t.shown[:0], t.shown[k:]...)
 	}
 }
 
