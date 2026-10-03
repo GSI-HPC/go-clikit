@@ -45,7 +45,10 @@ type Options[T any] struct {
 	// the error its commands exit with, as Failure's text with an exit
 	// code of its own. interrupted says that every item that failed ended
 	// canceled, which the end of ctx does whether it was interrupted or ran
-	// out of time; errors.Is on errs, or ctx.Err, tells the two apart.
+	// out of time, and an error Classify classes as canceled does as well.
+	// ctx.Err, or context.Cause, tells an interrupt from a deadline: errs
+	// holds the context's error only for the items the pool left out,
+	// since an item cut short keeps the error its work returned.
 	Summarize func(n int, names []string, errs []error, interrupted bool) error
 	// Acquire, when it is set, takes what an item's work needs besides its
 	// place in the pool, such as a place on each host it goes to, and
@@ -395,10 +398,11 @@ var errGoexit = [...]error{
 // and none repeats, and otherwise as a list separated by commas, in the
 // order given, so that a name such as "config volume" is not read as two
 // hosts and the list names as many as the count. Its progress class is
-// ClassCanceled when interrupted says that the end of the context, an
-// interrupt or a deadline, ended the items, since the error of an item is
-// what its work returned, which need not say so, and ClassTarget
-// otherwise. It is nil when none failed.
+// ClassCanceled when interrupted is true, as Map passes it when every item
+// that failed ended canceled, such as when the context ended, by an
+// interrupt or a deadline, since the error of an item is what its work
+// returned, which need not say so; it is ClassTarget otherwise. It is nil
+// when none failed.
 func Failure(noun string, n int, names []string, errs []error, interrupted bool) error {
 	if len(names) == 0 {
 		return nil
