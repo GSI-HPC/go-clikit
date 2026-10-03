@@ -132,7 +132,8 @@ func newBus(c *Capture, opts []Option) *progress.Bus {
 // Nothing in it depends on how concurrent work was scheduled. Targets that
 // read the same once their own node and host are written {} are folded into
 // one line naming them as a node set, or listing them when a name is no
-// node or appears twice, as it does for a target that ran twice; siblings
+// node or a node is named twice, alone or in another name's node set, as it
+// is for a target that ran twice; siblings
 // are sorted by what they read, with numbers in their numeric order and
 // those that differ only in leading zeros, as x01 and x1, byte by byte; and
 // neither ids, times nor lines of output are drawn. A span not ended reads
@@ -272,18 +273,19 @@ func field(b *strings.Builder, key, value string) {
 }
 
 // fold names targets as a node set, or lists them when one of the names
-// does not read as itself in one, as "port 10" would not, or when a name is
-// given twice, as a target that ran twice would be, which a node set would
-// hide.
+// does not read as itself in one, as "port 10" would not, or when two names
+// share a node, as the names of a target that ran twice would, which a node
+// set would hide. A name that is itself a set, such as exe[1-2], shares its
+// nodes with every name that names one of them, whichever comes first.
 func fold(names []string) string {
 	set := nodeset.New()
 	for _, name := range names {
 		one, err := nodeset.Parse(name)
-		if err != nil || one.String() != name || set.Contains(name) {
+		if err != nil || one.String() != name || !set.Intersection(one).IsEmpty() {
 			slices.SortFunc(names, order)
 			return strings.Join(names, ",")
 		}
-		_ = set.Add(name)
+		set = set.Union(one)
 	}
 	return set.String()
 }
