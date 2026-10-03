@@ -151,7 +151,7 @@ The kit knows no program. What depends on one is a parameter or a hook:
 | The noun for the targets, "1 host" and "480 hosts" | `display.PlainOptions.Noun`, `fanout.Failure` |
 | What a display names an item by, and what an item needs besides its place in the pool | `fanout.MapOptions.Describe`, `fanout.MapOptions.Acquire` |
 | The terminal's size, whether the process is in its foreground, whether its locale shows UTF-8, and the interrupt | `display.NewTerminal`, `display.Terminal.Foreground`, the `ASCII` options, `display.TreeOptions.Interrupted` |
-| The trace another program handed on | `progress.ParseTraceContext`, with the values the program read from `TRACEPARENT` and `TRACESTATE` |
+| The trace another program handed on | `progress.BusOptions.Trace`, as `progress.ParseTraceContext` reads it from the values the program read from `TRACEPARENT` and `TRACESTATE` |
 | Where a panic's stack goes | the `PanicLog` options |
 
 What stays in the program: its flags and environment variables, which display

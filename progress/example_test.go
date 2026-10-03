@@ -100,7 +100,7 @@ func ExampleNewLog() {
 	bus := progress.NewBus(progress.BusOptions{
 		Sinks: []progress.Sink{log},
 		Now:   func() time.Time { return now },
-		Trace: progress.TraceID{0x4b, 0xf9, 0x2f, 0x35, 0x77, 0xb3, 0x4d, 0xa6, 0xa3, 0xce, 0x92, 0x9d, 0x0e, 0x0e, 0x47, 0x36},
+		Trace: progress.TraceContext{Trace: progress.TraceID{0x4b, 0xf9, 0x2f, 0x35, 0x77, 0xb3, 0x4d, 0xa6, 0xa3, 0xce, 0x92, 0x9d, 0x0e, 0x0e, 0x47, 0x36}},
 	})
 	ctx, command := progress.Start(progress.WithBus(context.Background(), bus), progress.KindCommand, "uptime")
 	_, call := progress.Start(ctx, progress.KindCall, "ssh", progress.Host("exe01.example.org"), progress.Timeout(time.Minute))
@@ -134,7 +134,7 @@ var spanID = regexp.MustCompile(`"(span|parent)":"[0-9a-f]{16}"`)
 func ExampleParseTraceContext() {
 	tc, ok := progress.ParseTraceContext("00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01", "rojo=00f067aa0ba902b7")
 	fmt.Println(ok, tc.Trace, tc.Parent, tc.Flags, tc.State)
-	bus := progress.NewBus(progress.BusOptions{Trace: tc.Trace, Parent: tc.Parent, TraceFlags: tc.Flags, TraceState: tc.State})
+	bus := progress.NewBus(progress.BusOptions{Trace: tc})
 	defer bus.Close()
 
 	_, ok = progress.ParseTraceContext("00-00000000000000000000000000000000-00f067aa0ba902b7-01", "")

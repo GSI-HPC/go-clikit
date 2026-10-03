@@ -23,16 +23,12 @@ type BusOptions struct {
 	Sinks []Sink
 	// Now is the clock the events are stamped with; nil is time.Now.
 	Now func() time.Time
-	// Trace is the trace the spans belong to; zero draws one at random.
-	Trace TraceID
-	// Parent, TraceFlags and TraceState say where Trace came from when
-	// another program handed it on, as ParseTraceContext reads them: the
-	// span of that program's the work runs under, the trace flags and
-	// the tracestate. They are recorded, for an event log, and change
-	// nothing else; without a Trace they are ignored.
-	Parent     SpanID
-	TraceFlags byte
-	TraceState string
+	// Trace is the trace the spans belong to, as ParseTraceContext reads
+	// it from another program that handed it on. Its Parent, Flags and
+	// State say where the trace came from; they are recorded, for an
+	// event log, and change nothing else. A zero Trace.Trace draws a
+	// trace at random, and the rest of Trace is then ignored.
+	Trace TraceContext
 	// PanicLog receives the stack of a sink that panicked, the front
 	// end's diagnostics; nil is the process's standard error.
 	PanicLog io.Writer
@@ -101,7 +97,7 @@ func NewBus(o BusOptions) *Bus {
 		panicLog: o.PanicLog,
 		program:  o.Program,
 		classify: o.Classify,
-		trace:    TraceContext{Trace: o.Trace, Parent: o.Parent, Flags: o.TraceFlags, State: o.TraceState},
+		trace:    o.Trace,
 	}
 	if b.now == nil {
 		b.now = time.Now
