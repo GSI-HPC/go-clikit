@@ -58,12 +58,19 @@ func Classify(err error, fallback func(error) Class) Class {
 // fanout do not count such an item among those that failed. Test for it
 // with errors.Is, since the error Skip returns, and one that wraps it,
 // say why instead.
+//
+// errors.Is looks through every error an error joins, so one that joins a
+// skip with a failure, by errors.Join or fmt.Errorf with two %w verbs,
+// counts as a skip, and the failure goes uncounted. Work that gathers the
+// errors of its parts returns a skip only when every part was skipped.
 var ErrSkipped = errors.New("skipped")
 
 // Skip returns an error that says work was left out on purpose, for the
 // reason given: its text is reason, and errors.Is finds ErrSkipped in it.
 // Span.End ends a span with it skipped, with reason as its Err, as
-// Span.Skip does.
+// Span.Skip does. An error that joins it with a failure counts as a skip
+// too, as ErrSkipped says, so it is returned only when all the work was
+// left out.
 func Skip(reason string) error { return &skipped{reason: reason} }
 
 // skipped is the error of work left out on purpose, as Skip makes it.

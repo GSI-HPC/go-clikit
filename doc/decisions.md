@@ -686,6 +686,10 @@ away from for `errors.Is` and a sentinel.
 
 - `Span.End` behaves otherwise for an error that is `ErrSkipped`, which an
   error opts into; one that wraps `ErrSkipped` by accident ends skipped.
+  So does one that joins a skip with a failure, since `errors.Is` looks
+  through every error joined: a `Batches` run that joins its nodes'
+  errors returns a skip only when every node was skipped, which the doc
+  comments of `ErrSkipped`, `Skip`, `Span.End`, `Map` and `Batches` say.
 - An item whose skip is wrapped, `fmt.Errorf("exe01: %w", progress.Skip(r))`,
   ends with the whole text as its Err, not the reason alone as before.
 - `Bus.Classify` and `progress.Classify` know nothing of skips; only `End`
