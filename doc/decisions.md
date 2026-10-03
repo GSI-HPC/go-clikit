@@ -22,6 +22,7 @@ edited: a later one supersedes it, and the earlier one's status names it.
 | [11](#11-a-deadline-ends-a-pools-items-as-an-interrupt-does) | A deadline ends a pool's items as an interrupt does | accepted |
 | [13](#13-the-skip-error-lives-in-progress) | The skip error lives in progress | accepted |
 | [14](#14-the-escape-deny-list-may-grow-in-a-minor-release) | The escape deny-list may grow in a minor release | accepted |
+| [15](#15-a-new-or-stricter-check-rule-is-a-breaking-change) | A new or stricter Check rule is a breaking change | accepted |
 
 ## 1. Apache-2.0, and GSI holds the copyright
 
@@ -679,3 +680,37 @@ would wait for a major release or be weighed against one.
   a consumer's test that compares such text changes with the release.
 - An event log written before the change and one written after can hold
   the same text in two forms.
+
+## 15. A new or stricter Check rule is a breaking change
+
+Status: accepted
+
+### Context
+
+`progresstest.Check` holds the events of a Bus to the promises the
+progress package makes to every sink: the order of spans, the work
+announced up front, the limits, the suspends and the bounds of the text.
+The kit tests itself with it, and programs call it, directly or through
+`Watch`, in their own tests, which pass or fail by its rules. Nothing said
+whether a rule may be added or tightened in a minor release, and a rule
+added without notice would fail a program's tests on an upgrade although
+the program had not changed.
+
+### Decision
+
+- Each rule `Check` enforces is a promise the progress package makes to
+  every sink, and the rules are an interface beyond the Go API, next to
+  the span kinds, the event log and the text the displays draw.
+- A new rule, or a stricter one, is a breaking change, named in the
+  release notes.
+- A rule that catches what an existing promise already forbade, such as a
+  case the rule missed, is a fix, released as any other.
+- No option selects which rules run: a test that cannot keep a rule
+  breaks a promise a display relies on.
+
+### Costs
+
+- A promise the progress package adds waits for a breaking release before
+  `Check` holds anyone's tests to it.
+- Telling a fix from a stricter rule is a judgement, made in review by
+  whether the promise was already written down.

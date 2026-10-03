@@ -416,6 +416,11 @@ func digits(s string) int {
 //  5. Every Suspend is followed by one Resume.
 //  6. No text holds anything termtext.Escape would escape, and none is
 //     longer than its bound. Hidden and ShowLines are passed down.
+//
+// Each rule is a promise the progress package makes to every sink. A new
+// or stricter rule is a breaking change, named in the release notes; a
+// rule that catches what an existing promise already forbade is a fix
+// (decision 15). No option selects which rules run.
 func Check(t testing.TB, events []progress.Event) {
 	t.Helper()
 	problems := violations(events)
