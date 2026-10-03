@@ -4,6 +4,7 @@
 package display_test
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"regexp"
@@ -387,6 +388,49 @@ func TestThePanicOfADisplayTakesItsRegionOff(t *testing.T) {
 			t.Errorf("after the panic, before Close, the log has %q", log.String())
 		}
 		counter.Close()
+	})
+}
+
+// A display that panics while it holds lines to write above its region,
+// here the line of a step that finished since the last frame, writes them
+// before its stack, in the order they were given, as a frame would have.
+func TestThePanicOfADisplayWritesWhatItHeldFirst(t *testing.T) {
+	t.Parallel()
+	synctest.Test(t, func(t *testing.T) {
+		s := &progresstest.Screen{}
+		var mu sync.Mutex
+		broken := false
+		term := display.NewTerminal(s, func() (int, int, error) {
+			mu.Lock()
+			defer mu.Unlock()
+			if broken {
+				panic("the size of the terminal")
+			}
+			return 100, 24, nil
+		})
+		tree := display.NewTree(term, display.TreeOptions{})
+		bus := progress.NewBus(progress.Options{Sinks: []progress.Sink{tree}})
+		ctx, command := progress.Start(progress.WithBus(context.Background(), bus), progress.KindCommand, "cmd")
+		tree.Start()
+		time.Sleep(2 * time.Second)
+		synctest.Wait()
+		_, step := progress.Start(ctx, progress.KindStep, "the first step")
+		time.Sleep(2 * time.Second)
+		step.End(nil)
+		synctest.Wait()
+		mu.Lock()
+		broken = true
+		mu.Unlock()
+		time.Sleep(time.Second)
+		synctest.Wait()
+		got := s.String()
+		held, stack := strings.Index(got, "the first step"), strings.Index(got, "the progress display stopped")
+		if held < 0 || stack < 0 || held > stack {
+			t.Errorf("after the panic, the screen shows %q, want the step's line and then the stack", got)
+		}
+		command.End(nil)
+		bus.Close()
+		tree.Close()
 	})
 }
 
