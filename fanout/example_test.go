@@ -18,15 +18,16 @@ import (
 )
 
 // Map works on every item, a bounded number at a time, and returns what
-// each came to in the order of the items. A Capture shows what it
-// reported: a Fold step with a target for each item.
+// each came to in the order of the items, and the error its step ended
+// with. A Capture shows what it reported: a Fold step with a target for
+// each item.
 func ExampleMap() {
 	capture := &progresstest.Capture{}
 	bus := progress.NewBus(progress.BusOptions{Sinks: []progress.Sink{capture}})
 	ctx := progress.WithBus(context.Background(), bus)
 
 	nodes := []string{"exe01", "exe02", "exe03", "exe04"}
-	outcomes := fanout.Map(ctx, nodes, fanout.MapOptions[string]{Step: "uptime", Limit: 2},
+	outcomes, err := fanout.Map(ctx, nodes, fanout.MapOptions[string]{Step: "uptime", Limit: 2},
 		func(_ context.Context, node string) (string, error) {
 			if node == "exe03" {
 				return "", fmt.Errorf("%s: no answer", node)
@@ -36,6 +37,7 @@ func ExampleMap() {
 	for i, o := range outcomes {
 		fmt.Println(nodes[i], o.Value, o.Err)
 	}
+	fmt.Println(err)
 	bus.Close()
 	fmt.Print(capture.Tree())
 	// Output:
@@ -43,6 +45,7 @@ func ExampleMap() {
 	// exe02 EXE02 <nil>
 	// exe03  exe03: no answer
 	// exe04 EXE04 <nil>
+	// 1 of 4 failed: exe03
 	// step uptime total=4 limit=2 [fold]: failed (target): 1 of 4 failed: exe03
 	//   target exe03: failed (target): {}: no answer
 	//   target exe[01-02,04]: ok
@@ -136,7 +139,7 @@ func ExampleFailure() {
 // A skip, an error of progress.Skip, leaves an item out on purpose: its
 // target ends skipped, and it is not counted among those that failed.
 func ExampleMap_skip() {
-	outcomes := fanout.Map(context.Background(), []string{"exe01", "exe02"}, fanout.MapOptions[string]{Step: "push"},
+	outcomes, _ := fanout.Map(context.Background(), []string{"exe01", "exe02"}, fanout.MapOptions[string]{Step: "push"},
 		func(_ context.Context, node string) (struct{}, error) {
 			if node == "exe02" {
 				return struct{}{}, progress.Skip("nothing to push")

@@ -128,8 +128,8 @@ keeps it without a line of the caller's.
 - **The pools.** `fanout.Each` is the one loop every pool runs on: at most
   its limit at a time, and nothing started once the context has ended, so an
   interrupt stops every pool the same way. `Map` returns what each item came
-  to in the order the items were given, whatever order they finished in, and
-  turns a panic in one item's work, or in what it acquired and released for
+  to in the order the items were given, whatever order they finished in,
+  with the error its step ended with, and turns a panic in one item's work, or in what it acquired and released for
   it, into that item's error, since `recover` reaches only its own
   goroutine. Work, an acquire or a release that calls `runtime.Goexit`, as
   `t.FailNow` does, fails its item with an error that says which of them
