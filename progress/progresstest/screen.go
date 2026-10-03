@@ -29,7 +29,9 @@ import (
 // Every row is kept, those that have scrolled off the top too, so that what
 // a Screen shows is the scrollback and the screen in one. With Width set, a
 // row wraps at that column, as a terminal's does, so that a row drawn too
-// long shows as the two it is. A Screen is safe for concurrent use.
+// long shows as the two it is. A wide rune, as CJK text and emoji are,
+// takes two columns; writing over either half of one blanks the other. A
+// Screen is safe for concurrent use.
 type Screen struct {
 	// Width is the number of columns, at which a row wraps; 0 is a row
 	// that never does.
@@ -138,12 +140,16 @@ func (s *Screen) escape(b []byte) (int, bool) {
 	return end + 1, true
 }
 
-// cut erases the row the cursor is on from the cursor to its end.
+// cut erases the row the cursor is on from the cursor to its end, and a
+// wide rune whose right half the cursor is on with it.
 func (s *Screen) cut() {
 	s.at()
 	row := s.rows[s.row]
-	if s.col < len(row) {
-		s.rows[s.row] = row[:s.col]
+	if col := s.col; col < len(row) {
+		if row[col] == wideRest {
+			col--
+		}
+		s.rows[s.row] = row[:col]
 	}
 }
 
@@ -166,7 +172,8 @@ const wideRest = rune(0)
 
 // put writes r where the cursor is, over what was there. A wide rune, as
 // CJK text and emoji are, takes two columns, and wraps when only one is
-// left, as it does on a terminal.
+// left, as it does on a terminal; writing over half of one blanks the other
+// half.
 func (s *Screen) put(r rune) {
 	w := max(1, termtext.RuneWidth(r))
 	if s.Width > 0 && s.col+w > s.Width {
@@ -177,6 +184,12 @@ func (s *Screen) put(r rune) {
 	row := s.rows[s.row]
 	for len(row) < s.col+w {
 		row = append(row, ' ')
+	}
+	if row[s.col] == wideRest {
+		row[s.col-1] = ' '
+	}
+	if next := s.col + w; next < len(row) && row[next] == wideRest {
+		row[next] = ' '
 	}
 	row[s.col] = r
 	if w == 2 {
