@@ -23,10 +23,10 @@ import (
 // newline and bytes that are not UTF-8 as a visible escape such as \x1b.
 // The result is cut on a rune boundary.
 //
-// The Bus applies it to every text of an event, cut to MaxText, MaxErr or
-// MaxField and Node to none, so neither the work that reports a span nor a sink
-// ever needs to call it. A program that shows text from elsewhere outside a
-// Bus may call it to the same end.
+// The Bus applies it to every text of an event, each cut to its bound,
+// MaxText, MaxErr or MaxField, and Node to none, so neither the work that
+// reports a span nor a sink ever needs to call it. A program that shows
+// text from elsewhere outside a Bus may call it to the same end.
 func Sanitize(s string, limit int) string {
 	if strings.IndexByte(s, '\r') >= 0 {
 		s = foldCR(s, limit)
