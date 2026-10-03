@@ -36,6 +36,15 @@
 // text in scripts that need joiners and marks too. A caller that compares
 // names should not rely on this package to make look-alikes visible.
 //
+// The escapes are for a reader, not for decoding: a backslash is written as
+// it is, so text that holds the four characters \x1b looks the same as text
+// whose ESC was escaped, and the original cannot always be recovered from
+// what is shown. Escaping the backslash too would double every backslash
+// in a path or a pattern, and would make escaped text change each time it
+// is escaped again, which the callers of EscapeCell rely on it not to. A
+// program that has to tell the two apart keeps the text as it came, not
+// escaped.
+//
 // # Widths
 //
 // RuneWidth and Width approximate the columns a terminal gives text: two

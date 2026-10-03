@@ -47,6 +47,9 @@ func TestEscapeCell(t *testing.T) {
 		{"bad\nexe0002  idle   fine", `bad\nexe0002  idle   fine`},
 		{"cr\rtab\t", `cr\rtab\t`},
 		{hostile, `ok\r\x1b[1Aexe0001: \x1b]52;c;ZXZpbA==\x07evil`},
+		// A backslash is written as it is, so a literal escape looks like
+		// one the escaper wrote; the package comment says why.
+		{`C:\temp\x1b`, `C:\temp\x1b`},
 	}
 	for _, tc := range tests {
 		if got := termtext.EscapeCell(tc.in); got != tc.want {
