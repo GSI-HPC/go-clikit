@@ -596,6 +596,53 @@ func TestASinkThatPanicsIsRemoved(t *testing.T) {
 	}
 }
 
+// asker is a LineSink that counts how often it is asked for lines, and
+// panics when asked if it is told to.
+type asker struct {
+	asks, seen int
+	panics     bool
+}
+
+func (a *asker) Handle(progress.Event) { a.seen++ }
+
+func (a *asker) WantsLines() bool {
+	a.asks++
+	if a.panics {
+		panic("asked for lines")
+	}
+	return true
+}
+
+// The Bus asks each sink for lines once, when it is made, however many
+// sinks are removed later, and a sink that panics when asked is removed.
+func TestASinkIsAskedForLinesOnce(t *testing.T) {
+	t.Parallel()
+
+	var log bytes.Buffer
+	bad, good := &asker{panics: true}, &asker{}
+	bus := progress.NewBus(progress.Options{
+		Sinks:    []progress.Sink{bad, &panicky{n: 1}, &panicky{n: 2}, good},
+		PanicLog: &log,
+	})
+	ctx, span := progress.Start(progress.WithBus(context.Background(), bus), progress.KindCall, "ssh", progress.WithFlags(progress.ShowLines))
+	var buf bytes.Buffer
+	if w := progress.Tee(ctx, &buf, progress.Stdout, nil); w == &buf {
+		t.Error("Tee returned the writer itself, although a sink still wants the lines")
+	}
+	span.End(nil)
+	bus.Close()
+
+	if bad.asks != 1 || good.asks != 1 {
+		t.Errorf("the sinks were asked for lines %d and %d times, want once each", bad.asks, good.asks)
+	}
+	if bad.seen != 0 {
+		t.Errorf("the sink that panicked when asked for lines was sent %d events", bad.seen)
+	}
+	if n := strings.Count(log.String(), "a progress display panicked"); n != 3 {
+		t.Errorf("the panic log tells of %d panics, want 3", n)
+	}
+}
+
 // terminal is a Suspender that records its calls, and checks that the Bus
 // is not locked while it is called.
 type terminal struct {

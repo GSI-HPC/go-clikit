@@ -54,8 +54,11 @@ type Bus struct {
 	// from interleaving with another's.
 	suspending sync.Mutex
 
-	mu       sync.Mutex
-	sinks    []Sink
+	mu    sync.Mutex
+	sinks []Sink
+	// liners are the sinks that asked for lines, and lines says there
+	// are any.
+	liners   []Sink
 	lines    bool
 	now      func() time.Time
 	panicLog io.Writer
@@ -100,7 +103,7 @@ func NewBus(o Options) *Bus {
 	b.base = binary.BigEndian.Uint64(base[:])
 	b.mu.Lock()
 	b.begin()
-	b.lines = b.wantLines()
+	b.ask()
 	b.mu.Unlock()
 	return b
 }
@@ -533,18 +536,27 @@ func (b *Bus) safely(f func()) (ok bool) {
 // remove takes sink off the Bus. b.mu is held.
 func (b *Bus) remove(sink Sink) {
 	b.sinks = slices.DeleteFunc(b.sinks, func(s Sink) bool { return s == sink })
-	b.lines = b.wantLines()
+	b.liners = slices.DeleteFunc(b.liners, func(s Sink) bool { return s == sink })
+	b.lines = len(b.liners) > 0
 }
 
-// wantLines reports whether a sink asks for lines. b.mu is held.
-func (b *Bus) wantLines() bool {
-	for _, s := range b.sinks {
+// ask asks each sink once whether it wants the lines, and removes one that
+// panics. b.mu is held.
+func (b *Bus) ask() {
+	for i := 0; i < len(b.sinks); i++ {
+		ls, ok := b.sinks[i].(LineSink)
+		if !ok {
+			continue
+		}
 		want := false
-		if ls, ok := s.(LineSink); ok && b.safely(func() { want = ls.WantsLines() }) && want {
-			return true
+		if !b.safely(func() { want = ls.WantsLines() }) {
+			b.sinks = slices.Delete(b.sinks, i, i+1)
+			i--
+		} else if want {
+			b.liners = append(b.liners, b.sinks[i])
 		}
 	}
-	return false
+	b.lines = len(b.liners) > 0
 }
 
 // sanitizeFields makes the text fields of f that differ from those of prev
