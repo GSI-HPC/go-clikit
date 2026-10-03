@@ -129,9 +129,11 @@ keeps it without a line of the caller's.
   its limit at a time, and nothing started once the context has ended, so an
   interrupt stops every pool the same way. `Map` returns what each item came
   to in the order the items were given, whatever order they finished in,
-  with the error its step ended with, and turns a panic in one item's work, or in what it acquired and released for
-  it, into that item's error, since `recover` reaches only its own
-  goroutine. Work, an acquire or a release that calls `runtime.Goexit`, as
+  with the error its step ended with, and turns a panic in one item's
+  work, or in what it acquired and released for it, into that item's
+  error, since `recover` reaches only its own goroutine; `Each` and
+  `Batches` recover nothing, and a panic in a batch goes up the goroutine
+  that called `Batches`. Work, an acquire or a release that calls `runtime.Goexit`, as
   `t.FailNow` does, fails its item with an error that says which of them
   did, rather than pass for done, and loses nothing else that broke the
   item. The end of the context, an interrupt or a deadline alike, ends the
