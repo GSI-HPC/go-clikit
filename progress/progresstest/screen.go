@@ -29,9 +29,12 @@ import (
 // Every row is kept, those that have scrolled off the top too, so that what
 // a Screen shows is the scrollback and the screen in one. With Width set, a
 // row wraps at that column, as a terminal's does, so that a row drawn too
-// long shows as the two it is. A wide rune, as CJK text and emoji are,
-// takes two columns; writing over either half of one blanks the other. A
-// Screen is safe for concurrent use.
+// long shows as the two it is. As on a terminal, the wrap waits for the next
+// rune: a row written to its last column leaves the cursor on that column,
+// where ESC [ K erases the last rune and a carriage return or a newline
+// wraps nothing. A wide rune, as CJK text and emoji are, takes two columns;
+// writing over either half of one blanks the other. A Screen is safe for
+// concurrent use.
 type Screen struct {
 	// Width is the number of columns, at which a row wraps; 0 is a row
 	// that never does.
@@ -40,6 +43,9 @@ type Screen struct {
 	mu       sync.Mutex
 	rows     [][]rune
 	row, col int
+	// wrap is set when a rune has filled the last column, and the next one
+	// starts the next row.
+	wrap bool
 	// pending is the start of a sequence or of a rune that the next
 	// write completes.
 	pending []byte
@@ -72,10 +78,12 @@ func (s *Screen) feed(b []byte, end bool) []byte {
 		case c == '\n':
 			s.row++
 			s.col = 0
+			s.wrap = false
 			s.at()
 			b = b[1:]
 		case c == '\r':
 			s.col = 0
+			s.wrap = false
 			b = b[1:]
 		case c < 0x20 || c == 0x7f:
 			s.text(fmt.Sprintf("^%c", c^0x40))
@@ -126,9 +134,11 @@ func (s *Screen) escape(b []byte) (int, bool) {
 	switch {
 	case final == 'A' && err == nil:
 		s.row = max(0, s.row-max(n, 1))
+		s.wrap = false
 	case final == 'K' && param == "2":
 		s.at()
 		s.rows[s.row] = s.rows[s.row][:0]
+		s.wrap = false
 	case final == 'K' && n == 0 && err == nil:
 		s.cut()
 	case final == 'J' && n == 0 && err == nil:
@@ -151,6 +161,7 @@ func (s *Screen) cut() {
 		}
 		s.rows[s.row] = row[:col]
 	}
+	s.wrap = false
 }
 
 // at makes sure the row the cursor is on exists.
@@ -173,13 +184,15 @@ const wideRest = rune(0)
 // put writes r where the cursor is, over what was there. A wide rune, as
 // CJK text and emoji are, takes two columns, and wraps when only one is
 // left, as it does on a terminal; writing over half of one blanks the other
-// half.
+// half. A rune that fills the last column leaves the cursor on it, and the
+// next rune wraps.
 func (s *Screen) put(r rune) {
 	w := max(1, termtext.RuneWidth(r))
-	if s.Width > 0 && s.col+w > s.Width {
+	if s.Width > 0 && (s.wrap || s.col+w > s.Width) {
 		s.row++
 		s.col = 0
 	}
+	s.wrap = false
 	s.at()
 	row := s.rows[s.row]
 	for len(row) < s.col+w {
@@ -197,6 +210,10 @@ func (s *Screen) put(r rune) {
 	}
 	s.rows[s.row] = row
 	s.col += w
+	if s.Width > 0 && s.col >= s.Width {
+		s.col = s.Width - 1
+		s.wrap = true
+	}
 }
 
 // String returns what the screen shows, each row ended by a newline, up to
@@ -208,7 +225,7 @@ func (s *Screen) String() string {
 	defer s.mu.Unlock()
 	rows := s.rows
 	if len(s.pending) > 0 {
-		v := &Screen{Width: s.Width, rows: make([][]rune, len(s.rows)), row: s.row, col: s.col}
+		v := &Screen{Width: s.Width, rows: make([][]rune, len(s.rows)), row: s.row, col: s.col, wrap: s.wrap}
 		for i, row := range s.rows {
 			v.rows[i] = append([]rune(nil), row...)
 		}
