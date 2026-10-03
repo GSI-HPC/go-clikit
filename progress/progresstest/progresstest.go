@@ -363,8 +363,7 @@ type span struct {
 	total   int
 	open    int
 	running int
-	// ran is set once a target or a batch below this Fold step or batch
-	// has run.
+	// ran is set once a span this span announces up front has run.
 	ran bool
 }
 
@@ -375,6 +374,19 @@ func (s *span) String() string {
 // counts reports whether s counts the targets below it against its Total.
 func (s *span) counts() bool {
 	return s.e.Kind == progress.KindBatch || s.e.Kind == progress.KindStep && s.e.Flags&progress.Fold != 0
+}
+
+// announces reports whether s announces the spans of kind k below it up
+// front: the targets of a Fold step or a batch, and the batches of any
+// step, Fold or not.
+func (s *span) announces(k progress.Kind) bool {
+	switch k {
+	case progress.KindTarget:
+		return s.counts()
+	case progress.KindBatch:
+		return s.counts() || s.e.Kind == progress.KindStep
+	}
+	return false
 }
 
 func violations(events []progress.Event) []string {
@@ -456,7 +468,7 @@ func violations(events []progress.Event) []string {
 					if missing := p.e.Flags & (progress.Hidden | progress.ShowLines) &^ e.Flags; missing != 0 {
 						bad("%s lacks the %s of its parent", s, missing)
 					}
-					if p.counts() && (e.Kind == progress.KindTarget || e.Kind == progress.KindBatch) {
+					if p.announces(e.Kind) {
 						if e.State != progress.StateQueued {
 							bad("%s is not queued under %s", s, p)
 						}
@@ -494,7 +506,7 @@ func violations(events []progress.Event) []string {
 				bad("event %d runs %s, which was not queued", e.Seq, s)
 			}
 			s.state = progress.StateRunning
-			if p := s.parent; p != nil && p.counts() && (s.e.Kind == progress.KindTarget || s.e.Kind == progress.KindBatch) {
+			if p := s.parent; p != nil && p.announces(s.e.Kind) {
 				p.ran = true
 			}
 			if s.e.Kind == progress.KindTarget {

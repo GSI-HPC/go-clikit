@@ -343,3 +343,29 @@ func TestTreeOrdersNamesThatDifferInLeadingZeros(t *testing.T) {
 		t.Errorf("the names listed depend on their order: %q and %q", a, b)
 	}
 }
+
+// The batches of a step are announced queued before the first runs,
+// whether the step folds its targets or not.
+func TestCheckHoldsTheBatchesOfEveryStep(t *testing.T) {
+	t.Parallel()
+
+	bat := progress.KindBatch
+	staggered := events{}.add(start, 1, 0, step).
+		add(start, 2, 1, bat, queued).add(run, 2, 1, bat).add(end, 2, 1, bat).
+		add(start, 3, 1, bat, queued).add(run, 3, 1, bat).add(end, 3, 1, bat).
+		add(end, 1, 0, step)
+	if problems := strings.Join(violations(staggered), "\n"); !strings.Contains(problems, "after another has run") {
+		t.Errorf("violations %q, want one saying a batch is announced after another has run", problems)
+	}
+	running := events{}.add(start, 1, 0, step).add(start, 2, 1, bat).add(end, 2, 1, bat).add(end, 1, 0, step)
+	if problems := strings.Join(violations(running), "\n"); !strings.Contains(problems, "is not queued under") {
+		t.Errorf("violations %q, want one saying a batch is not queued", problems)
+	}
+	upFront := events{}.add(start, 1, 0, step).
+		add(start, 2, 1, bat, queued).add(start, 3, 1, bat, queued).
+		add(run, 2, 1, bat).add(end, 2, 1, bat).add(run, 3, 1, bat).add(end, 3, 1, bat).
+		add(end, 1, 0, step)
+	if problems := violations(upFront); len(problems) > 0 {
+		t.Errorf("violations of batches announced up front: %q", problems)
+	}
+}
