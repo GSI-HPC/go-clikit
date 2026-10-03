@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"runtime"
 	"strings"
 	"sync/atomic"
@@ -573,6 +574,43 @@ func TestMapTurnsAPanicInAReleaseIntoThatItemsFailure(t *testing.T) {
 	}
 	if !strings.Contains(log.String(), `panic while working on exe1: "release exe1"`) {
 		t.Errorf("the log has no stack for the release of exe1:\n%s", log.String())
+	}
+}
+
+// A panic in the release fails the item whatever the work returned: an
+// error of Skip does not leave the item out, and an error of a context that
+// has ended does not end it canceled.
+func TestMapFailsAnItemWhoseReleasePanickedWhateverTheWorkReturned(t *testing.T) {
+	t.Parallel()
+
+	cause, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	ctx, tree := progresstest.Watch(cause, t)
+	outcomes := fanout.Map(ctx, nodes(2), fanout.Options[string]{
+		Step: "check", Limit: 1, PanicLog: io.Discard,
+		Acquire: func(_ context.Context, node string) (func(), error) {
+			return func() { panic("release " + node) }, nil
+		},
+	}, func(ctx context.Context, node string) (struct{}, error) {
+		if node == "exe1" {
+			return struct{}{}, fanout.Skip("dry run")
+		}
+		cancel()
+		return struct{}{}, ctx.Err()
+	})
+	var p *fanout.PanicError
+	if o := outcomes[0]; fanout.IsSkipped(o.Err) || !errors.As(o.Err, &p) || p.Value != "release exe1" {
+		t.Errorf("exe1 = %+v, want the panic of its release, not skipped", o)
+	}
+	if o := outcomes[1]; !errors.Is(o.Err, context.Canceled) || !errors.As(o.Err, &p) || p.Value != "release exe2" {
+		t.Errorf("exe2 = %+v, want the context's error and the panic of its release", o)
+	}
+	want := `step check total=2 limit=1 [fold]: failed (target): 2 of 2 failed: exe[1-2]
+  target exe1: failed (target): the program panicked; this is a bug, please report it: "release {}"
+  target exe2: failed (target): context canceled\nthe program panicked; this is a bug, please report it: "release {}"
+`
+	if got := tree(); got != want {
+		t.Errorf("tree:\n%s\nwant:\n%s", got, want)
 	}
 }
 
