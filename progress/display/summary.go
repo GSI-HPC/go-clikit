@@ -109,7 +109,7 @@ func (s *Summary) finish(e progress.Event, count progress.Count, counted bool) {
 		// A batch or a Fold step left out before any target of its own
 		// started counts as its Total, as Tally has it: as its nodes,
 		// each once with the others, when it names as many as that.
-		if left := e.Status == progress.StatusSkipped || e.Status == progress.StatusCanceled; left && count.Targets == 0 {
+		if left := e.Status == progress.StatusSkipped || e.Status == progress.StatusCanceled; left && count.Started == 0 {
 			if set, err := nodeset.Parse(e.Node); err == nil && set.Len() == count.Total {
 				for _, node := range set.Expand() {
 					s.node(node, e.Status)
