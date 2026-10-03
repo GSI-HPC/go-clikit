@@ -321,6 +321,40 @@ func TestTreeListsATargetThatRanTwice(t *testing.T) {
 	}
 }
 
+// A node named twice, once alone and once in another target's node set or
+// in two node sets, is listed, whichever name comes first.
+func TestFoldListsANodeNamedTwiceInEitherOrder(t *testing.T) {
+	t.Parallel()
+
+	for _, tc := range []struct {
+		names []string
+		want  string
+	}{
+		{[]string{"exe1", "exe[1-2]"}, "exe1,exe[1-2]"},
+		{[]string{"exe[1-2]", "exe1"}, "exe1,exe[1-2]"},
+		{[]string{"exe[1-2]", "exe[2-3]"}, "exe[1-2],exe[2-3]"},
+		{[]string{"exe[2-3]", "exe[1-2]"}, "exe[1-2],exe[2-3]"},
+		{[]string{"exe3", "exe[1-2]"}, "exe[1-3]"},
+	} {
+		if got := fold(append([]string(nil), tc.names...)); got != tc.want {
+			t.Errorf("fold(%q) = %q, want %q", tc.names, got, tc.want)
+		}
+	}
+	for _, names := range [][]string{{"exe1", "exe[1-2]"}, {"exe[1-2]", "exe1"}} {
+		es := events{}.add(start, 1, 0, step)
+		for i, name := range names {
+			es = es.add(start, progress.SpanID(i+2), 1, tgt, func(e *progress.Event) { e.Name = name })
+		}
+		for i := range names {
+			es = es.add(end, progress.SpanID(i+2), 1, tgt)
+		}
+		es = es.add(end, 1, 0, step)
+		if got, want := tree(es), "step s1: ok\n  target exe1,exe[1-2]: ok\n"; got != want {
+			t.Errorf("tree of %q:\n%s\nwant:\n%s", names, got, want)
+		}
+	}
+}
+
 // Siblings whose numbers differ only in leading zeros are drawn in the
 // same order whichever started first.
 func TestTreeOrdersNamesThatDifferInLeadingZeros(t *testing.T) {
