@@ -19,7 +19,7 @@ import (
 // step runs a counted step over nodes, each ending with what outcome says
 // of it, nil for ok.
 func step(ctx context.Context, name string, nodes []string, outcome map[string]error) {
-	fanout.Map(ctx, nodes, fanout.Options[string]{Step: name, Limit: 1},
+	fanout.Map(ctx, nodes, fanout.MapOptions[string]{Step: name, Limit: 1},
 		func(_ context.Context, node string) (struct{}, error) { return struct{}{}, outcome[node] })
 }
 

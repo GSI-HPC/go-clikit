@@ -416,7 +416,7 @@ func TestAFastFailureKeepsItsLine(t *testing.T) {
 	quick := func(name string, err error, below bool) {
 		ctx, step := progress.Start(f.ctx, progress.KindStep, name)
 		if below {
-			fanout.Map(ctx, []string{"exe1"}, fanout.Options[string]{Step: "clearing the boot overrides"},
+			fanout.Map(ctx, []string{"exe1"}, fanout.MapOptions[string]{Step: "clearing the boot overrides"},
 				func(context.Context, string) (struct{}, error) { return struct{}{}, nil })
 		}
 		f.clock.Add(40 * time.Millisecond)
@@ -779,7 +779,7 @@ exec · 0:02
 func TestAStepOfATargetIsPartOfItsRow(t *testing.T) {
 	t.Parallel()
 	f := newTreeFixture(t, "secrets push", treeSetup{})
-	fanout.Map(f.ctx, []string{"exe1", "exe2"}, fanout.Options[string]{Step: "write the secrets", Limit: 1},
+	fanout.Map(f.ctx, []string{"exe1", "exe2"}, fanout.MapOptions[string]{Step: "write the secrets", Limit: 1},
 		func(ctx context.Context, node string) (struct{}, error) {
 			for _, file := range []string{"/etc/munge/munge.key", "/etc/ssh/ssh_host_ed25519_key"} {
 				ctx, step := progress.Start(ctx, progress.KindStep, "write "+file)

@@ -44,7 +44,7 @@ func TestMapKeepsTheOrderOfTheItems(t *testing.T) {
 	t.Parallel()
 
 	items := nodes(5)
-	outcomes := fanout.Map(context.Background(), items, fanout.Options[string]{Limit: 5},
+	outcomes := fanout.Map(context.Background(), items, fanout.MapOptions[string]{Limit: 5},
 		func(_ context.Context, node string) (string, error) {
 			// The first finishes last, which must not move it.
 			if node == "exe1" {
@@ -85,7 +85,7 @@ func TestMapKeepsToItsLimit(t *testing.T) {
 			synctest.Test(t, func(t *testing.T) {
 				var now, peak, started atomic.Int32
 				ctx, tree := progresstest.Watch(context.Background(), t)
-				fanout.Map(ctx, nodes(tc.items), fanout.Options[string]{Step: "scan", Limit: tc.limit},
+				fanout.Map(ctx, nodes(tc.items), fanout.MapOptions[string]{Step: "scan", Limit: tc.limit},
 					func(context.Context, string) (struct{}, error) {
 						started.Add(1)
 						n := now.Add(1)
@@ -120,7 +120,7 @@ func TestMapStartsNothingOnceCancelled(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		cancel()
 		var ran atomic.Int32
-		outcomes := fanout.Map(ctx, nodes(200), fanout.Options[string]{Limit: 4},
+		outcomes := fanout.Map(ctx, nodes(200), fanout.MapOptions[string]{Limit: 4},
 			func(context.Context, string) (int, error) { ran.Add(1); return 0, nil })
 		if got := ran.Load(); got != 0 {
 			t.Errorf("%d items were started on a cancelled context", got)
@@ -136,7 +136,7 @@ func TestMapStartsNothingOnceCancelled(t *testing.T) {
 		t.Parallel()
 		ctx, cancel := context.WithCancel(context.Background())
 		failed := errors.New("exe2: command exited -1")
-		outcomes := fanout.Map(ctx, nodes(200), fanout.Options[string]{Limit: 1},
+		outcomes := fanout.Map(ctx, nodes(200), fanout.MapOptions[string]{Limit: 1},
 			func(_ context.Context, node string) (string, error) {
 				if node == "exe2" {
 					cancel()
@@ -171,7 +171,7 @@ func TestMapTurnsAPanicIntoThatItemsFailure(t *testing.T) {
 	t.Parallel()
 
 	var log strings.Builder
-	outcomes := fanout.Map(context.Background(), nodes(3), fanout.Options[string]{Limit: 2, PanicLog: &log, Program: "sind"},
+	outcomes := fanout.Map(context.Background(), nodes(3), fanout.MapOptions[string]{Limit: 2, PanicLog: &log, Program: "sind"},
 		func(_ context.Context, node string) (*string, error) {
 			if node == "exe2" {
 				panic("assignment to entry in nil map")
@@ -203,7 +203,7 @@ func TestMapReportsItsWork(t *testing.T) {
 	t.Parallel()
 
 	ctx, tree := progresstest.Watch(context.Background(), t)
-	fanout.Map(ctx, nodes(5), fanout.Options[string]{Step: "reset the machines", Limit: 2, Describe: onBMC},
+	fanout.Map(ctx, nodes(5), fanout.MapOptions[string]{Step: "reset the machines", Limit: 2, Describe: onBMC},
 		func(ctx context.Context, node string) (struct{}, error) {
 			_, call := progress.Start(ctx, progress.KindCall, "redfish", progress.HTTP("POST", "/redfish/v1/Systems/1"))
 			var err error
@@ -234,7 +234,7 @@ func TestMapReportsAnInterrupt(t *testing.T) {
 
 	ctx, tree := progresstest.Watch(context.Background(), t)
 	ctx, cancel := context.WithCancel(ctx)
-	fanout.Map(ctx, nodes(6), fanout.Options[string]{Step: "reset the machines", Limit: 1},
+	fanout.Map(ctx, nodes(6), fanout.MapOptions[string]{Step: "reset the machines", Limit: 1},
 		func(_ context.Context, node string) (struct{}, error) {
 			if node == "exe2" {
 				cancel()
@@ -259,7 +259,7 @@ func TestMapEndsAStepTheInterruptEndedCanceled(t *testing.T) {
 
 	ctx, tree := progresstest.Watch(context.Background(), t)
 	ctx, cancel := context.WithCancel(ctx)
-	fanout.Map(ctx, nodes(2), fanout.Options[string]{Step: "read the power state", Limit: 2},
+	fanout.Map(ctx, nodes(2), fanout.MapOptions[string]{Step: "read the power state", Limit: 2},
 		func(_ context.Context, node string) (struct{}, error) {
 			if node == "exe2" {
 				cancel()
@@ -283,7 +283,7 @@ func TestMapEndsAnItemLeftOutSkipped(t *testing.T) {
 	t.Parallel()
 
 	ctx, tree := progresstest.Watch(context.Background(), t)
-	outcomes := fanout.Map(ctx, nodes(3), fanout.Options[string]{Step: "write /etc/munge/munge.key", Limit: 2},
+	outcomes := fanout.Map(ctx, nodes(3), fanout.MapOptions[string]{Step: "write /etc/munge/munge.key", Limit: 2},
 		func(_ context.Context, node string) (struct{}, error) {
 			switch node {
 			case "exe2":
@@ -319,7 +319,7 @@ func TestMapAcquiresWhatAnItemNeeds(t *testing.T) {
 	refused := errors.New("no place for exe2")
 	var released atomic.Int32
 	ctx, tree := progresstest.Watch(context.Background(), t)
-	outcomes := fanout.Map(ctx, nodes(4), fanout.Options[string]{
+	outcomes := fanout.Map(ctx, nodes(4), fanout.MapOptions[string]{
 		Step: "check", Limit: 2, PanicLog: &log,
 		Acquire: func(_ context.Context, node string) (func(), error) {
 			switch node {
@@ -376,7 +376,7 @@ func TestMapTakesTheProgramsRules(t *testing.T) {
 	}
 	// The program's Bus classes the items' errors by the same rule.
 	ctx, tree := progresstest.Watch(context.Background(), t, progresstest.Classify(classify))
-	fanout.Map(ctx, nodes(2), fanout.Options[string]{
+	fanout.Map(ctx, nodes(2), fanout.MapOptions[string]{
 		Step: "stop", Limit: 1, Classify: classify,
 		Summarize: func(n int, names []string, errs []error, interrupted bool) error {
 			if n != 2 || len(names) != 1 || !errors.Is(errs[0], stopped) || !interrupted {
@@ -418,7 +418,7 @@ func TestMapEndsAnItemAcquireRefusedAtOnce(t *testing.T) {
 	ctx, capture := progresstest.Checked(context.Background(), t)
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	outcomes := fanout.Map(ctx, nodes(2), fanout.Options[string]{
+	outcomes := fanout.Map(ctx, nodes(2), fanout.MapOptions[string]{
 		Step: "check", Limit: 1,
 		Acquire: func(_ context.Context, node string) (func(), error) {
 			if node == "exe1" {
@@ -454,7 +454,7 @@ func TestMapEndsAnItemRefusedAfterTheInterruptCanceled(t *testing.T) {
 	ctx, tree := progresstest.Watch(context.Background(), t)
 	ctx, cancel := context.WithCancel(ctx)
 	waited := errors.New("gave up waiting for a slot")
-	outcomes := fanout.Map(ctx, nodes(1), fanout.Options[string]{
+	outcomes := fanout.Map(ctx, nodes(1), fanout.MapOptions[string]{
 		Step: "check", Limit: 1,
 		Acquire: func(context.Context, string) (func(), error) {
 			cancel()
@@ -478,7 +478,7 @@ func TestMapEndsAnItemAcquireSkippedSkipped(t *testing.T) {
 	t.Parallel()
 
 	ctx, tree := progresstest.Watch(context.Background(), t)
-	outcomes := fanout.Map(ctx, nodes(2), fanout.Options[string]{
+	outcomes := fanout.Map(ctx, nodes(2), fanout.MapOptions[string]{
 		Step: "check", Limit: 2,
 		Acquire: func(_ context.Context, node string) (func(), error) {
 			if node == "exe1" {
@@ -508,7 +508,7 @@ func TestMapEndsTheItemsADeadlineLeftOutCanceled(t *testing.T) {
 		ctx, tree := progresstest.Watch(context.Background(), t)
 		ctx, cancel := context.WithTimeout(ctx, 30*time.Millisecond)
 		defer cancel()
-		outcomes := fanout.Map(ctx, nodes(4), fanout.Options[string]{Step: "scan", Limit: 1},
+		outcomes := fanout.Map(ctx, nodes(4), fanout.MapOptions[string]{Step: "scan", Limit: 1},
 			func(ctx context.Context, _ string) (struct{}, error) {
 				select {
 				case <-ctx.Done():
@@ -540,7 +540,7 @@ func TestMapTurnsAPanicInAReleaseIntoThatItemsFailure(t *testing.T) {
 	var log strings.Builder
 	failed := errors.New("exe2: command exited 1")
 	ctx, tree := progresstest.Watch(context.Background(), t)
-	outcomes := fanout.Map(ctx, nodes(3), fanout.Options[string]{
+	outcomes := fanout.Map(ctx, nodes(3), fanout.MapOptions[string]{
 		Step: "check", Limit: 1, PanicLog: &log,
 		Acquire: func(_ context.Context, node string) (func(), error) {
 			if node == "exe3" {
@@ -586,7 +586,7 @@ func TestMapFailsAnItemWhoseReleasePanickedWhateverTheWorkReturned(t *testing.T)
 	cause, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	ctx, tree := progresstest.Watch(cause, t)
-	outcomes := fanout.Map(ctx, nodes(2), fanout.Options[string]{
+	outcomes := fanout.Map(ctx, nodes(2), fanout.MapOptions[string]{
 		Step: "check", Limit: 1, PanicLog: io.Discard,
 		Acquire: func(_ context.Context, node string) (func(), error) {
 			return func() { panic("release " + node) }, nil
@@ -626,7 +626,7 @@ func TestMapFailsAnItemThatPanickedAfterTheContextEnded(t *testing.T) {
 			cause, cancel := context.WithCancel(context.Background())
 			defer cancel()
 			ctx, tree := progresstest.Watch(cause, t)
-			outcomes := fanout.Map(ctx, nodes(1), fanout.Options[string]{
+			outcomes := fanout.Map(ctx, nodes(1), fanout.MapOptions[string]{
 				Step: "check", Limit: 1, PanicLog: io.Discard,
 				Acquire: func(context.Context, string) (func(), error) {
 					if in == "acquire" {
@@ -661,7 +661,7 @@ func TestMapFailsAnItemWhoseWorkCalledGoexit(t *testing.T) {
 
 	var released atomic.Int32
 	ctx, tree := progresstest.Watch(context.Background(), t)
-	outcomes := fanout.Map(ctx, nodes(4), fanout.Options[string]{
+	outcomes := fanout.Map(ctx, nodes(4), fanout.MapOptions[string]{
 		Step: "check", Limit: 1,
 		Acquire: func(_ context.Context, node string) (func(), error) {
 			switch node {
@@ -710,7 +710,7 @@ func TestMapKeepsWhatBrokeAnItemBesidesAGoexit(t *testing.T) {
 	cause, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	ctx, tree := progresstest.Watch(cause, t)
-	outcomes := fanout.Map(ctx, nodes(2), fanout.Options[string]{
+	outcomes := fanout.Map(ctx, nodes(2), fanout.MapOptions[string]{
 		Step: "check", Limit: 1, PanicLog: io.Discard,
 		Acquire: func(_ context.Context, node string) (func(), error) {
 			if node == "exe1" {
