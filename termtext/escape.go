@@ -9,24 +9,25 @@ import (
 	"unicode/utf8"
 )
 
-// EscapeText makes untrusted text safe to write to a terminal, keeping its
-// lines: untrusted text from a remote host or a container, say, whose
-// control characters would otherwise act on the terminal. It replaces every
-// rune the package's escape policy names with a visible escape such as
-// \x1b or \u009b, and a byte that is not UTF-8 with one such as \xff.
-// Newline and tab are kept, since they cannot move the cursor back over
-// text already written.
+// Escape makes untrusted text safe to write to a terminal as one line:
+// untrusted text from a remote host or a container, say, whose control
+// characters would otherwise act on the terminal. It replaces every rune
+// the package's escape policy names with a visible escape such as \x1b or
+// \u009b, and a byte that is not UTF-8 with one such as \xff. Newline and
+// tab are escaped too, as \n and \t, so that a message, a log line or a
+// table cell cannot start a line that seems to be another.
 //
 // Text that holds none of these is returned unchanged.
-func EscapeText(s string) string {
-	return escape(s, false)
+func Escape(s string) string {
+	return escape(s, true)
 }
 
-// EscapeCell is EscapeText for a value that has to stay on one line, such as
-// a table cell or a name in a header: newline and tab are escaped too, as \n
-// and \t, so that a value cannot start a row that seems to be another.
-func EscapeCell(s string) string {
-	return escape(s, true)
+// EscapeLines is Escape for text whose lines are kept, such as the output
+// of a program: newline and tab are written as they are, since they cannot
+// move the cursor back over text already written. Text that has to stay on
+// one line needs Escape.
+func EscapeLines(s string) string {
+	return escape(s, false)
 }
 
 func escape(s string, oneLine bool) string {

@@ -9,7 +9,7 @@
 // not trusted: a carriage return or a cursor movement can overwrite a line
 // printed before, an escape sequence can retitle the terminal or write the
 // clipboard, and a bidirectional control can show text in another order
-// than it has. EscapeText and EscapeCell show such characters as visible
+// than it has. Escape and EscapeLines show such characters as visible
 // escapes instead. A program that escapes everything with this package, and
 // nothing with anything else, has one place to fix when a character turns
 // out to need escaping too.
@@ -21,7 +21,7 @@
 // is shown in, and is written as it is otherwise. Escaped are:
 //
 //   - every C0 control (U+0000 to U+001F) and DEL (U+007F), except that
-//     EscapeText keeps newline and tab, which cannot move the cursor back
+//     EscapeLines keeps newline and tab, which cannot move the cursor back
 //     over text already written;
 //   - every C1 control (U+0080 to U+009F), which some terminals read as the
 //     introducer of a control sequence;
@@ -41,7 +41,7 @@
 // whose ESC was escaped, and the original cannot always be recovered from
 // what is shown. Escaping the backslash too would double every backslash
 // in a path or a pattern, and would make escaped text change each time it
-// is escaped again, which the callers of EscapeCell rely on it not to. A
+// is escaped again, which the callers of Escape rely on it not to. A
 // program that has to tell the two apart keeps the text as it came, not
 // escaped.
 //

@@ -76,7 +76,7 @@ func FuzzSanitize(f *testing.F) {
 		if !utf8.ValidString(got) {
 			t.Fatalf("Sanitize(%q, %d) = %q, which is not UTF-8", in, limit, got)
 		}
-		if termtext.EscapeCell(got) != got || strings.ContainsAny(got, "\r\n\t\x1b") {
+		if termtext.Escape(got) != got || strings.ContainsAny(got, "\r\n\t\x1b") {
 			t.Fatalf("Sanitize(%q, %d) = %q, which still holds a control character", in, limit, got)
 		}
 		if limit > 0 && len(got) > limit {
@@ -88,7 +88,7 @@ func FuzzSanitize(f *testing.F) {
 		if again := progress.Sanitize(got, limit); again != got {
 			t.Fatalf("Sanitize is not idempotent for %q: %q, then %q", in, got, again)
 		}
-		if !strings.Contains(in, "\r") && termtext.EscapeCell(in) == in && (limit == 0 || len(in) <= limit) && got != in {
+		if !strings.Contains(in, "\r") && termtext.Escape(in) == in && (limit == 0 || len(in) <= limit) && got != in {
 			t.Fatalf("Sanitize(%q, %d) = %q changed text that needed nothing", in, limit, got)
 		}
 	})

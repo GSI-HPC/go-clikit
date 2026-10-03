@@ -11,18 +11,18 @@ import (
 
 // A line a remote host printed, which tries to retitle the terminal and to
 // overwrite what was printed before it, is shown as it was sent.
-func ExampleEscapeText() {
+func ExampleEscapeLines() {
 	remote := "backup done\x1b]0;owned\x07\rbackup FAILED\n\tsee the log\n"
-	fmt.Print(termtext.EscapeText(remote))
+	fmt.Print(termtext.EscapeLines(remote))
 	// Output:
 	// backup done\x1b]0;owned\x07\rbackup FAILED
 	// 	see the log
 }
 
-// A cell of a table stays on one line, with its newline and tab shown.
-func ExampleEscapeCell() {
-	fmt.Println(termtext.EscapeCell("rack 1\nrow\t2"))
-	fmt.Println(termtext.EscapeCell("\u202eexe01"))
+// A value stays on one line, with its newline and tab shown.
+func ExampleEscape() {
+	fmt.Println(termtext.Escape("rack 1\nrow\t2"))
+	fmt.Println(termtext.Escape("\u202eexe01"))
 	// Output:
 	// rack 1\nrow\t2
 	// \u202eexe01

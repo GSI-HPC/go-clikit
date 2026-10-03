@@ -26,7 +26,7 @@ what it reports. `Capture` is a sink that keeps the events of a Bus, and
   Total however it ended, an interrupt included;
 - no more targets run at once below a span than its Limit;
 - every Suspend is followed by one Resume;
-- and no text holds anything `termtext.EscapeCell` would escape, or is
+- and no text holds anything `termtext.Escape` would escape, or is
   longer than its bound.
 
 `Checked` gives a test a Bus whose events are checked when the test ends,

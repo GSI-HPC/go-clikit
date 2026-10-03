@@ -88,7 +88,7 @@ func Width(s string) int {
 // whole, never split, and a character whose U+FE0F would reach past cols is
 // kept without it; cols of zero or less leaves nothing.
 //
-// s must be plain text that is already escaped, by EscapeCell for one line:
+// s must be plain text that is already escaped, by Escape for one line:
 // a control character or an escape sequence would be counted as the columns
 // of its runes, not as what it does. Truncate does not cluster graphemes,
 // so it may cut a sequence of runes a terminal draws as one character, such

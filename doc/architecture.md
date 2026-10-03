@@ -80,7 +80,7 @@ else. There is no field for an argument vector, a script, standard input, the
 environment or a header, so none of them can reach a display or the log.
 Every text in an event has been through `Sanitize`, which applies carriage
 returns the way a terminal does, escapes the rest with
-`termtext.EscapeCell` and cuts it to its bound.
+`termtext.Escape` and cuts it to its bound.
 
 A pool announces every target queued before the first runs, marks each
 running as it takes its place, and ends it before it gives the place up, so a
@@ -201,7 +201,8 @@ terminal, finds the same in each:
   nothing and leaves no summary.
 
 Text that came from elsewhere, a remote host, a container or a service, is
-escaped with `termtext.EscapeText`, or `EscapeCell` where it has to stay on
-one line, before it reaches a terminal, and there is no other escaper: a
-program that escapes everything with it has one place to fix when a
-character turns out to need escaping too.
+escaped with `termtext.Escape`, or `EscapeLines` where its lines are kept,
+before it reaches a terminal, and there is no other escaper: a program that
+escapes everything with it has one place to fix when a character turns out
+to need escaping too. Decision 7 calls the two by their earlier names,
+`EscapeCell` and `EscapeText`.
