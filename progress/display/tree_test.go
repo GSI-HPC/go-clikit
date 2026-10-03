@@ -288,13 +288,55 @@ func TestTheTreeReadsOnlyWholeNamesAsTheTargets(t *testing.T) {
 	f.draw(2 * time.Second)
 	spans[0].End(unreachable("1: dial tcp 10.0.0.12:443: i/o timeout"))
 	spans[1].End(unreachable("2: dial tcp 10.0.0.12:443: i/o timeout"))
-	spans[2].End(unreachable("e-1 e: dial tcp: i/o timeout"))
+	spans[2].End(unreachable("e1 e: dial tcp: i/o timeout"))
 	step.End(errors.New("3 of 3 failed: 1,2,e"))
 	checkScreen(t, f.end(errors.New("3 of 3 failed: 1,2,e")), `
 ✗ power off  2.0s  0 ok, 3 failed
   ✗ [1-2]  transport: {}: dial tcp {}: i/o timeout
-  ✗ e  transport: e-1 {}: dial tcp: i/o timeout
+  ✗ e  transport: e1 {}: dial tcp: i/o timeout
 bmc power off: failed in 2.0s: 0 ok, 3 failed
+`)
+}
+
+// A target's name next to a "-", "_" or ".", as in the names of the hosts
+// of its processor, is read as {}, and so is an address that is a target's
+// name, which keeps its port: such targets still fail alike.
+func TestTheTreeReadsNamesBesideOtherCharactersAsTheTargets(t *testing.T) {
+	t.Parallel()
+	f := newTreeFixture(t, "bmc power off", treeSetup{})
+	ctx, step := progress.Start(f.ctx, progress.KindStep, "power off",
+		progress.WithFlags(progress.Fold), progress.Total(8), progress.Limit(8))
+	failures := map[string]string{
+		"exe1":     "exe1-bmc: connection refused",
+		"exe2":     "exe2-bmc: connection refused",
+		"exe3":     "exe3_ipmi.mgmt: refused",
+		"exe4":     "exe4_ipmi.mgmt: refused",
+		"10.0.0.7": "dial tcp 10.0.0.7:443: refused",
+		"10.0.0.8": "dial tcp 10.0.0.8:443: refused",
+		"fe80::1":  "dial tcp [fe80::1]:623: refused",
+		"fe80::2":  "dial tcp [fe80::2]:623: refused",
+	}
+	order := []string{"exe1", "exe2", "exe3", "exe4", "10.0.0.7", "10.0.0.8", "fe80::1", "fe80::2"}
+	var spans []*progress.Span
+	for _, node := range order {
+		_, span := progress.Start(ctx, progress.KindTarget, node, progress.Queued(), progress.Node(node))
+		spans = append(spans, span)
+	}
+	for _, span := range spans {
+		span.Run()
+	}
+	f.draw(2 * time.Second)
+	for i, span := range spans {
+		span.End(unreachable("%s", failures[order[i]]))
+	}
+	step.End(errors.New("8 of 8 failed"))
+	checkScreen(t, f.end(errors.New("8 of 8 failed")), `
+✗ power off  2.0s  0 ok, 8 failed
+  ✗ exe[1-2]  transport: {}-bmc: connection refused
+  ✗ exe[3-4]  transport: {}_ipmi.mgmt: refused
+  ✗ 10.0.0.[7-8]  transport: dial tcp {}:443: refused
+  ✗ fe80::[1-2]  transport: dial tcp [{}]:623: refused
+bmc power off: failed in 2.0s: 0 ok, 8 failed
 `)
 }
 
