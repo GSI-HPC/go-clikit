@@ -80,7 +80,9 @@ else. There is no field for an argument vector, a script, standard input, the
 environment or a header, so none of them can reach a display or the log.
 Every text in an event has been through `Sanitize`, which applies carriage
 returns the way a terminal does, escapes the rest with
-`termtext.Escape` and cuts it to its bound.
+`termtext.Escape` and cuts it to its bound. The Bus calls it, so neither the
+work that reports a span nor a sink needs to; a program that shows text from
+elsewhere outside a Bus may call it too.
 
 A pool announces every target queued before the first runs, marks each
 running as it takes its place, and ends it before it gives the place up, so a
