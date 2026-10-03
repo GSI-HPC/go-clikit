@@ -102,6 +102,18 @@ func TestCharactersWideSinceUnicode15(t *testing.T) {
 	}
 }
 
+// A mark that combines in the Unicode tables of Go but spaces in Unicode
+// 18.0, the Ahom medial ra U+1171E, is drawn, and takes one column.
+func TestAMarkThatSpacesSinceUnicode15(t *testing.T) {
+	t.Parallel()
+	if got := termtext.RuneWidth(0x1171e); got != 1 {
+		t.Errorf("RuneWidth(U+1171E) = %d, want 1", got)
+	}
+	if got := termtext.Width("\U0001171e\U0001171d"); got != 1 {
+		t.Errorf("Width(U+1171E U+1171D) = %d, want 1", got)
+	}
+}
+
 // Truncate never lets text reach past the columns given, and leaves out a
 // wide character whole rather than split it.
 func TestTruncate(t *testing.T) {

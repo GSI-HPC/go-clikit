@@ -15,7 +15,9 @@ import (
 // combines with the character before it or a character that only formats,
 // such as a zero-width joiner; and one for everything else. The soft hyphen
 // U+00AD and the prepended concatenation marks, such as U+0600, format but
-// are drawn, and take one column.
+// are drawn, and take one column, as does the Ahom medial ra U+1171E, which
+// combines in the Unicode tables of Go but is a spacing mark since Unicode
+// 16.0.
 //
 // The East Asian Widths are those of golang.org/x/text, with the characters
 // that later versions of Unicode, up to 18.0, made wide added. A character
@@ -25,7 +27,7 @@ func RuneWidth(r rune) int {
 	switch {
 	case r == 0:
 		return 0
-	case r == 0x00ad, unicode.Is(prependedConcatenationMarks, r):
+	case r == 0x00ad, r == ahomMedialRa, unicode.Is(prependedConcatenationMarks, r):
 		return 1
 	case unicode.In(r, unicode.Mn, unicode.Me, unicode.Cf):
 		return 0
@@ -38,6 +40,11 @@ func RuneWidth(r rune) int {
 	}
 	return 1
 }
+
+// ahomMedialRa is U+1171E, the one character the Unicode tables of Go call
+// a combining mark, of no width, that Unicode 18.0 calls a spacing mark,
+// which a terminal draws.
+const ahomMedialRa = 0x1171e
 
 // emojiPresentation is the variation selector U+FE0F, which asks for the
 // emoji picture of the character before it.

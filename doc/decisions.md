@@ -385,7 +385,9 @@ joined emoji sequence is.
   kept by hand in `termtext/width.go`, of the characters whose East Asian
   Width is wide in Unicode 18.0 but not in those tables. The soft hyphen
   and the prepended concatenation marks, format characters that are drawn,
-  take one column.
+  take one column, as does U+1171E, which the Unicode tables of Go, that
+  `RuneWidth` reads for the marks of no width, call a combining mark and
+  Unicode 18.0 a spacing mark; it is the only such character.
 - `Width` and `Truncate` count a character of one column followed by U+FE0F
   as two columns, and `Truncate` keeps such a character without its
   selector when the selector would reach past the columns given.
@@ -398,6 +400,8 @@ joined emoji sequence is.
 - The table has to be brought up to date by hand when a version of Unicode
   makes more characters wide, until `golang.org/x/text` catches up; a wide
   character assigned after Unicode 18.0 counts as one column until then.
+  A mark that a later version of Unicode makes spacing has to be added to
+  `RuneWidth` by hand in the same way.
 - A terminal that draws a character with U+FE0F as one column shows less
   than `Width` counts, and a row holding one is cut a column short there.
 - A joined emoji sequence is counted wider than it is drawn, and a row

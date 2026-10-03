@@ -49,9 +49,9 @@
 //
 // RuneWidth and Width approximate the columns a terminal gives text: two
 // for East Asian wide and fullwidth characters, none for combining marks
-// and format characters, save the soft hyphen and the prepended
-// concatenation marks such as U+0600, which are drawn, and one for the
-// rest. Width counts a character followed by the variation selector
+// and format characters, save the soft hyphen, the prepended
+// concatenation marks such as U+0600 and the Ahom medial ra U+1171E, a
+// spacing mark since Unicode 16.0, which are drawn, and one for the rest. Width counts a character followed by the variation selector
 // U+FE0F, which asks for its emoji picture, as two columns, as terminals
 // draw it. Beyond that it does not cluster graphemes, so a sequence joined
 // with U+200D, a skin tone modifier or a flag is counted as the sum of its
