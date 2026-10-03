@@ -502,11 +502,12 @@ func (f *folded) merge(o *folded) {
 // what it dialled has it: 10.0.0.7:443, [fe80::1]:623.
 var addresses = regexp.MustCompile(`\b(?:\d{1,3}\.){3}\d{1,3}(?::\d+)?\b|\[[0-9A-Fa-f:.]+\](?::\d+)?`)
 
-// failureText is how a target failed: its class and its error, with any
-// address, and its own name and its host's where each stands as a name of
-// its own, read as {}, so that the targets that failed alike share it, the
-// processors that refused the connection to their own addresses among
-// them.
+// failureText is how a target failed: its class and its error, with its
+// own name and its host's where each stands as a name of its own, and any
+// other address, read as {}, so that the targets that failed alike share
+// it, the processors that refused the connection to their own addresses
+// among them. An address that is the target's name or its host's keeps
+// its port: "dial tcp {}:443".
 func failureText(s *treeSpan, e progress.Event) string {
 	if e.Class == progress.ClassNone && e.Err == "" {
 		return "failed"
@@ -514,14 +515,34 @@ func failureText(s *treeSpan, e progress.Event) string {
 	text := e.Class.String()
 	if e.Err != "" {
 		// The host first, since it usually holds the node's name.
-		text += ": " + ownNames(addresses.ReplaceAllString(e.Err, "{}"), e.Host, e.Node, s.name)
+		names := []string{e.Host, e.Node, s.name}
+		text += ": " + ownNames(addresses.ReplaceAllStringFunc(e.Err, func(a string) string {
+			return address(a, names)
+		}), names...)
 	}
 	return text
 }
 
+// address reads the address a as {}, but for its port where it is one of
+// names: a target named 10.0.0.7 reads "10.0.0.7:443" as "{}:443", and
+// any other target reads it as "{}".
+func address(a string, names []string) string {
+	host, port := a, ""
+	if i := strings.LastIndexByte(a, ']'); i >= 0 {
+		host, port = a[:i+1], a[i+1:]
+	} else if i := strings.IndexByte(a, ':'); i >= 0 {
+		host, port = a[:i], a[i:]
+	}
+	if slices.Contains(names, strings.Trim(host, "[]")) {
+		return ownNames(host, names...) + port
+	}
+	return "{}"
+}
+
 // ownNames reads each of names in text as {} where it stands as a name of
-// its own, with no letter, digit, "-" or "_" right before or after it: a
-// target named "e" leaves "timeout" as it is, and "exe1" leaves "exe10".
+// its own, with no letter or digit right before or after it: a target
+// named "e" leaves "timeout" as it is, and "exe1" leaves "exe10" but reads
+// "exe1-bmc" as "{}-bmc".
 // Where two names start at the same place the first given is read.
 func ownNames(text string, names ...string) string {
 	var b strings.Builder
@@ -559,7 +580,7 @@ func ownNameAt(text string, i int, names []string) int {
 // inName reports whether r can be part of a name, of a node or a host,
 // that it stands next to.
 func inName(r rune) bool {
-	return r == '-' || r == '_' || unicode.IsLetter(r) || unicode.IsDigit(r)
+	return unicode.IsLetter(r) || unicode.IsDigit(r)
 }
 
 // names are the names of targets, read as a node set, with any that do not
