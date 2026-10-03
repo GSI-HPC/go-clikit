@@ -131,7 +131,8 @@ func newBus(c *Capture, opts []Option) *progress.Bus {
 //
 // Nothing in it depends on how concurrent work was scheduled. Targets that
 // read the same once their own node and host are written {} are folded into
-// one line naming them as a node set; siblings are sorted by what they
+// one line naming them as a node set, or listing them when a name is no
+// node or is given twice, as a target that ran twice is; siblings are sorted by what they
 // read, with numbers in their numeric order; and neither ids, times nor
 // lines of output are drawn. A span not ended reads as its state.
 //
@@ -269,12 +270,14 @@ func field(b *strings.Builder, key, value string) {
 }
 
 // fold names targets as a node set, or lists them when one of the names
-// does not read as itself in one, as "port 10" would not.
+// does not read as itself in one, as "port 10" would not, or when a name is
+// given twice, as a target that ran twice would be, which a node set would
+// hide.
 func fold(names []string) string {
 	set := nodeset.New()
 	for _, name := range names {
 		one, err := nodeset.Parse(name)
-		if err != nil || one.String() != name {
+		if err != nil || one.String() != name || set.Contains(name) {
 			slices.SortFunc(names, natural)
 			return strings.Join(names, ",")
 		}

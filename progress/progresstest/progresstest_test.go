@@ -299,3 +299,24 @@ func TestFoldListsNamesThatAreNoNodeSet(t *testing.T) {
 		t.Errorf("fold of names no node set takes = %q", got)
 	}
 }
+
+// A target that ran twice under the same name is not hidden by the fold:
+// its name is listed as often as it ran.
+func TestTreeListsATargetThatRanTwice(t *testing.T) {
+	t.Parallel()
+
+	es := events{}.add(start, 1, 0, step)
+	for i, name := range []string{"exe1", "exe1", "exe2"} {
+		es = es.add(start, progress.SpanID(i+2), 1, tgt, func(e *progress.Event) { e.Name = name })
+	}
+	for i := range 3 {
+		es = es.add(end, progress.SpanID(i+2), 1, tgt)
+	}
+	es = es.add(end, 1, 0, step)
+	if got, want := tree(es), "step s1: ok\n  target exe1,exe1,exe2: ok\n"; got != want {
+		t.Errorf("tree:\n%s\nwant:\n%s", got, want)
+	}
+	if got := fold([]string{"exe2", "exe1", "exe1"}); got != "exe1,exe1,exe2" {
+		t.Errorf("fold of a name given twice = %q", got)
+	}
+}
