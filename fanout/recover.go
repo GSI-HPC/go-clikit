@@ -23,11 +23,17 @@ var panicLogMu sync.Mutex
 // process's standard error when log is nil. It is called as
 // Recovered(log, program, name, recover()) in a function deferred by the
 // goroutine doing the work, and returns a *PanicError that holds program,
-// target and v, or nil when nothing panicked. The target is named by text from elsewhere, so the line shows
-// it through progress.Sanitize, its control characters as escapes. program
-// names the program, in front of the line in the log, as "prog: ",
-// and in the error, which asks for the bug to be reported; empty leaves the
-// name out of the line and calls it "the program" in the error.
+// target and v, or nil when nothing panicked. The target is named by text
+// from elsewhere, so the line shows it through progress.Sanitize, its
+// control characters as escapes. program names the program, in front of
+// the line in the log, as "prog: ", and in the error, which asks for the
+// bug to be reported; empty leaves the name out of the line and calls it
+// "the program" in the error.
+//
+// A library that reports to a Bus calls it as
+// Recovered(b.PanicLog(), b.Program(), name, recover()), with
+// b := progress.BusFrom(ctx), so that it names the program and writes the
+// stack where the Bus does.
 //
 // recover only stops a panic in its own goroutine, so each worker of a
 // fan-out needs its own; without it, a panic on one target ends the
@@ -43,11 +49,12 @@ func Recovered(log io.Writer, program, target string, v any) error {
 	if program != "" {
 		prefix = program + ": "
 	}
+	text := fmt.Sprint(v)
 	panicLogMu.Lock()
 	// The log is a courtesy; a write that fails changes nothing.
-	_, _ = fmt.Fprintf(log, "%spanic while working on %s: %q\n%s", prefix, progress.Sanitize(target, 0), fmt.Sprint(v), debug.Stack())
+	_, _ = fmt.Fprintf(log, "%spanic while working on %s: %q\n%s", prefix, progress.Sanitize(target, 0), text, debug.Stack())
 	panicLogMu.Unlock()
-	return &PanicError{Program: program, Target: target, Value: v}
+	return &PanicError{Program: program, Target: target, Value: v, text: text, fixed: true}
 }
 
 // PanicError is the error a panic in the work for an item became, which
@@ -58,6 +65,9 @@ func Recovered(log io.Writer, program, target string, v any) error {
 // and errors.As do not find the context's error, a skip or a Classifier in
 // it, which would end the item canceled, skipped or of another class.
 // Value holds what the panic was called with, for a program to look at.
+// The error's text is fixed when Recovered recovers the panic, as the log
+// line shows it, so a value the program goes on changing changes neither
+// the text nor is read again, from another goroutine, by Error.
 type PanicError struct {
 	// Program is the program that panicked, as Recovered was told it.
 	Program string
@@ -66,10 +76,21 @@ type PanicError struct {
 	Target string
 	// Value is what the panic was called with, as recover returned it.
 	Value any
+
+	// text is Value as fmt.Sprint printed it when the panic was recovered,
+	// and fixed says it was, since a value can print as "".
+	text  string
+	fixed bool
 }
 
 // Error says that the program panicked, that this is a bug to report, and
-// what the panic was called with, as fmt.Sprint prints it, quoted.
+// what the panic was called with, as fmt.Sprint printed it when the panic
+// was recovered, quoted. A PanicError that Recovered did not make prints
+// Value as it is when Error is called.
 func (e *PanicError) Error() string {
-	return fmt.Sprintf("%s panicked; this is a bug, please report it: %q", cmp.Or(e.Program, "the program"), fmt.Sprint(e.Value))
+	text := e.text
+	if !e.fixed {
+		text = fmt.Sprint(e.Value)
+	}
+	return fmt.Sprintf("%s panicked; this is a bug, please report it: %q", cmp.Or(e.Program, "the program"), text)
 }
