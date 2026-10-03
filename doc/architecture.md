@@ -68,7 +68,11 @@ ok; an error that is `progress.ErrSkipped`, as `errors.Is` tells, such as
 one `progress.Skip` returns, ends it skipped, work left out on purpose,
 before any rule for classes is asked, so that a program's rule cannot turn
 a skip into a failure; any other error ends it failed or canceled, as
-`progress.Classify` tells. `Span.Skip` is `End` with a skip.
+`progress.Classify` tells. `Span.Skip` is `End` with a skip. `errors.Is`
+looks through every error an error joins, so one that joins a skip with a
+failure, by `errors.Join` or two `%w` verbs, ends skipped, and the failure
+goes uncounted: work that gathers the errors of its parts returns a skip
+only when every part was skipped.
 
 Without a Bus in the context, `Start` returns the context as it is and a nil
 `*Span`, whose methods do nothing. The path allocates nothing, which two tests

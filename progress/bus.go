@@ -369,7 +369,8 @@ func (s *Span) Update(opts ...Option) {
 // End ends a span with the outcome of its work: ok for a nil error;
 // skipped, with no class, for an error that is ErrSkipped as errors.Is
 // tells, such as one Skip returns, before Classify is asked, so that no
-// rule of a program's turns work left out on purpose into a failure; and
+// rule of a program's turns work left out on purpose into a failure, even
+// when err joins the skip with a failure, as ErrSkipped warns; and
 // otherwise failed or canceled as Classify tells from err, with the
 // Bus's BusOptions.Classify as its fallback. err's text becomes the
 // span's one-line Err. The options set the fields that are known only at
