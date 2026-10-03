@@ -318,3 +318,15 @@ func TestLinesStayWholeUnderInterleaving(t *testing.T) {
 		t.Errorf("%d lines of the command's reached the terminal, want %d", commands, each)
 	}
 }
+
+// A line that comes in many small writes costs each write the bytes it
+// adds, not the line written so far: a byte more allocates nothing.
+func TestALongLineInSmallWritesCostsLittle(t *testing.T) {
+	term := display.NewTerminal(io.Discard, nil)
+	diag := term.Lines(io.Discard)
+	_, _ = io.WriteString(diag, strings.Repeat("x", 4<<10))
+	b := []byte("x")
+	if n := testing.AllocsPerRun(1000, func() { _, _ = diag.Write(b) }); n != 0 {
+		t.Errorf("a byte added to a line of 4 KiB allocates %v times, want 0", n)
+	}
+}
