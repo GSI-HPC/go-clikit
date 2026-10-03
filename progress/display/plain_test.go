@@ -109,7 +109,7 @@ func TestPlainLinesOfAFanOut(t *testing.T) {
 		t.Fatalf("%d outcomes, want %d", len(outcomes), len(nodes))
 	}
 	checkScreen(t, f.end(errors.New("2 of 6 hosts failed: exe[3,5]")), `
-[0:00] bmc power off › power off: start, 6 hosts, 1 at a time
+[0:00] bmc power off › power off: start, 6 targets, 1 at a time
 [0:09] bmc power off › power off › exe3 failed (transport): exe3.mgmt: dial tcp: i/o timeout
 [0:12] bmc power off › power off: 3/6 done, 1 failed, 1 running, 2 queued
 [0:15] bmc power off › power off › exe5 failed (transport): exe5.mgmt: dial tcp: i/o timeout
@@ -164,11 +164,11 @@ func TestPlainLinesOfAPowerOnInBatches(t *testing.T) {
 		t.Fatal("the batch after the one that failed was run")
 	}
 	checkScreen(t, f.end(batches[1].Err), `
-[0:00] bmc power on › power on: start, 6 hosts
-[0:00] bmc power on › power on › batch 1/3: start, 2 hosts
+[0:00] bmc power on › power on: start, 6 targets
+[0:00] bmc power on › power on › batch 1/3: start, 2 targets
 [0:04] bmc power on › power on › batch 1/3: done in 4.0s: 2 ok
 [0:04] bmc power on › power on › stagger: waiting 5s
-[0:09] bmc power on › power on › batch 2/3: start, 2 hosts
+[0:09] bmc power on › power on › batch 2/3: start, 2 targets
 [0:11] bmc power on › power on: batch 2/3, 2/6 done, 1 running, 3 queued
 [0:13] bmc power on › power on › batch 2/3 › exe4 failed (target): exe4.mgmt: connection timeout
 [0:13] bmc power on › power on › batch 2/3: failed in 4.0s: 1 ok, 1 failed
@@ -195,7 +195,7 @@ func TestPlainLinesOfStepsWithNoName(t *testing.T) {
 				return struct{}{}, nil
 			})
 		checkScreen(t, f.end(errors.New("1 of 4 hosts failed: exe3")), `
-[0:00] exec: start, 4 hosts, 1 at a time
+[0:00] exec: start, 4 targets, 1 at a time
 [0:09] exec › exe3 failed (transport): dial tcp: i/o timeout
 [0:12] exec: 3/4 done, 1 failed, 1 running
 [0:12] exec: failed in 12s: 3 ok, 1 failed
@@ -218,8 +218,8 @@ exec: failed in 12s: 3 ok, 1 failed
 				return outcomes[0].Err
 			})
 		checkScreen(t, f.end(batches[0].Err), `
-[0:00] exec › power on: start, 4 hosts
-[0:00] exec › power on › batch 1/2: start, 2 hosts, 1 at a time
+[0:00] exec › power on: start, 4 targets
+[0:00] exec › power on › batch 1/2: start, 2 targets, 1 at a time
 [0:01] exec › power on › batch 1/2 › exe1 failed (transport): dial tcp: i/o timeout
 [0:02] exec › power on › batch 1/2: failed in 2.0s: 1 ok, 1 failed
 [0:02] exec › power on › batch 2/2: skipped: not tried: an earlier batch failed
@@ -247,7 +247,7 @@ func TestPlainLinesOfAStepWithNothingToNameIt(t *testing.T) {
 	bus.Close()
 	plain.Close()
 	checkScreen(t, s.String(), `
-[0:00] start, 2 hosts, 1 at a time
+[0:00] start, 2 targets, 1 at a time
 [0:11] 0/2 done, 1 running, 1 queued
 [0:22] 1/2 done, 1 running
 [0:22] done in 22s: 2 ok
@@ -285,11 +285,11 @@ func TestPlainLinesOfAFailure(t *testing.T) {
 	checkScreen(t, f.end(unreachable("setting the machines to boot from the network once failed: exe2")), `
 [0:01] provision reinstall › configuring the network boot: start
 [0:03] provision reinstall › configuring the network boot: done in 2.0s
-[0:03] provision reinstall › setting the machines to boot from the network once: start, 3 hosts
+[0:03] provision reinstall › setting the machines to boot from the network once: start, 3 targets
 [0:04] provision reinstall › setting the machines to boot from the network once › exe2 failed (transport): exe2.mgmt: dial tcp: connection refused
 [0:04] provision reinstall › setting the machines to boot from the network once: failed in 1.0s: 2 ok, 1 failed
 [0:04] provision reinstall › disarming: start
-[0:04] provision reinstall › disarming › clearing the boot overrides: start, 2 hosts
+[0:04] provision reinstall › disarming › clearing the boot overrides: start, 2 targets
 [0:04] provision reinstall › disarming › clearing the boot overrides: done in 0.0s: 2 ok
 [0:04] provision reinstall › disarming: done in 0.0s
 provision reinstall: failed in 4.0s: 2 ok, 1 failed
@@ -319,8 +319,8 @@ func TestPlainHeartbeatsEveryTenSeconds(t *testing.T) {
 	node.End(nil)
 	ssh.End(nil)
 	checkScreen(t, f.end(nil), `
-[0:00] provision status › read the power state: start, 1 host
-[0:04] provision status › read the uptime: start, 1 host
+[0:00] provision status › read the power state: start, 1 target
+[0:04] provision status › read the uptime: start, 1 target
 [0:10] provision status › read the power state: 0/1 done, 1 running
 [0:14] provision status › read the uptime: 0/1 done, 1 running
 [0:16] provision status › read the power state: done in 16s: 1 ok
@@ -418,7 +418,7 @@ func TestPlainReadsTheRealClock(t *testing.T) {
 		_, target := progress.Start(ctx, progress.KindTarget, "exe1", progress.Queued(), progress.Node("exe1"))
 		target.Run()
 		synctest.Wait()
-		if got, want := s.String(), "[0:00] exec › run: start, 1 host\n"; got != want {
+		if got, want := s.String(), "[0:00] exec › run: start, 1 target\n"; got != want {
 			t.Errorf("once the step started, the screen shows:\n%s\nwant:\n%s", got, want)
 		}
 		time.Sleep(10 * time.Second)
@@ -430,7 +430,7 @@ func TestPlainReadsTheRealClock(t *testing.T) {
 		plain.Close()
 		progresstest.Check(t, capture.Events())
 		checkScreen(t, s.String(), `
-[0:00] exec › run: start, 1 host
+[0:00] exec › run: start, 1 target
 [0:10] exec › run: 0/1 done, 1 running
 [0:10] exec › run: done in 10s: 1 ok
 `)
@@ -495,7 +495,7 @@ func TestPlainLinesOfAWaitThatFails(t *testing.T) {
 	_, drain := progress.Start(f.ctx, progress.KindStep, "drain")
 	drain.Skip("no jobs to drain")
 	checkScreen(t, f.end(context.Canceled), `
-[0:00] bmc power on › power on: start, 1 host
+[0:00] bmc power on › power on: start, 1 target
 [0:00] bmc power on › power on › stagger: waiting 30s
 [0:10] bmc power on › power on: 0/1 done, 1 queued, waiting
 [0:10] bmc power on › power on › stagger: failed (transport)
@@ -557,8 +557,8 @@ func TestPlainLinesInASCII(t *testing.T) {
 	}
 }
 
-// A program whose targets are not hosts names them with a noun of its own,
-// one and many.
+// A program names its targets with a noun of its own, one and many, in
+// place of the default "1 target" and "%d targets".
 func TestPlainLinesSayTheNounTheyAreGiven(t *testing.T) {
 	t.Parallel()
 	nodes := func(n int) string {

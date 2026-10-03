@@ -24,7 +24,7 @@ const (
 // the time since the command started in front and no escape codes, for a
 // log as much as for a terminal:
 //
-//	[0:00] bmc power › power off: start, 480 hosts, 8 at a time
+//	[0:00] bmc power › power off: start, 480 targets, 8 at a time
 //	[0:03] bmc power › power off › exe0007 failed (transport): exe0007.mgmt: dial tcp: i/o timeout
 //	[0:10] bmc power › power off: 312/480 done, 1 failed, 8 running, 160 queued
 //	[0:18] bmc power › power off: failed in 18s: 478 ok, 2 failed
@@ -34,7 +34,9 @@ const (
 // is written as a step or a batch starts and ends, as a pause of a known
 // length starts, and as a wait fails or is interrupted; for each
 // target that fails, once; and, every ten seconds, for each counted step
-// under way, a root of a progress.Tally, with how far it has got. Hidden
+// under way, a root of a progress.Tally, with how far it has got. The line
+// that starts a step or a batch says how many targets it expects, in the
+// word PlainOptions.Noun gives, and as "targets" without one. Hidden
 // spans and calls get no line, and neither do the lines of output the work
 // prints: a command whose product that output is prints it itself. A step
 // with no name, as a pool given none reports its targets under, names no
@@ -42,7 +44,7 @@ const (
 // own under a batch, or another span that counts its targets, and with no
 // span above it that has a name its lines name nothing:
 //
-//	[0:00] start, 2 hosts
+//	[0:00] start, 2 targets
 //
 // The lines go out through the Terminal: ahead of whatever the command
 // writes after the events they tell of, never into a line the command has
@@ -103,8 +105,8 @@ type PlainOptions struct {
 	// locale that is not UTF-8, rather than "›".
 	ASCII bool
 	// Noun says how many targets a step or a batch expects, n of them,
-	// in the line that starts it: "480 hosts"; nil is "1 host" and "%d
-	// hosts".
+	// in the line that starts it, in the program's own word for them, such
+	// as "480 hosts"; nil is "1 target" and "%d targets".
 	Noun func(n int) string
 }
 
@@ -119,7 +121,7 @@ func NewPlain(term *Terminal, o PlainOptions) *Plain {
 		p.now = time.Now
 	}
 	if p.noun == nil {
-		p.noun = hosts
+		p.noun = targets
 	}
 	p.start = p.now()
 	term.mu.Lock()
@@ -376,12 +378,12 @@ func (p *Plain) sizes(f progress.Fields) string {
 	return text
 }
 
-// hosts is the noun of a Plain that was given none: n hosts.
-func hosts(n int) string {
+// targets is the noun of a Plain that was given none: n targets.
+func targets(n int) string {
 	if n == 1 {
-		return "1 host"
+		return "1 target"
 	}
-	return fmt.Sprintf("%d hosts", n)
+	return fmt.Sprintf("%d targets", n)
 }
 
 // standing says how far a counted step has got while it is under way.
