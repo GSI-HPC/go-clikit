@@ -336,9 +336,11 @@ be decoded back to what came.
 Escaping the backslash as well, as `strconv.Quote` does, would make them
 injective, but would double every backslash in a Windows path, a regular
 expression or a shell command a host reports, and escaped text would change
-each time it was escaped again. The displays escape the cells of a row with
-`EscapeCell` and may meet text escaped once already, and they, and
-`termtext.FuzzEscape`, rely on escaping twice changing nothing.
+each time it was escaped again. `progress.Sanitize`, which the `Bus`
+applies to every text it records, escapes with `EscapeCell` and may meet
+text sanitised once already, and `progresstest.Check` accepts a text only
+if `EscapeCell` leaves it as it is. Both rely on escaping twice changing
+nothing, which `termtext.FuzzEscape` and `progress.FuzzSanitize` test.
 
 ### Decision
 
