@@ -5,7 +5,8 @@
 
 One section per decision, in the order they were taken. Each says what the
 situation was, what was decided, and what that costs. A decision is never
-edited: a later one supersedes it, and the earlier one's status names it.
+edited: a later one supersedes or refines it, and the earlier one's status
+names it.
 
 | | Decision | Status |
 | --- | --- | --- |
@@ -19,7 +20,7 @@ edited: a later one supersedes it, and the earlier one's status names it.
 | [8](#8-widths-err-wide-and-follow-unicode-180) | Widths err wide, and follow Unicode 18.0 | accepted |
 | [9](#9-the-region-comes-off-one-line-a-row) | The region comes off one line a row | accepted |
 | [10](#10-a-daily-audit-holds-the-releases-to-their-record) | A daily audit holds the releases to their record | accepted |
-| [11](#11-a-deadline-ends-a-pools-items-as-an-interrupt-does) | A deadline ends a pool's items as an interrupt does | accepted, refined by [12](#12-the-programs-identity-lives-on-the-bus) |
+| [11](#11-a-deadline-ends-a-pools-items-as-an-interrupt-does) | A deadline ends a pool's items as an interrupt does | accepted, refined by [12](#12-the-programs-identity-lives-on-the-bus) and [13](#13-the-skip-error-lives-in-progress) |
 | [12](#12-the-programs-identity-lives-on-the-bus) | The program's identity lives on the Bus | accepted |
 | [13](#13-the-skip-error-lives-in-progress) | The skip error lives in progress | accepted |
 | [14](#14-the-escape-deny-list-may-grow-in-a-minor-release) | The escape deny-list may grow in a minor release | accepted |
@@ -549,7 +550,8 @@ and withdrawn.
 ## 11. A deadline ends a pool's items as an interrupt does
 
 Status: accepted, refined by
-[decision 12](#12-the-programs-identity-lives-on-the-bus)
+[decision 12](#12-the-programs-identity-lives-on-the-bus) and
+[decision 13](#13-the-skip-error-lives-in-progress)
 
 ### Context
 
@@ -700,8 +702,7 @@ away from for `errors.Is` and a sentinel.
 
 ## 14. The escape deny-list may grow in a minor release
 
-Status: accepted, refines
-[decision 7](#7-escapes-are-for-a-reader-not-for-decoding)
+Status: accepted
 
 ### Context
 
