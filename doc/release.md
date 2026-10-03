@@ -31,11 +31,14 @@ maintainers create tags.
    ```
 
 The Release workflow verifies the tag and its version, tests the tagged
-commit on both Go lines, publishes the GitHub release and fetches the version
-through the module proxy, after which pkg.go.dev lists it. The version is
+commit on both Go lines, fetches the version through the module proxy, after
+which pkg.go.dev lists it, and publishes the GitHub release. The version is
 one the go command accepts: `vX.Y.Z`, optionally with a pre-release such as
 `-rc.1`, with no leading zeros in any number, `-rc.01` included, and no
 build metadata.
+
+If the publishing job fails, run it again: it fetches the version once more
+and leaves a GitHub release that an earlier attempt created as it is.
 
 ## Withdrawing a release
 

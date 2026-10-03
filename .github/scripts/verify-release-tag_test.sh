@@ -4,8 +4,9 @@
 #
 # Tests the scripts of the release workflow against tags made in a scratch
 # repository, one case per way a tag has been shown to pass that should not:
-# verify-release-tag.sh and check-release-version.sh. The release workflow
-# runs only on a tag push, so this is where its steps are tested.
+# verify-release-tag.sh, check-release-version.sh and publish-release.sh.
+# The release workflow runs only on a tag push, so this is where its steps
+# are tested.
 #
 # Needs git, ssh-keygen and gpg. Run from anywhere:
 #
@@ -206,6 +207,72 @@ expect 'build metadata' fail 'not a semantic version' version v1.2.3+build "$v1m
 expect 'v2 in a module path without /v2' fail 'does not match the module path' version v2.0.0 "$v1mod"
 expect 'v2 in a module path ending in /v2' pass '' version v2.0.0 "$v2mod"
 expect 'v1 in a module path ending in /v2' fail 'does not match the module path' version v1.0.0 "$v2mod"
+
+# Publishing, against a stand-in for gh that logs what it is asked to do, the
+# notes file by its content. A run that failed after the release was created
+# can be run again.
+mkdir "$scratch/bin"
+cat > "$scratch/bin/gh" << 'GH'
+#!/usr/bin/env bash
+set -euo pipefail
+if [ "$1 $2" = 'release view' ]; then
+  exit "$GH_VIEW_STATUS"
+fi
+args=()
+notes=''
+while [ "$#" -gt 0 ]; do
+  if [ "$1" = '--notes-file' ]; then
+    notes="$(cat "$2")"
+    args+=("$1" NOTES)
+    shift 2
+  else
+    args+=("$1")
+    shift
+  fi
+done
+echo "gh ${args[*]}" >> "$GH_LOG"
+if [ -n "$notes" ]; then
+  printf '%s\n' "$notes" | sed 's/^/notes: /' >> "$GH_LOG"
+fi
+GH
+chmod +x "$scratch/bin/gh"
+git init -q "$scratch/publish"
+cd "$scratch/publish"
+git commit -q --allow-empty -m 'first'
+git tag -a v0.3.0 --cleanup=whitespace -F - << 'MSG'
+go-clikit v0.3.0
+
+## Changes
+MSG
+git tag -a v0.4.0 -m 'go-clikit v0.4.0'
+git tag -a v0.5.0-rc.1 -m 'go-clikit v0.5.0-rc.1'
+
+# publish <tag> <exit status of gh release view> <what gh is asked to do>
+publish() {
+  local tag="$1" view="$2" want="$3" out got
+  : > "$scratch/gh.log"
+  if ! out="$(PATH="$scratch/bin:$PATH" GH_LOG="$scratch/gh.log" GH_VIEW_STATUS="$view" \
+    TAG="$tag" "$scripts/publish-release.sh" 2>&1)"; then
+    echo "FAIL publishing $tag: the script failed"
+    printf '%s\n' "$out" | sed 's/^/    /'
+    failures=$((failures + 1))
+    return
+  fi
+  got="$(cat "$scratch/gh.log")"
+  if [ "$got" != "$want" ]; then
+    echo "FAIL publishing $tag: gh was asked"
+    printf '%s\n' "$got" | sed 's/^/    /'
+    echo "  instead of"
+    printf '%s\n' "$want" | sed 's/^/    /'
+    failures=$((failures + 1))
+  else
+    echo "ok   publishing $tag, gh release view exiting $view"
+  fi
+}
+publish v0.3.0 1 $'gh release create v0.3.0 --verify-tag --title v0.3.0 --notes-file NOTES\nnotes: ## Changes'
+publish v0.4.0 1 'gh release create v0.4.0 --verify-tag --title v0.4.0 --generate-notes'
+publish v0.5.0-rc.1 1 'gh release create v0.5.0-rc.1 --verify-tag --title v0.5.0-rc.1 --generate-notes --prerelease'
+publish v0.3.0 0 ''
 
 if [ "$failures" -ne 0 ]; then
   echo "$failures case(s) failed"
