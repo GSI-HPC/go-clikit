@@ -37,6 +37,10 @@ func TestFailure(t *testing.T) {
 			"2 of 5 volumes failed: config volume,exe1", progress.ClassTarget},
 		{"a name no node set holds", "", []string{"exe1", "exe99999999999999999999999"}, []error{refused, nil}, false,
 			"2 of 5 failed: exe1,exe99999999999999999999999", progress.ClassTarget},
+		// A node set holds a name once, so the list would name fewer
+		// than the count.
+		{"names that repeat", "hosts", []string{"exe1", "exe1", "exe2"}, []error{refused, nil, nil}, false,
+			"3 of 5 hosts failed: exe1,exe1,exe2", progress.ClassTarget},
 		{"a name that is a group", "", []string{"@compute"}, []error{refused}, false, "1 of 5 failed: @compute", progress.ClassTarget},
 		{"interrupted", "hosts", []string{"exe1", "exe2"}, []error{context.Canceled, refused}, true,
 			"2 of 5 hosts failed: exe[1-2]", progress.ClassCanceled},
