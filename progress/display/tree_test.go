@@ -59,7 +59,7 @@ func newTreeFixture(t *testing.T, command string, o treeSetup) *treeFixture {
 	// A row drawn wider than the terminal wraps on the screen, as it
 	// would on a terminal, so a test sees it.
 	f.screen = &progresstest.Screen{Width: f.width}
-	f.term = display.NewTerminal(f.screen, f.size)
+	f.term = display.NewTerminal(f.screen, display.TerminalOptions{Size: f.size})
 	f.tree = display.NewTree(f.term, display.TreeOptions{Now: f.clock.Now, ASCII: o.ascii, Interrupted: o.interrupted})
 	f.summary = &display.Summary{}
 	f.capture = &progresstest.Capture{}
@@ -856,7 +856,7 @@ func TestTheTreeReadsTheRealClock(t *testing.T) {
 	t.Parallel()
 	synctest.Test(t, func(t *testing.T) {
 		s := &progresstest.Screen{}
-		tree := display.NewTree(display.NewTerminal(s, func() (int, int, error) { return 100, 24, nil }), display.TreeOptions{})
+		tree := display.NewTree(display.NewTerminal(s, display.TerminalOptions{Size: func() (int, int, error) { return 100, 24, nil }}), display.TreeOptions{})
 		capture := &progresstest.Capture{}
 		bus := progress.NewBus(progress.BusOptions{Sinks: []progress.Sink{capture, tree}})
 		_, command := progress.Start(progress.WithBus(context.Background(), bus), progress.KindCommand, "exec")
@@ -1113,7 +1113,7 @@ exec · 0:01
 func TestTheTreeTakesEventsNoBusSends(t *testing.T) {
 	t.Parallel()
 	s := &progresstest.Screen{}
-	term := display.NewTerminal(s, func() (int, int, error) { return 100, 24, nil })
+	term := display.NewTerminal(s, display.TerminalOptions{Size: func() (int, int, error) { return 100, 24, nil }})
 	c := &clock{now: time.Date(2026, 9, 26, 12, 0, 0, 0, time.UTC)}
 	tree := display.NewTree(term, display.TreeOptions{Now: c.Now})
 	t.Cleanup(tree.Close)

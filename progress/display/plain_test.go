@@ -46,7 +46,7 @@ func newPlainFixture(t *testing.T, command string) *plainFixture {
 func newPlainFixtureWith(t *testing.T, command string, o display.PlainOptions) *plainFixture {
 	t.Helper()
 	f := &plainFixture{screen: &screen{}, clock: &clock{now: time.Date(2026, 9, 26, 12, 0, 0, 0, time.UTC)}}
-	f.term = display.NewTerminal(f.screen, nil)
+	f.term = display.NewTerminal(f.screen, display.TerminalOptions{})
 	o.Now = f.clock.Now
 	f.plain = display.NewPlain(f.term, o)
 	f.summary = &display.Summary{}
@@ -236,7 +236,7 @@ func TestPlainLinesOfAStepWithNothingToNameIt(t *testing.T) {
 	t.Parallel()
 	s := &screen{}
 	c := &clock{now: time.Date(2026, 9, 26, 12, 0, 0, 0, time.UTC)}
-	plain := display.NewPlain(display.NewTerminal(s, nil), display.PlainOptions{Now: c.Now})
+	plain := display.NewPlain(display.NewTerminal(s, display.TerminalOptions{}), display.PlainOptions{Now: c.Now})
 	bus := progress.NewBus(progress.BusOptions{Sinks: []progress.Sink{plain}, Now: c.Now})
 	fanout.Map(progress.WithBus(context.Background(), bus), []string{"exe1", "exe2"}, fanout.MapOptions[string]{Limit: 1},
 		func(context.Context, string) (struct{}, error) {
@@ -409,7 +409,7 @@ func TestPlainReadsTheRealClock(t *testing.T) {
 	t.Parallel()
 	synctest.Test(t, func(t *testing.T) {
 		s := &screen{}
-		plain := display.NewPlain(display.NewTerminal(s, nil), display.PlainOptions{})
+		plain := display.NewPlain(display.NewTerminal(s, display.TerminalOptions{}), display.PlainOptions{})
 		capture := &progresstest.Capture{}
 		bus := progress.NewBus(progress.BusOptions{Sinks: []progress.Sink{capture, plain}})
 		ctx, command := progress.Start(progress.WithBus(context.Background(), bus), progress.KindCommand, "exec")
@@ -452,7 +452,7 @@ func TestPlainWritesTheLinesThatComeWhileItDraws(t *testing.T) {
 			}
 			return time.Now()
 		}
-		plain := display.NewPlain(display.NewTerminal(s, nil), display.PlainOptions{Now: now})
+		plain := display.NewPlain(display.NewTerminal(s, display.TerminalOptions{}), display.PlainOptions{Now: now})
 		made = true
 		capture := &progresstest.Capture{}
 		bus := progress.NewBus(progress.BusOptions{Sinks: []progress.Sink{capture, plain}})
@@ -516,7 +516,7 @@ func TestPlainTakesEventsNoBusSends(t *testing.T) {
 	t.Parallel()
 	s := &screen{}
 	c := &clock{now: time.Date(2026, 9, 26, 12, 0, 0, 0, time.UTC)}
-	plain := display.NewPlain(display.NewTerminal(s, nil), display.PlainOptions{Now: c.Now})
+	plain := display.NewPlain(display.NewTerminal(s, display.TerminalOptions{}), display.PlainOptions{Now: c.Now})
 	t.Cleanup(plain.Close)
 	for _, e := range []progress.Event{
 		{Type: progress.TypeStart, Span: 1, Kind: progress.KindCommand, Name: "exec", State: progress.StateRunning},

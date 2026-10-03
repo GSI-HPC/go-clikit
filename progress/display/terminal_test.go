@@ -22,7 +22,8 @@ import (
 )
 
 // terminalFixture is a counter on a Screen, drawn from a clock two seconds
-// on, so that its first Draw shows it.
+// on, so that its first Draw shows it; newTerminalFixture puts it on a
+// Terminal as o configures it.
 type terminalFixture struct {
 	screen  *progresstest.Screen
 	term    *display.Terminal
@@ -30,10 +31,10 @@ type terminalFixture struct {
 	clock   *clock
 }
 
-func newTerminalFixture(t *testing.T) *terminalFixture {
+func newTerminalFixture(t *testing.T, o display.TerminalOptions) *terminalFixture {
 	t.Helper()
 	f := &terminalFixture{screen: &progresstest.Screen{}, clock: &clock{now: time.Date(2026, 9, 26, 12, 0, 0, 0, time.UTC)}}
-	f.term = display.NewTerminal(f.screen, nil)
+	f.term = display.NewTerminal(f.screen, o)
 	f.counter = display.NewCounter(f.term, display.CounterOptions{Now: f.clock.Now})
 	f.clock.Add(2 * time.Second)
 	t.Cleanup(f.counter.Close)
@@ -56,7 +57,7 @@ func (f *terminalFixture) shows(t *testing.T, what, want string) {
 // that of a helper, such as sops, which writes to the terminal itself.
 func TestLinesWaitWhileAQuestionIsAsked(t *testing.T) {
 	t.Parallel()
-	f := newTerminalFixture(t)
+	f := newTerminalFixture(t, display.TerminalOptions{})
 	diag := f.term.Lines(f.screen)
 	errOut := f.term.Writer(f.screen)
 	f.counter.Draw()
@@ -89,7 +90,7 @@ func TestLinesWaitWhileAQuestionIsAsked(t *testing.T) {
 // it asks, waits for the write that ends that line.
 func TestLinesWaitForAnOpenLineToEnd(t *testing.T) {
 	t.Parallel()
-	f := newTerminalFixture(t)
+	f := newTerminalFixture(t, display.TerminalOptions{})
 	out := f.term.Writer(f.screen)
 	diag := f.term.Lines(f.screen)
 	_, _ = io.WriteString(out, "Reset 2 hosts? [y/N] ")
@@ -104,7 +105,7 @@ func TestLinesWaitForAnOpenLineToEnd(t *testing.T) {
 // which writes it above the region and draws the region again.
 func TestLinesAreWrittenAboveTheNextFrame(t *testing.T) {
 	t.Parallel()
-	f := newTerminalFixture(t)
+	f := newTerminalFixture(t, display.TerminalOptions{})
 	diag := f.term.Lines(f.screen)
 	f.counter.Draw()
 	_, _ = io.WriteString(diag, "first\n")
@@ -122,7 +123,7 @@ func TestLinesAreWrittenAboveTheNextFrame(t *testing.T) {
 // so that the two keep the order they were written in.
 func TestLinesComeBeforeTheCommandsNextWrite(t *testing.T) {
 	t.Parallel()
-	f := newTerminalFixture(t)
+	f := newTerminalFixture(t, display.TerminalOptions{})
 	f.counter.Draw()
 	_, _ = io.WriteString(f.term.Lines(f.screen), "a log line\n")
 	_, _ = io.WriteString(f.term.Writer(f.screen), "output\n")
@@ -133,7 +134,7 @@ func TestLinesComeBeforeTheCommandsNextWrite(t *testing.T) {
 // part of a line written after its end waits for the rest.
 func TestCloseEndsALineOfLinesThatWasNotEnded(t *testing.T) {
 	t.Parallel()
-	f := newTerminalFixture(t)
+	f := newTerminalFixture(t, display.TerminalOptions{})
 	diag := f.term.Lines(f.screen)
 	_, _ = io.WriteString(diag, "one\ntw")
 	f.shows(t, "with a line begun", "one\n")
@@ -147,7 +148,7 @@ func TestCloseEndsALineOfLinesThatWasNotEnded(t *testing.T) {
 // the write that ends it, and then goes out with it, whole.
 func TestLinesWriteNothingOfALineNotEnded(t *testing.T) {
 	t.Parallel()
-	f := newTerminalFixture(t)
+	f := newTerminalFixture(t, display.TerminalOptions{})
 	diag := f.term.Lines(f.screen)
 	_, _ = io.WriteString(diag, "a log ")
 	f.shows(t, "with part of a line", "")
@@ -161,8 +162,7 @@ func TestLinesWriteNothingOfALineNotEnded(t *testing.T) {
 func TestWhatLinesHoldIsBounded(t *testing.T) {
 	t.Parallel()
 	var out strings.Builder
-	f := newTerminalFixture(t)
-	f.term.Program = "sind"
+	f := newTerminalFixture(t, display.TerminalOptions{Program: "sind"})
 	diag := f.term.Lines(&out)
 	f.counter.Suspend()
 	line := strings.Repeat("x", 1023) + "\n"
@@ -193,15 +193,17 @@ func TestThePanicOfADisplayWaitsForTheQuestion(t *testing.T) {
 	s := &progresstest.Screen{}
 	var mu sync.Mutex
 	asking := false
-	term := display.NewTerminal(s, func() (int, int, error) {
-		mu.Lock()
-		defer mu.Unlock()
-		if asking {
-			panic("the size of the terminal")
-		}
-		return 80, 24, nil
+	term := display.NewTerminal(s, display.TerminalOptions{
+		Size: func() (int, int, error) {
+			mu.Lock()
+			defer mu.Unlock()
+			if asking {
+				panic("the size of the terminal")
+			}
+			return 80, 24, nil
+		},
+		PanicLog: &log,
 	})
-	term.PanicLog = &log
 	c := &clock{now: time.Date(2026, 9, 26, 12, 0, 0, 0, time.UTC)}
 	counter := display.NewCounter(term, display.CounterOptions{Now: c.Now})
 	c.Add(2 * time.Second)
@@ -232,8 +234,10 @@ func TestThePanicOfADisplayGoesToTheTerminalWithoutAPanicLog(t *testing.T) {
 	t.Parallel()
 	synctest.Test(t, func(t *testing.T) {
 		s := &progresstest.Screen{}
-		term := display.NewTerminal(s, func() (int, int, error) { panic("the size of the terminal") })
-		term.Program = "sind"
+		term := display.NewTerminal(s, display.TerminalOptions{
+			Size:    func() (int, int, error) { panic("the size of the terminal") },
+			Program: "sind",
+		})
 		counter := display.NewCounter(term, display.CounterOptions{})
 		counter.Start()
 		time.Sleep(time.Second)
@@ -249,22 +253,23 @@ func TestThePanicOfADisplayGoesToTheTerminalWithoutAPanicLog(t *testing.T) {
 	})
 }
 
-// A PanicLog that is one of the Terminal's own writers takes the stack of
-// a display that panicked like any other, and the command's writes and
-// Close go on; and Lines and Writer take each other's writers.
-func TestThePanicLogMayBeAWriterOfTheTerminal(t *testing.T) {
+// A display that panicked writes its stack to the stream the command
+// writes its own lines to, through the Terminal, and the command's writes
+// and Close go on; and Lines and Writer take each other's writers.
+func TestTheCommandGoesOnAfterADisplayPanicked(t *testing.T) {
 	t.Parallel()
 	s := &progresstest.Screen{}
-	term := display.NewTerminal(s, nil)
-	errOut := term.Writer(s)
-	term.PanicLog = errOut
 	var draws atomic.Int32
-	term.Foreground = func() bool {
-		if draws.Add(1) == 3 {
-			panic("the foreground")
-		}
-		return true
-	}
+	term := display.NewTerminal(s, display.TerminalOptions{
+		PanicLog: s,
+		Foreground: func() bool {
+			if draws.Add(1) == 3 {
+				panic("the foreground")
+			}
+			return true
+		},
+	})
+	errOut := term.Writer(s)
 	// A clock past the counter's first second, so that it draws at once.
 	clock := &clock{now: time.Date(2026, 9, 26, 12, 0, 0, 0, time.UTC)}
 	counter := display.NewCounter(term, display.CounterOptions{Now: clock.Now})
@@ -300,7 +305,7 @@ func TestThePanicLogMayBeAWriterOfTheTerminal(t *testing.T) {
 
 	// The writers of another Terminal are streams like any other: they are
 	// written through, and take their own region off.
-	other := display.NewTerminal(s, nil)
+	other := display.NewTerminal(s, display.TerminalOptions{})
 	_, _ = io.WriteString(term.Writer(other.Writer(s)), "theirs\n")
 	_, _ = io.WriteString(term.Lines(other.Lines(s)), "their line\n")
 	if got := s.String(); !strings.HasSuffix(got, "theirs\ntheir line\n") {
@@ -315,7 +320,7 @@ func TestThePanicLogMayBeAWriterOfTheTerminal(t *testing.T) {
 func TestLinesStayWholeUnderInterleaving(t *testing.T) {
 	t.Parallel()
 	const writers, each = 4, 200
-	f := newTerminalFixture(t)
+	f := newTerminalFixture(t, display.TerminalOptions{})
 	f.counter.Start()
 
 	var wg sync.WaitGroup
@@ -388,7 +393,7 @@ func TestLinesStayWholeUnderInterleaving(t *testing.T) {
 // the colour, until a write ends the line, or sets the colour back.
 func TestAColourNotSetBackLeavesTheLineOpen(t *testing.T) {
 	t.Parallel()
-	f := newTerminalFixture(t)
+	f := newTerminalFixture(t, display.TerminalOptions{})
 	out := f.term.Writer(f.screen)
 	diag := f.term.Lines(f.screen)
 	_, _ = io.WriteString(out, "line\n\x1b[41m")
@@ -425,15 +430,17 @@ func TestThePanicOfADisplayTakesItsRegionOff(t *testing.T) {
 		s := &progresstest.Screen{}
 		var mu sync.Mutex
 		broken := false
-		term := display.NewTerminal(s, func() (int, int, error) {
-			mu.Lock()
-			defer mu.Unlock()
-			if broken {
-				panic("the size of the terminal")
-			}
-			return 80, 24, nil
+		term := display.NewTerminal(s, display.TerminalOptions{
+			Size: func() (int, int, error) {
+				mu.Lock()
+				defer mu.Unlock()
+				if broken {
+					panic("the size of the terminal")
+				}
+				return 80, 24, nil
+			},
+			PanicLog: &log,
 		})
-		term.PanicLog = &log
 		counter := display.NewCounter(term, display.CounterOptions{})
 		counter.Start()
 		time.Sleep(2 * time.Second)
@@ -465,14 +472,14 @@ func TestThePanicOfADisplayWritesWhatItHeldFirst(t *testing.T) {
 		s := &progresstest.Screen{}
 		var mu sync.Mutex
 		broken := false
-		term := display.NewTerminal(s, func() (int, int, error) {
+		term := display.NewTerminal(s, display.TerminalOptions{Size: func() (int, int, error) {
 			mu.Lock()
 			defer mu.Unlock()
 			if broken {
 				panic("the size of the terminal")
 			}
 			return 100, 24, nil
-		})
+		}})
 		tree := display.NewTree(term, display.TreeOptions{})
 		bus := progress.NewBus(progress.BusOptions{Sinks: []progress.Sink{tree}})
 		ctx, command := progress.Start(progress.WithBus(context.Background(), bus), progress.KindCommand, "cmd")
@@ -504,7 +511,7 @@ func TestThePanicOfADisplayWritesWhatItHeldFirst(t *testing.T) {
 // drawn again, and the lines of the Lines writers are not held.
 func TestAColourAfterTheEndOfALineLeavesNoLineOpen(t *testing.T) {
 	t.Parallel()
-	f := newTerminalFixture(t)
+	f := newTerminalFixture(t, display.TerminalOptions{})
 	out := f.term.Writer(f.screen)
 	diag := f.term.Lines(f.screen)
 	f.counter.Draw()
@@ -532,7 +539,7 @@ func TestAColourAfterTheEndOfALineLeavesNoLineOpen(t *testing.T) {
 // A line that comes in many small writes costs each write the bytes it
 // adds, not the line written so far: a byte more allocates nothing.
 func TestALongLineInSmallWritesCostsLittle(t *testing.T) {
-	term := display.NewTerminal(io.Discard, nil)
+	term := display.NewTerminal(io.Discard, display.TerminalOptions{})
 	diag := term.Lines(io.Discard)
 	_, _ = io.WriteString(diag, strings.Repeat("x", 4<<10))
 	b := []byte("x")
@@ -555,11 +562,11 @@ func TestTheRegionComesOffByItsRowsAfterTheTerminalNarrows(t *testing.T) {
 		width = w
 	}
 	var out strings.Builder
-	term := display.NewTerminal(&out, func() (int, int, error) {
+	term := display.NewTerminal(&out, display.TerminalOptions{Size: func() (int, int, error) {
 		mu.Lock()
 		defer mu.Unlock()
 		return width, 24, nil
-	})
+	}})
 	c := &clock{now: time.Date(2026, 9, 26, 12, 0, 0, 0, time.UTC)}
 	counter := display.NewCounter(term, display.CounterOptions{Now: c.Now})
 	defer counter.Close()

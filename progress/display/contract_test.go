@@ -63,8 +63,10 @@ func newSession(t *testing.T, command string, newDisplay func(*display.Terminal,
 		capture: &progresstest.Capture{},
 		summary: &display.Summary{},
 	}
-	term := display.NewTerminal(s.screen, func() (int, int, error) { return 100, 40, nil })
-	term.Program = "prog"
+	term := display.NewTerminal(s.screen, display.TerminalOptions{
+		Size:    func() (int, int, error) { return 100, 40, nil },
+		Program: "prog",
+	})
 	s.out, s.errOut = term.Writer(s.screen), term.Writer(s.screen)
 	s.shown = newDisplay(term, s.clock.Now)
 	s.bus = progress.NewBus(progress.BusOptions{Sinks: []progress.Sink{s.capture, s.shown, s.summary}, Now: s.clock.Now})
