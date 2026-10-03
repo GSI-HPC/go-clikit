@@ -7,7 +7,8 @@
 # checking the latter with verify-release-tag.sh; every version the module
 # proxy lists, or release pinned, that has no tag in the checkout; and every
 # version the module proxy serves from another commit than its tag names,
-# asking module-proxy.sh.
+# asking module-proxy.sh. A version the proxy serves without saying which
+# commit it serves it from is unverified, which is a warning.
 #
 # A tag push runs the release workflow of the tagged commit, so a tag on a
 # commit from before the workflow, or on one that changes it, verifies
@@ -120,8 +121,18 @@ if ! versions="$("$module_proxy" list)"; then
   unread=1
 fi
 
+# reported <output>: prints what a check reported, and fails, for check.
+reported() {
+  printf '%s\n' "$1"
+  return 1
+}
+
+# A version whose .info does not say which commit the proxy serves it from
+# is unverified, a warning: the proxy leaves that out for a version it
+# fetched long ago, and that cannot be helped.
 untagged=0
 moved=0
+unverified=0
 while IFS= read -r version; do
   [ -n "$version" ] || continue
   if ! git rev-parse --verify --quiet "refs/tags/$version" > /dev/null; then
@@ -130,7 +141,14 @@ while IFS= read -r version; do
     continue
   fi
   commit="$(git rev-parse --verify --quiet "refs/tags/$version^{commit}")" || commit="(none)"
-  check "$version" "$module_proxy" check "$version" "$commit" || moved=$((moved + 1))
+  if out="$("$module_proxy" check "$version" "$commit" 2>&1)"; then
+    printf '%s\n' "$out"
+    if grep -q '^::warning::' <<< "$out"; then
+      unverified=$((unverified + 1))
+    fi
+    continue
+  fi
+  check "$version" reported "$out" || moved=$((moved + 1))
 done <<< "$versions"
 
 gone=0
@@ -177,13 +195,18 @@ if [ "$failed" -ne 0 ] || [ "$untagged" -ne 0 ] || [ "$moved" -ne 0 ] || [ "$gon
   [ "$unread" -ne 0 ]; then
   exit 1
 fi
+served="the module proxy serves no other version or commit"
+if [ "$unverified" -ne 0 ]; then
+  echo "::warning::$unverified version(s) on the module proxy are unverified, since the proxy does not say which commit it serves them from; see doc/release.md"
+  served="the module proxy serves no other version, nor another commit that it names"
+fi
 # What a retraction acknowledged is reported whether or not there are tags:
 # only an audit that found nothing at all says there was nothing to verify.
 if [ "$acknowledged" -ne 0 ]; then
   echo "::warning::$acknowledged problem(s) are acknowledged by the versions $go_mod retracts"
-  echo "::notice::all ${#tags[@]} release tag(s) but the retracted versions are pinned or signed by a listed signer, and the module proxy serves no other version or commit"
+  echo "::notice::all ${#tags[@]} release tag(s) but the retracted versions are pinned or signed by a listed signer, and $served"
 elif [ "${#tags[@]}" -eq 0 ]; then
   echo "::notice::no release tags to verify"
 else
-  echo "::notice::all ${#tags[@]} release tag(s) are pinned or signed by a listed signer, and the module proxy serves no other version or commit"
+  echo "::notice::all ${#tags[@]} release tag(s) are pinned or signed by a listed signer, and $served"
 fi

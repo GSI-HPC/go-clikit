@@ -281,12 +281,50 @@ expect 'an audit of a version the module proxy serves from another commit than i
   "the module proxy serves v1.0.0 from commit $old, but the tag v1.0.0 names $released" audit "$listed" ''
 expect 'an audit counting the versions served from another commit' fail \
   '1 version(s) on the module proxy are not served from the commit their tag names' audit "$listed" ''
-printf '{"Version":"v1.0.0","Time":"2026-10-01T00:00:00Z"}' > "$PROXY_INFO/v1.0.0.info"
-expect 'an audit of a version the module proxy names no commit for' fail \
-  'does not say which commit it serves v1.0.0 from' audit "$listed" ''
+# The proxy leaves Origin out of the .info of a version it fetched long ago:
+# the version is unverified, a warning, unless the time of the commit in the
+# .info is another than that of the commit the tag names.
+# unrecorded <version> <time>: has the proxy serve a version from a commit
+# of that time, or of none if it is empty, without saying which commit.
+unrecorded() {
+  jq -n --arg v "$1" --arg t "$2" '{Version: $v} + (if $t == "" then {} else {Time: $t} end)' \
+    > "$PROXY_INFO/$1.info"
+}
+released_time="$(TZ=UTC git show -s --format=%cd --date=format-local:%Y-%m-%dT%H:%M:%SZ "$released")"
+unrecorded v1.0.0 "$released_time"
+expect 'an audit of a version the module proxy names no commit for' pass \
+  '::warning::the module proxy does not say which commit it serves v1.0.0 from' audit "$listed" ''
+expect 'an audit counting the versions the module proxy names no commit for' pass \
+  '1 version(s) on the module proxy are unverified' audit "$listed" ''
+expect 'an audit not claiming what it could not verify' pass \
+  'nor another commit that it names' audit "$listed" ''
+unrecorded v1.0.0 ''
+expect 'an audit of a version the module proxy names no commit and no time for' pass \
+  'the time it gives is none' audit "$listed" ''
+printf '{"Version":"v1.0.0","Time":"%s","Origin":{"VCS":"git"}}' "$released_time" > "$PROXY_INFO/v1.0.0.info"
+expect 'an audit of a version whose Origin names no commit' pass \
+  '::warning::the module proxy does not say which commit it serves v1.0.0 from' audit "$listed" ''
+unrecorded v1.0.0 '2000-01-01T00:00:00Z'
+expect 'an audit of a version the module proxy serves from a commit of another time' fail \
+  "the module proxy serves v1.0.0 from a commit of 2000-01-01T00:00:00Z, but the tag v1.0.0 names $released" \
+  audit "$listed" ''
+unrecorded v1.0.0 "$released_time"
+git tag -a v0.0.9 -m 'release v0.0.9' "$released"
+unrecorded v0.0.9 "$released_time"
+printf 'v0.0.9\nv1.0.0\n' > "$PROXY_LIST"
+expect 'an audit of an unsigned tag of a version the module proxy names no commit for' fail \
+  'v0.0.9 is not signed by a key' audit "$listed" ''
+git tag -d v0.0.9 > /dev/null
+rm "$PROXY_INFO/v0.0.9.info"
+printf 'v1.0.0\n' > "$PROXY_LIST"
+printf '{"Version":"v1.0.0","Origin":{"Hash":"main"}}' > "$PROXY_INFO/v1.0.0.info"
+expect 'an audit of a version whose Origin names no commit hash' fail \
+  'names main as the commit it serves v1.0.0 from, which is no commit' audit "$listed" ''
 printf 'not JSON' > "$PROXY_INFO/v1.0.0.info"
-expect 'an audit of a version whose .info is no JSON' fail \
-  'does not say which commit it serves v1.0.0 from' audit "$listed" ''
+expect 'an audit of a version whose .info is no JSON' fail 'v1.0.0.info is not a JSON object' audit "$listed" ''
+printf '"v1.0.0"' > "$PROXY_INFO/v1.0.0.info"
+expect 'an audit of a version whose .info is no JSON object' fail 'v1.0.0.info is not a JSON object' \
+  audit "$listed" ''
 rm "$PROXY_INFO/v1.0.0.info"
 expect 'an audit of a version the module proxy has no .info for' fail 'v1.0.0.info answered 404' audit "$listed" ''
 info v1.0.0 "$released"
@@ -302,6 +340,17 @@ expect 'a version the module proxy serves from the verified commit' pass \
   "the module proxy serves v1.0.0 from $released" proxy_check v1.0.0 "$released"
 expect 'a version the module proxy serves from another commit' fail \
   "serves v1.0.0 from commit $released, but the tag v1.0.0 names $old" proxy_check v1.0.0 "$old"
+unrecorded v1.0.0 "$released_time"
+expect 'a version the module proxy names no commit for' pass \
+  "::warning::the module proxy does not say which commit it serves v1.0.0 from, so it cannot be held to $released" \
+  proxy_check v1.0.0 "$released"
+unrecorded v1.0.0 '2000-01-01T00:00:00Z'
+expect 'a version the module proxy serves from a commit of another time' fail \
+  'from a commit of 2000-01-01T00:00:00Z' proxy_check v1.0.0 "$released"
+unrecorded v1.0.0 ''
+expect 'a version the module proxy names no commit for, and a commit that is not in the checkout' fail \
+  "cannot read the commit $(printf '%040d' 0)" proxy_check v1.0.0 "$(printf '%040d' 0)"
+info v1.0.0 "$released"
 : > "$CURL_LOG"
 info 'v1.1.0-!r!c.1' "$released"
 expect 'a version with upper-case letters' pass '' proxy_check v1.1.0-RC.1 "$released"
