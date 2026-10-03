@@ -76,3 +76,25 @@ func TestPanicErrorKeepsTheValueAndWrapsNothing(t *testing.T) {
 		}
 	}
 }
+
+// The text of a PanicError is fixed when the panic is recovered: a value
+// the program changes afterwards changes neither the error nor the log.
+// A PanicError made by hand prints its Value.
+func TestPanicErrorFixesItsTextWhenRecovered(t *testing.T) {
+	t.Parallel()
+
+	state := map[string]int{"done": 1}
+	var log strings.Builder
+	err := fanout.Recovered(&log, "prog", "exe1", state)
+	state["done"] = 2
+	if want := `prog panicked; this is a bug, please report it: "map[done:1]"`; err.Error() != want {
+		t.Errorf("Error() = %q, want %q", err, want)
+	}
+	if !strings.Contains(log.String(), `"map[done:1]"`) {
+		t.Errorf("the log reads %q", log.String())
+	}
+	byHand := &fanout.PanicError{Value: "boom"}
+	if want := `the program panicked; this is a bug, please report it: "boom"`; byHand.Error() != want {
+		t.Errorf("Error() = %q, want %q", byHand, want)
+	}
+}
