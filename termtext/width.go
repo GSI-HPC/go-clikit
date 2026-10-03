@@ -4,7 +4,6 @@
 package termtext
 
 import (
-	"strings"
 	"unicode"
 
 	"golang.org/x/text/width"
@@ -40,19 +39,46 @@ func RuneWidth(r rune) int {
 	return 1
 }
 
-// Width returns how many columns s takes on a terminal, the widths of its
-// runes added up.
+// emojiPresentation is the variation selector U+FE0F, which asks for the
+// emoji picture of the character before it.
+const emojiPresentation = 0xfe0f
+
+// advance returns the columns r adds to text whose last rune that took
+// columns took last of them, and what last becomes. U+FE0F after a rune of
+// one column makes that rune two columns, as a terminal draws its emoji
+// picture; any other rune adds its RuneWidth.
+func advance(r rune, last int) (cols, next int) {
+	if r == emojiPresentation {
+		if last == 1 {
+			return 1, 2
+		}
+		return 0, last
+	}
+	cols = RuneWidth(r)
+	if cols == 0 {
+		return 0, last
+	}
+	return cols, cols
+}
+
+// Width returns how many columns s takes on a terminal: the widths of its
+// runes added up, except that a rune of one column followed by U+FE0F is
+// counted as two, since a terminal draws it as an emoji picture, as it does
+// a keycap such as 1, U+FE0F, U+20E3.
 func Width(s string) int {
-	n := 0
+	n, last := 0, 0
 	for _, r := range s {
-		n += RuneWidth(r)
+		var w int
+		w, last = advance(r, last)
+		n += w
 	}
 	return n
 }
 
 // Truncate shortens s to at most cols columns, as Width counts them, so that
 // a row never wraps. A wide character that would reach past cols is left out
-// whole, never split; cols of zero or less leaves nothing.
+// whole, never split, and a character whose U+FE0F would reach past cols is
+// kept without it; cols of zero or less leaves nothing.
 //
 // s must be plain text that is already escaped, by EscapeCell for one line:
 // a control character or an escape sequence would be counted as the columns
@@ -63,19 +89,16 @@ func Truncate(s string, cols int) string {
 	if cols < 1 {
 		return ""
 	}
-	if Width(s) <= cols {
-		return s
-	}
-	var b strings.Builder
-	for _, r := range s {
-		w := RuneWidth(r)
+	last := 0
+	for i, r := range s {
+		var w int
+		w, last = advance(r, last)
 		if w > cols {
-			break
+			return s[:i]
 		}
-		b.WriteRune(r)
 		cols -= w
 	}
-	return b.String()
+	return s
 }
 
 // prependedConcatenationMarks are the format characters with the Unicode

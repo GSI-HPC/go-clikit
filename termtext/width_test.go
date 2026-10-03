@@ -35,6 +35,32 @@ func TestTheWidthOfTextOnATerminal(t *testing.T) {
 	}
 }
 
+// A variation selector U+FE0F asks for the emoji picture of the character
+// before it, which a terminal draws two columns wide, as it does a keycap.
+func TestAnEmojiPresentationSequenceTakesTwoColumns(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		text string
+		want int
+	}{
+		{"\u2764\ufe0f", 2},
+		{"\u263a\ufe0f", 2},
+		{"1\ufe0f\u20e3", 2},
+		{"\u2764\ufe0f\u2764\ufe0f", 4},
+		{"\u2764\ufe0f\ufe0f", 2},
+		{"\U0001F600\ufe0f", 2},
+		{"\ufe0f", 0},
+		{"\u2764", 1},
+		{"\u2764\ufe0e", 1},
+		{"e\u0301\ufe0f", 2},
+		{"\u2764\ufe0f\u200d\U0001F525", 4},
+	} {
+		if got := termtext.Width(tc.text); got != tc.want {
+			t.Errorf("Width(%q) = %d, want %d", tc.text, got, tc.want)
+		}
+	}
+}
+
 // Of the format characters, the soft hyphen and the prepended concatenation
 // marks are drawn, one column wide; the others take none.
 func TestTheFormatCharactersATerminalDraws(t *testing.T) {
@@ -96,8 +122,14 @@ func TestTruncate(t *testing.T) {
 		{"a失败", 2, "a"},
 		{"失败", 1, ""},
 		{"e\u0301e\u0301", 1, "e\u0301"},
+		{"\u2764\ufe0f\u2764\ufe0f", 3, "\u2764\ufe0f\u2764"},
+		{"\u2764\ufe0f\u2764\ufe0f", 2, "\u2764\ufe0f"},
+		{"\u2764\ufe0f", 1, "\u2764"},
+		{"a\u2764\ufe0f", 2, "a\u2764"},
+		{"1\ufe0f\u20e3 ok", 2, "1\ufe0f\u20e3"},
 		{"\u00ad\u00ad\u00adok", 2, "\u00ad\u00ad"},
 		{"\U0001FAE9\U0001FAE9", 3, "\U0001FAE9"},
+		{"bad \xff", 4, "bad "},
 	} {
 		got := termtext.Truncate(tc.text, tc.cols)
 		if got != tc.want {
