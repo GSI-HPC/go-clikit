@@ -19,7 +19,7 @@ edited: a later one supersedes it, and the earlier one's status names it.
 | [8](#8-widths-err-wide-and-follow-unicode-180) | Widths err wide, and follow Unicode 18.0 | accepted |
 | [9](#9-the-region-comes-off-one-line-a-row) | The region comes off one line a row | accepted |
 | [10](#10-a-daily-audit-holds-the-releases-to-their-record) | A daily audit holds the releases to their record | accepted |
-| [11](#11-a-deadline-ends-a-pool-as-an-interrupt-does) | A deadline ends a pool as an interrupt does | accepted |
+| [11](#11-a-deadline-ends-a-pools-items-as-an-interrupt-does) | A deadline ends a pool's items as an interrupt does | accepted |
 
 ## 1. Apache-2.0, and GSI holds the copyright
 
@@ -539,7 +539,7 @@ and withdrawn.
 - What a retraction acknowledges stays in every run of the audit as a
   warning.
 
-## 11. A deadline ends a pool as an interrupt does
+## 11. A deadline ends a pool's items as an interrupt does
 
 Status: accepted
 
@@ -559,14 +559,17 @@ own time.
 ### Decision
 
 - The end of a pool's context ends its items canceled, `ClassCanceled`,
-  whether it was interrupted or ran out of time: those the pool left out,
-  and those whose `Acquire` refused them or whose work returned an error
-  other than of `Skip` once the context had ended. Their targets end with
-  the context's error, in a type that says `ClassCanceled`, and when every
-  item that failed ended so, `Summarize` is told that they were
-  interrupted, which `Failure` ends canceled. `Batches` ends the
-  batches a deadline left out in the same way. The pool, not the item,
-  stopped the work.
+  whether it was interrupted or ran out of time: those `Map` left out, and
+  those whose `Acquire` refused them or whose work returned an error other
+  than of `Skip` once the context had ended. Their targets end with the
+  context's error, in a type that says `ClassCanceled`, and when every item
+  that failed ended so, `Summarize` is told that they were interrupted,
+  which `Failure` ends canceled. The pool, not the item, stopped the work.
+- `Batches` ends the batches the end of its context left out canceled in
+  the same way. Its step, when no batch failed, and a `stagger` wait the
+  context ended, end with the context's error as it is, so that a deadline
+  ends them failed, as timeouts, and an interrupt canceled; a batch that
+  was run ends with what its run returned.
 - An item that runs out of its own time, a call whose own deadline passed
   while the pool's context had not ended, is classed by its error as any
   other, and so stays a timeout, a failure of that item.
@@ -575,11 +578,15 @@ own time.
 
 ### Costs
 
-- An event log or a display does not tell from the class whether a pool
-  was interrupted or ran out of time; the error text in the event log,
-  `context canceled` or `context deadline exceeded`, does, and a program
-  asks its context, with `ctx.Err` or `context.Cause`, to tell the two
-  apart, such as to exit with another code.
+- An event log or a display does not tell from the class of an item, or of
+  `Map`'s step, whether a pool was interrupted or ran out of time; the
+  error text in the event log, `context canceled` or `context deadline
+  exceeded`, does, and a program asks its context, with `ctx.Err` or
+  `context.Cause`, to tell the two apart, such as to exit with another
+  code.
+- `Batches` classes its step and its wait otherwise than its batches and
+  `Map`'s step: under a deadline its step ends failed, as a timeout, while
+  the batches it left out end canceled.
 - The outcome of an item cut short keeps the error its work returned,
   which may be a timeout of its own, while its target ends canceled.
 - An item whose work fails for a reason of its own just as the context

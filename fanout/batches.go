@@ -78,7 +78,10 @@ var ErrNotTried = errors.New("not tried: an earlier batch failed")
 // wait, "stagger". A batch not tried ends skipped, and one the context
 // ended before ends canceled, whether it was interrupted or ran out of
 // time, and either counts as its Total, so that the step's count reaches
-// its own.
+// its own. The step ends with what ended the run: the error of the batch
+// that failed, or else the context's, or else the last batch's. It and a
+// wait the context ended keep the context's error as it is, so a deadline
+// ends them failed, as timeouts, and an interrupt canceled.
 func Batches(ctx context.Context, nodes *nodeset.NodeSet, o BatchOptions, run func(ctx context.Context, batch *nodeset.NodeSet) error) []Batch {
 	parts := 1
 	if n := nodes.Len(); o.Size > 0 && n > o.Size {
