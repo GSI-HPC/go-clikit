@@ -882,6 +882,50 @@ func TestADisplayListedTwiceIsResumedTwice(t *testing.T) {
 	}
 }
 
+// valueDisplay is a Suspender of a type that cannot be compared, which
+// counts its calls through a pointer.
+type valueDisplay struct {
+	names []string
+	calls *[]string
+}
+
+func (valueDisplay) Handle(progress.Event) {}
+
+func (v valueDisplay) Suspend() { *v.calls = append(*v.calls, "suspend") }
+
+func (v valueDisplay) Resume() { *v.calls = append(*v.calls, "resume") }
+
+// A display of a type that cannot be compared is suspended and resumed
+// like any other, when suspensions nest and when two such displays share
+// the type.
+func TestADisplayThatCannotBeComparedIsSuspended(t *testing.T) {
+	t.Parallel()
+
+	var one, two []string
+	sinks := []progress.Sink{
+		valueDisplay{names: []string{"a"}, calls: &one},
+		valueDisplay{names: []string{"b"}, calls: &two},
+	}
+	ctx, bus, _ := watched(t, progress.Options{Sinks: sinks, PanicLog: io.Discard})
+	outer := progress.Suspend(ctx)
+	inner := progress.Suspend(ctx)
+	inner()
+	want := "suspend suspend resume"
+	if got := strings.Join(one, " "); got != want {
+		t.Errorf("after the inner resume the first display saw %q, want %q", got, want)
+	}
+	outer()
+	progress.Suspend(ctx)
+	bus.Close()
+	want = "suspend suspend resume resume suspend resume"
+	if got := strings.Join(one, " "); got != want {
+		t.Errorf("the first display saw %q, want %q", got, want)
+	}
+	if got := strings.Join(two, " "); got != want {
+		t.Errorf("the second display saw %q, want %q", got, want)
+	}
+}
+
 func equal(a, b []string) bool {
 	return strings.Join(a, "\n") == strings.Join(b, "\n")
 }

@@ -516,7 +516,7 @@ type level struct {
 // hold counts a Suspend that x returned from at depth. b.suspending is
 // held.
 func (b *Bus) hold(x Suspender, depth int) {
-	i := slices.IndexFunc(b.holds, func(h *hold) bool { return h.display == x })
+	i := slices.IndexFunc(b.holds, func(h *hold) bool { return same(h.display, x) })
 	if i < 0 {
 		b.holds = append(b.holds, &hold{display: x})
 		i = len(b.holds) - 1
@@ -527,6 +527,20 @@ func (b *Bus) hold(x Suspender, depth int) {
 		return
 	}
 	h.levels = append(h.levels, level{depth: depth, n: 1})
+}
+
+// same reports whether a and b are the same display. A display of a type
+// that cannot be compared, such as a struct value holding a slice, is
+// never the same as another, itself included, so that each Suspend it
+// returns from is held, and resumed, on its own rather than make == panic
+// in the caller of Suspend.
+func same(a, b Suspender) (eq bool) {
+	defer func() {
+		if recover() != nil {
+			eq = false
+		}
+	}()
+	return a == b
 }
 
 // release resumes every display sent Suspends deeper than the depth the
