@@ -415,6 +415,21 @@ expect 'an audit finding a version on the module proxy and no tags at all' fail 
 : > "$PROXY_LIST"
 expect 'an audit finding a pinned release and no tags at all' fail \
   '1 pinned release(s) have no tag' audit '' '' "v0.1.0 $(printf '%040d' 0)"
+# What a retraction acknowledges is reported when there are no tags as well,
+# and the audit does not say that there was nothing to verify.
+retracting 'retract v0.1.0 // Deleted.'
+AUDIT_MOD="$scratch/retract.mod" expect 'an audit of a retracted pinned release and no tags at all' pass \
+  '1 problem(s) are acknowledged' audit '' '' "v0.1.0 $(printf '%040d' 0)"
+printf 'v0.1.0\n' > "$PROXY_LIST"
+AUDIT_MOD="$scratch/retract.mod" expect 'an audit of a retracted version on the module proxy and no tags at all' pass \
+  '1 problem(s) are acknowledged' audit '' ''
+if AUDIT_MOD="$scratch/retract.mod" audit '' '' 2>&1 | grep -qF 'no release tags'; then
+  echo "FAIL an audit that acknowledged a problem says there were no release tags to verify"
+  failures=$((failures + 1))
+else
+  echo "ok   an audit that acknowledged a problem does not say there was nothing to verify"
+fi
+: > "$PROXY_LIST"
 
 # The version: one the go command takes for this module, or none.
 printf 'module example.org/kit\n\ngo 1.26.0\n' > "$scratch/go.mod"
