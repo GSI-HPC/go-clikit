@@ -544,6 +544,62 @@ func TestALogThatStallsHoldsNothingUp(t *testing.T) {
 	}
 }
 
+// gate is a writer that takes nothing until it is opened, as a pipe does
+// whose reader has paused, and then keeps all it is given.
+type gate struct {
+	open chan struct{}
+	writes
+}
+
+func (g *gate) Write(p []byte) (int, error) {
+	<-g.open
+	return g.writes.Write(p)
+}
+
+// A log that falls behind keeps the lines it had already taken and leaves
+// out only those that came after: once the writer takes lines again, what
+// it is given is the run's first events, seq 1 up without a gap, as much as
+// fitted in 8 MiB, and Close says why the rest are missing.
+func TestALogThatFallsBehindKeepsWhatItHad(t *testing.T) {
+	t.Parallel()
+	w := &gate{open: make(chan struct{})}
+	log := progress.NewLog(w, progress.LogOptions{Run: "0123456789abcdef", FlushEvery: time.Millisecond, CloseWait: time.Minute})
+	bus := progress.NewBus(progress.Options{Sinks: []progress.Sink{log}})
+	ctx := progress.WithBus(context.Background(), bus)
+	const n = 50000
+	for i := range n {
+		_, s := progress.Start(ctx, progress.KindCall, "ssh", progress.Node(fmt.Sprintf("exe%05d", i)))
+		s.End(nil)
+	}
+	close(w.open)
+	bus.Close()
+	err := log.Close()
+	if err == nil || !strings.Contains(err.Error(), "not written as fast as the work went on") {
+		t.Errorf("Close = %v, want it to say the log fell behind", err)
+	}
+	out := written(&w.writes)
+	if len(out) < 7<<20 {
+		t.Errorf("%d bytes written, want the 8 MiB the log had taken before it fell behind", len(out))
+	}
+	seq := 0.0
+	for line := range strings.Lines(out) {
+		var got map[string]any
+		if err := json.Unmarshal([]byte(line), &got); err != nil {
+			t.Fatalf("a line that is not whole: %q", line)
+		}
+		if got["type"] == "trace" {
+			continue
+		}
+		if s, _ := got["seq"].(float64); s != seq+1 {
+			t.Fatalf("seq %v after %v: a gap in the lines the log had taken", s, seq)
+		}
+		seq++
+	}
+	if seq == 0 || seq >= 2*n {
+		t.Errorf("%v events written of %d, want the first of them and not all", seq, 2*n)
+	}
+}
+
 // The log is written in pieces, each of them whole lines, so that the
 // lines of runs appending to one file at once do not cut into each other;
 // a line longer than the buffer is written on its own.

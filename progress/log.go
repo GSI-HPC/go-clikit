@@ -68,8 +68,10 @@ const (
 // latest, so that a log followed as it grows, or one of a run killed, falls
 // little behind. A write that fails stops the log, and so does a writer
 // that falls 8 MiB behind, a pipe whose reader has stopped: the log never
-// holds the work up. Close writes what is left, waiting five seconds at
-// most, and says why the log stops short when it does.
+// holds the work up. A log that falls behind still writes the lines it had
+// taken, and leaves out those that come after. Close writes what is left,
+// waiting five seconds at most, and says why the log stops short when it
+// does.
 type Log struct {
 	w   io.Writer
 	o   LogOptions
@@ -272,7 +274,9 @@ func (l *Log) write(v any) {
 		return
 	}
 	if len(l.pending)+l.line.Len() > logBehind {
-		l.err, l.pending = errBehind, nil
+		// The lines already kept are still written; this one and those
+		// after it are not.
+		l.err = errBehind
 		return
 	}
 	l.pending = append(l.pending, l.line.Bytes()...)
