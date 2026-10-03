@@ -49,7 +49,9 @@ type Options[T any] struct {
 	// returns the function that gives that back once the work is done.
 	// It is called once the item has its place in the pool, and the item
 	// stays queued until it returns. An error it returns is the item's,
-	// whose work is then never started.
+	// whose work is then never started, and whose target ends at once,
+	// before the place is given up; an error of Skip leaves the item out
+	// on purpose, as one fn returns does.
 	Acquire func(ctx context.Context, item T) (release func(), err error)
 }
 
@@ -58,8 +60,9 @@ type Outcome[R any] struct {
 	// Value is what the work returned; the zero value when it panicked.
 	Value R
 	// Err is the error the work returned, or the one a panic in it
-	// became. For an item that was never started it is the context's, or
-	// the one Options.Acquire refused it with.
+	// became. For an item that was never started it is the one
+	// Options.Acquire refused it with, or, when the pool left it out, the
+	// context's.
 	Err error
 	// Started says whether the work for the item was started, which it
 	// is not once the context has ended.
@@ -87,9 +90,11 @@ type Outcome[R any] struct {
 // An item that failed once the context had ended is reported canceled,
 // since the interrupt is what ended it, and its outcome keeps the error fn
 // returned. An item fn left out on purpose, by returning an error of Skip,
-// ends skipped and is none of those that failed. An item waiting for
-// o.Acquire is not yet running, and one it refused, or the context ended
-// for while it waited, ends as one never started.
+// ends skipped and is none of those that failed, and so does one
+// o.Acquire leaves out with an error of Skip. An item waiting for o.Acquire
+// is not yet running; one it refused ends then, failed with the refusal,
+// or, when the context had ended by then, as one never started, and its
+// outcome keeps the refusal.
 func Map[T, R any](ctx context.Context, items []T, o Options[T], fn func(ctx context.Context, item T) (R, error)) []Outcome[R] {
 	limit := o.Limit
 	if limit < 1 {
@@ -114,15 +119,15 @@ func Map[T, R any](ctx context.Context, items []T, o Options[T], fn func(ctx con
 		release, err := o.acquire(ctxs[i], names[i], items[i])
 		if err != nil {
 			out[i].Err = err
+			canceled[i] = o.refused(ctxs[i], spans[i], err)
 			return
 		}
 		defer release()
 		spans[i].Run()
 		value, err := call(ctxs[i], o.PanicLog, o.Program, names[i], items[i], fn)
 		out[i] = Outcome[R]{Value: value, Err: err, Started: true}
-		var skip *skipped
-		if errors.As(err, &skip) {
-			spans[i].Skip(skip.reason)
+		if reason, ok := skipReason(err); ok {
+			spans[i].Skip(reason)
 			return
 		}
 		if err != nil && ctxs[i].Err() != nil {
@@ -135,10 +140,10 @@ func Map[T, R any](ctx context.Context, items []T, o Options[T], fn func(ctx con
 	var errs []error
 	interrupted := true
 	for i := range out {
-		if !out[i].Started {
-			if out[i].Err == nil || ctx.Err() != nil {
-				out[i].Err = ctx.Err()
-			}
+		// An item with neither a start nor an error is one Each left
+		// out, which it does only once ctx has ended.
+		if !out[i].Started && out[i].Err == nil {
+			out[i].Err = ctx.Err()
 			canceled[i] = o.endsCanceled(out[i].Err)
 			spans[i].End(out[i].Err)
 		}
@@ -157,6 +162,23 @@ func Map[T, R any](ctx context.Context, items []T, o Options[T], fn func(ctx con
 	return out
 }
 
+// refused ends the target of an item o.Acquire refused with err, before
+// the item gives its place in the pool up, and reports whether it ended
+// canceled: skipped for an error of Skip, as one never started when ctx
+// had ended by then, and with err otherwise.
+func (o Options[T]) refused(ctx context.Context, span *progress.Span, err error) bool {
+	if reason, ok := skipReason(err); ok {
+		span.Skip(reason)
+		return false
+	}
+	if cause := ctx.Err(); cause != nil {
+		span.End(cause)
+		return o.endsCanceled(cause)
+	}
+	span.End(err)
+	return o.endsCanceled(err)
+}
+
 // endsCanceled reports whether a target that ends with err ends canceled.
 func (o Options[T]) endsCanceled(err error) bool {
 	return err != nil && progress.Classify(err, o.Classify) == progress.ClassCanceled
@@ -172,8 +194,18 @@ func Skip(reason string) error { return &skipped{reason: reason} }
 
 // IsSkipped reports whether err says that an item was left out on purpose.
 func IsSkipped(err error) bool {
+	_, ok := skipReason(err)
+	return ok
+}
+
+// skipReason returns the reason of the error of Skip in err's chain, if
+// there is one.
+func skipReason(err error) (string, bool) {
 	var skip *skipped
-	return errors.As(err, &skip)
+	if errors.As(err, &skip) {
+		return skip.reason, true
+	}
+	return "", false
 }
 
 // skipped is the error of an item left out on purpose.

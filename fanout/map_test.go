@@ -396,3 +396,103 @@ func TestMapTakesTheProgramsRules(t *testing.T) {
 		t.Errorf("tree:\n%s\nwant:\n%s", got, want)
 	}
 }
+
+// ended reports whether the events hold the end of the target named name.
+func ended(events []progress.Event, name string) bool {
+	for _, e := range events {
+		if e.Type == progress.TypeEnd && e.Kind == progress.KindTarget && e.Name == name {
+			return true
+		}
+	}
+	return false
+}
+
+// An item Acquire refuses ends at once, before its place goes to the next,
+// and keeps the refusal, however the context ends afterwards.
+func TestMapEndsAnItemAcquireRefusedAtOnce(t *testing.T) {
+	t.Parallel()
+
+	refused := unreachable{errors.New("exe1 unreachable")}
+	ctx, capture := progresstest.Checked(context.Background(), t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	outcomes := fanout.Map(ctx, nodes(2), fanout.Options[string]{
+		Step: "check", Limit: 1,
+		Acquire: func(_ context.Context, node string) (func(), error) {
+			if node == "exe1" {
+				return nil, refused
+			}
+			return nil, nil
+		},
+	}, func(context.Context, string) (struct{}, error) {
+		if !ended(capture.Events(), "exe1") {
+			t.Error("exe1 is not ended when exe2 runs")
+		}
+		cancel()
+		return struct{}{}, nil
+	})
+	if outcomes[0].Started || !errors.Is(outcomes[0].Err, refused) {
+		t.Errorf("exe1 = %+v, want it never started, with the refusal", outcomes[0])
+	}
+	want := `step check total=2 limit=1 [fold]: failed (target): 1 of 2 failed: exe1
+  target exe1: failed (transport): {} unreachable
+  target exe2: ok
+`
+	if got := capture.Tree(); got != want {
+		t.Errorf("tree:\n%s\nwant:\n%s", got, want)
+	}
+}
+
+// An Acquire refusal that comes once the context has ended, such as the
+// context's own error after a wait, ends the item as one never started:
+// canceled.
+func TestMapEndsAnItemRefusedAfterTheInterruptCanceled(t *testing.T) {
+	t.Parallel()
+
+	ctx, tree := progresstest.Watch(context.Background(), t)
+	ctx, cancel := context.WithCancel(ctx)
+	waited := errors.New("gave up waiting for a slot")
+	outcomes := fanout.Map(ctx, nodes(1), fanout.Options[string]{
+		Step: "check", Limit: 1,
+		Acquire: func(context.Context, string) (func(), error) {
+			cancel()
+			return nil, waited
+		},
+	}, func(context.Context, string) (struct{}, error) { return struct{}{}, nil })
+	if outcomes[0].Started || !errors.Is(outcomes[0].Err, waited) {
+		t.Errorf("exe1 = %+v, want it never started, with the refusal", outcomes[0])
+	}
+	want := `step check total=1 limit=1 [fold]: canceled (canceled): 1 of 1 failed: exe1
+  target exe1: canceled (canceled): context canceled
+`
+	if got := tree(); got != want {
+		t.Errorf("tree:\n%s\nwant:\n%s", got, want)
+	}
+}
+
+// An item Acquire leaves out on purpose, with an error of Skip, ends
+// skipped, as one its work leaves out does, and is no failure of the step.
+func TestMapEndsAnItemAcquireSkippedSkipped(t *testing.T) {
+	t.Parallel()
+
+	ctx, tree := progresstest.Watch(context.Background(), t)
+	outcomes := fanout.Map(ctx, nodes(2), fanout.Options[string]{
+		Step: "check", Limit: 2,
+		Acquire: func(_ context.Context, node string) (func(), error) {
+			if node == "exe1" {
+				return nil, fanout.Skip("dry run")
+			}
+			return nil, nil
+		},
+	}, func(context.Context, string) (struct{}, error) { return struct{}{}, nil })
+	if o := outcomes[0]; o.Started || !fanout.IsSkipped(o.Err) {
+		t.Errorf("exe1 = %+v, want it never started and skipped", o)
+	}
+	want := `step check total=2 limit=2 [fold]: ok
+  target exe1: skipped: dry run
+  target exe2: ok
+`
+	if got := tree(); got != want {
+		t.Errorf("tree:\n%s\nwant:\n%s", got, want)
+	}
+}
