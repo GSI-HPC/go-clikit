@@ -140,3 +140,28 @@ func TestTallyCountsWhatAQueuedBatchGrowsBy(t *testing.T) {
 		t.Errorf("the batch counts %+v, want a total of 5", c)
 	}
 }
+
+// A Fold step left out inside another adds to the counts above it only
+// what the spans left out below it have not already added, so that no
+// count passes its Total.
+func TestTallyCountsANestedStepLeftOutOnce(t *testing.T) {
+	t.Parallel()
+	sink := &tallied{ended: map[string]progress.Count{}}
+	ctx, bus, _ := watched(t, progress.Options{Sinks: []progress.Sink{sink}})
+	outerCtx, _ := progress.Start(ctx, progress.KindStep, "outer", progress.WithFlags(progress.Fold), progress.Total(6))
+	innerCtx, _ := progress.Start(outerCtx, progress.KindStep, "inner", progress.WithFlags(progress.Fold), progress.Total(6))
+	progress.Start(innerCtx, progress.KindBatch, "1/2", progress.Queued(), progress.Batch(1, 2), progress.Total(4))
+	bus.Close()
+
+	for _, want := range []progress.Count{
+		{Name: "outer", Flags: progress.Fold, Total: 6, Done: 6, Canceled: 6},
+		{Name: "inner", Flags: progress.Fold, Total: 6, Done: 4, Canceled: 4},
+		{Name: "1/2", Total: 4, Batch: "1/2"},
+	} {
+		got := sink.ended[want.Name]
+		got.Span = 0
+		if got != want {
+			t.Errorf("%s ended as\n%+v\nwant\n%+v", want.Name, got, want)
+		}
+	}
+}

@@ -9,7 +9,8 @@ package progress
 // A step with Fold and a batch count the targets below them. A target that
 // ends counts once in every such span above it, however it ended; a batch
 // or a Fold step left out, skipped or canceled before any target of its own
-// started, counts in the same spans as its Total. So a count reaches its
+// started, counts in the same spans as its Total, less what the batches and
+// steps left out below it have counted there already. So a count reaches its
 // Total once all the work it expects has ended, after an interrupt too,
 // and never passes it: progresstest.Check holds every source to that.
 //
@@ -35,7 +36,8 @@ type Count struct {
 	// Total is the span's Total, the targets it expects.
 	Total int
 	// Done counts the targets that ended below, however they ended, and
-	// the Total of every batch or Fold step below that was left out.
+	// the Total of every batch or Fold step below that was left out, each
+	// target once.
 	// Failed, Canceled and Skipped count those that ended so.
 	Done, Failed, Canceled, Skipped int
 	// Running counts the targets below that are running. Queued counts
@@ -204,7 +206,9 @@ func (t *Tally) end(e Event) (Count, bool) {
 		return Count{}, false
 	}
 	if s.count.Targets == 0 && (e.Status == StatusSkipped || e.Status == StatusCanceled) {
-		left := s.count.Total
+		// The spans left out below it have counted their Totals already,
+		// in its count and above it alike.
+		left := max(s.count.Total-s.count.Done, 0)
 		s.above(func(c *Count) {
 			c.Done += left
 			tallyStatus(c, e.Status, left)
