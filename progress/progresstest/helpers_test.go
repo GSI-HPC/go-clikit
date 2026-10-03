@@ -181,7 +181,7 @@ func TestTreeDrawsTheStatusOfARequest(t *testing.T) {
 	t.Parallel()
 
 	c := &Capture{}
-	bus := progress.NewBus(progress.Options{Sinks: []progress.Sink{c}})
+	bus := progress.NewBus(progress.BusOptions{Sinks: []progress.Sink{c}})
 	_, span := progress.Start(progress.WithBus(context.Background(), bus), progress.KindCall, "redfish",
 		progress.HTTP("GET", "/redfish/v1"), progress.Timeout(time.Second))
 	span.End(nil, progress.HTTPStatus(200))

@@ -46,7 +46,7 @@ func shown(c *progresstest.Capture) []string {
 
 // showing returns a context with a running call that shows lines, and a
 // capture that wants them.
-func showing(t *testing.T, o progress.Options) (context.Context, *progress.Span, *progresstest.Capture) {
+func showing(t *testing.T, o progress.BusOptions) (context.Context, *progress.Span, *progresstest.Capture) {
 	t.Helper()
 	capture := &progresstest.Capture{Lines: true}
 	o.Sinks = []progress.Sink{capture}
@@ -63,8 +63,8 @@ func showing(t *testing.T, o progress.Options) (context.Context, *progress.Span,
 func TestTeeIsTheWriterItselfWhenNothingWantsTheLines(t *testing.T) {
 	t.Parallel()
 
-	noLines := progress.NewBus(progress.Options{Sinks: []progress.Sink{&progresstest.Capture{}}})
-	wantsLines := progress.NewBus(progress.Options{Sinks: []progress.Sink{&progresstest.Capture{Lines: true}}})
+	noLines := progress.NewBus(progress.BusOptions{Sinks: []progress.Sink{&progresstest.Capture{}}})
+	wantsLines := progress.NewBus(progress.BusOptions{Sinks: []progress.Sink{&progresstest.Capture{Lines: true}}})
 	defer noLines.Close()
 	defer wantsLines.Close()
 	shows := func(b *progress.Bus, f progress.Flags) context.Context {
@@ -116,7 +116,7 @@ func TestTeeHandsAParserCompleteLinesOnly(t *testing.T) {
 			for _, display := range []bool{false, true} {
 				ctx, call := context.Background(), (*progress.Span)(nil)
 				if display {
-					ctx, call, _ = showing(t, progress.Options{})
+					ctx, call, _ = showing(t, progress.BusOptions{})
 				}
 				var p parser
 				var buf bytes.Buffer
@@ -141,7 +141,7 @@ func TestTeeHandsAParserCompleteLinesOnly(t *testing.T) {
 func TestTeeShowsSanitisedLines(t *testing.T) {
 	t.Parallel()
 
-	ctx, call, capture := showing(t, progress.Options{})
+	ctx, call, capture := showing(t, progress.BusOptions{})
 	var stdout, stderr bytes.Buffer
 	out := progress.Tee(ctx, &stdout, progress.Stdout, nil)
 	errw := progress.Tee(ctx, &stderr, progress.Stderr, nil)
@@ -171,7 +171,7 @@ func TestTeeShowsSanitisedLines(t *testing.T) {
 func TestADisplayGetsALongLineInPiecesAndTheRestAtTheEnd(t *testing.T) {
 	t.Parallel()
 
-	ctx, call, capture := showing(t, progress.Options{})
+	ctx, call, capture := showing(t, progress.BusOptions{})
 	var p parser
 	w := progress.Tee(ctx, io.Discard, progress.Stdout, p.parse)
 	// After the "a", every two-byte rune starts at an odd offset, so the
@@ -206,7 +206,7 @@ func TestLinesAreRateLimitedKeepingTheNewest(t *testing.T) {
 	t.Parallel()
 
 	clock := newClock()
-	ctx, call, capture := showing(t, progress.Options{Now: clock.Now})
+	ctx, call, capture := showing(t, progress.BusOptions{Now: clock.Now})
 	w := progress.Tee(ctx, io.Discard, progress.Stdout, nil)
 	for i := range 30 {
 		fmt.Fprintf(w, "line %d\n", i)
@@ -244,7 +244,7 @@ func TestLinesAreRateLimitedKeepingTheNewest(t *testing.T) {
 func TestTheLineHeldBackIsSentWhenItsPlaceComes(t *testing.T) {
 	t.Parallel()
 
-	ctx, call, capture := showing(t, progress.Options{})
+	ctx, call, capture := showing(t, progress.BusOptions{})
 	w := progress.Tee(ctx, io.Discard, progress.Stdout, nil)
 	for i := range 21 {
 		fmt.Fprintf(w, "line %d\n", i)
@@ -269,7 +269,7 @@ func TestTheLineHeldBackIsSentWhenItsPlaceComes(t *testing.T) {
 func TestNoLineIsShownOnceTheSpanHasEnded(t *testing.T) {
 	t.Parallel()
 
-	ctx, call, capture := showing(t, progress.Options{})
+	ctx, call, capture := showing(t, progress.BusOptions{})
 	var p parser
 	w := progress.Tee(ctx, io.Discard, progress.Stdout, p.parse)
 	call.End(nil)
@@ -292,7 +292,7 @@ func (failing) Write(p []byte) (int, error) { return len(p) / 2, errors.New("dis
 func TestTeeReportsWhatTheWriterDid(t *testing.T) {
 	t.Parallel()
 
-	ctx, call, capture := showing(t, progress.Options{})
+	ctx, call, capture := showing(t, progress.BusOptions{})
 	var p parser
 	w := progress.Tee(ctx, failing{}, progress.Stdout, p.parse)
 	n, err := w.Write([]byte("ab\ncd\n"))
@@ -311,7 +311,7 @@ func TestTeeReportsWhatTheWriterDid(t *testing.T) {
 func TestTeeKeepsUpWithAnEndWhileWriting(t *testing.T) {
 	t.Parallel()
 
-	ctx, call, _ := showing(t, progress.Options{})
+	ctx, call, _ := showing(t, progress.BusOptions{})
 	var p parser
 	var wg sync.WaitGroup
 	for _, st := range []progress.Stream{progress.Stdout, progress.Stderr} {
@@ -357,7 +357,7 @@ func TestTheLineHeldBackWaitsForItsTokenByTheBusClock(t *testing.T) {
 	t.Parallel()
 	synctest.Test(t, func(t *testing.T) {
 		clock := newClock()
-		ctx, call, capture := showing(t, progress.Options{Now: clock.Now})
+		ctx, call, capture := showing(t, progress.BusOptions{Now: clock.Now})
 		w := progress.Tee(ctx, io.Discard, progress.Stdout, nil)
 		for i := range 21 {
 			fmt.Fprintf(w, "line %d\n", i)
@@ -386,7 +386,7 @@ func TestALateTokenIsWaitedForAWholeInterval(t *testing.T) {
 	t.Parallel()
 	synctest.Test(t, func(t *testing.T) {
 		clock := &stepper{now: time.Date(2026, 9, 25, 12, 0, 0, 0, time.UTC)}
-		ctx, call, capture := showing(t, progress.Options{Now: clock.Now})
+		ctx, call, capture := showing(t, progress.BusOptions{Now: clock.Now})
 		w := progress.Tee(ctx, io.Discard, progress.Stdout, nil)
 		for i := range 20 {
 			fmt.Fprintf(w, "line %d\n", i)
@@ -410,7 +410,7 @@ func TestALateTokenIsWaitedForAWholeInterval(t *testing.T) {
 func TestALineOfASpanThatEndedWhileItWasParsedIsNotShown(t *testing.T) {
 	t.Parallel()
 
-	ctx, call, capture := showing(t, progress.Options{})
+	ctx, call, capture := showing(t, progress.BusOptions{})
 	w := progress.Tee(ctx, io.Discard, progress.Stdout, func(progress.Stream, string) { call.End(nil) })
 	fmt.Fprint(w, "done\n")
 	if got := shown(capture); len(got) != 0 {
@@ -423,7 +423,7 @@ func TestALineOfASpanThatEndedWhileItWasParsedIsNotShown(t *testing.T) {
 func TestALineEndedByAWriteThatEndsTheSpanIsNotShown(t *testing.T) {
 	t.Parallel()
 
-	ctx, call, capture := showing(t, progress.Options{})
+	ctx, call, capture := showing(t, progress.BusOptions{})
 	w := progress.Tee(ctx, io.Discard, progress.Stdout, func(progress.Stream, string) { call.End(nil) })
 	fmt.Fprint(w, "do")
 	fmt.Fprint(w, "ne\n")
@@ -437,7 +437,7 @@ func TestALineEndedByAWriteThatEndsTheSpanIsNotShown(t *testing.T) {
 func TestALongLineWithoutAnEndIsCutInLinearTime(t *testing.T) {
 	t.Parallel()
 
-	ctx, call, _ := showing(t, progress.Options{})
+	ctx, call, _ := showing(t, progress.BusOptions{})
 	w := progress.Tee(ctx, io.Discard, progress.Stdout, nil)
 	const size = 8 << 20
 	unended := bytes.Repeat([]byte("x"), size)
@@ -463,7 +463,7 @@ func TestALongLineWithoutAnEndIsCutInLinearTime(t *testing.T) {
 func TestTheUnfinishedLineOfEachStreamIsSentAtTheEnd(t *testing.T) {
 	t.Parallel()
 
-	ctx, call, capture := showing(t, progress.Options{Now: newClock().Now})
+	ctx, call, capture := showing(t, progress.BusOptions{Now: newClock().Now})
 	out := progress.Tee(ctx, io.Discard, progress.Stdout, nil)
 	errw := progress.Tee(ctx, io.Discard, progress.Stderr, nil)
 	for i := range 25 {
@@ -496,7 +496,7 @@ func TestTheLineThatWaitsAndTheUnfinishedOneAreBothSentAtTheEnd(t *testing.T) {
 	t.Parallel()
 
 	clock := newClock()
-	ctx, call, capture := showing(t, progress.Options{Now: clock.Now})
+	ctx, call, capture := showing(t, progress.BusOptions{Now: clock.Now})
 	w := progress.Tee(ctx, io.Discard, progress.Stdout, nil)
 	for i := range 21 {
 		fmt.Fprintf(w, "line %d\n", i)
@@ -520,7 +520,7 @@ func TestTheLineThatWaitsAndTheUnfinishedOneAreBothSentAtTheEnd(t *testing.T) {
 func TestASpanKeepsNoWriterOfACommandThatIsDone(t *testing.T) {
 	t.Parallel()
 
-	ctx, call, capture := showing(t, progress.Options{})
+	ctx, call, capture := showing(t, progress.BusOptions{})
 	const commands = 100
 	var collected atomic.Int32
 	for i := range commands {

@@ -162,7 +162,7 @@ func TestTheSummary(t *testing.T) {
 			c := &clock{now: time.Date(2026, 9, 26, 12, 0, 0, 0, time.UTC)}
 			summary := &display.Summary{}
 			capture := &progresstest.Capture{}
-			bus := progress.NewBus(progress.Options{Sinks: []progress.Sink{capture, summary}, Now: c.Now})
+			bus := progress.NewBus(progress.BusOptions{Sinks: []progress.Sink{capture, summary}, Now: c.Now})
 			ctx, command := progress.Start(progress.WithBus(context.Background(), bus), progress.KindCommand, "exec")
 			err := tc.work(ctx, c)
 			if got := summary.Line(); got != "" {

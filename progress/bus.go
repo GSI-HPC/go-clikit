@@ -17,8 +17,8 @@ import (
 	"time"
 )
 
-// Options configure a Bus.
-type Options struct {
+// BusOptions configure a Bus.
+type BusOptions struct {
 	// Sinks receive every event, in the order given.
 	Sinks []Sink
 	// Now is the clock the events are stamped with; nil is time.Now.
@@ -62,7 +62,7 @@ type Bus struct {
 
 	mu sync.Mutex
 	// sinks are the sinks on the Bus, one entry for each time a sink is
-	// listed in Options.Sinks, and lines says that one of them asked for
+	// listed in BusOptions.Sinks, and lines says that one of them asked for
 	// lines.
 	sinks    []*entry
 	lines    bool
@@ -95,7 +95,7 @@ type entry struct {
 }
 
 // NewBus returns a Bus that sends its events to o.Sinks.
-func NewBus(o Options) *Bus {
+func NewBus(o BusOptions) *Bus {
 	b := &Bus{
 		now:      o.Now,
 		panicLog: o.PanicLog,
@@ -339,7 +339,7 @@ func (s *Span) Update(opts ...Option) {
 
 // End ends a span with the outcome of its work: ok for a nil error,
 // otherwise failed or canceled as Classify tells from err, with the
-// Bus's Options.Classify as its fallback, and err's text becomes the
+// Bus's BusOptions.Classify as its fallback, and err's text becomes the
 // span's one-line Err. The options set the fields that are known only at
 // the end, such as Exit. Only the first End or Skip of a span
 // counts. Spans started under it that are still open end first, as
@@ -545,7 +545,7 @@ func (b *Bus) suspenders() []*entry {
 
 // hold is a display sent Suspends not yet resumed, with the depth of
 // suspension each was sent at, the outermost first. A display listed more
-// than once in Options.Sinks has a hold for each time it is listed, and is
+// than once in BusOptions.Sinks has a hold for each time it is listed, and is
 // sent a Suspend and a Resume for each.
 type hold struct {
 	display *entry

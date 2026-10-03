@@ -63,7 +63,7 @@ func newTreeFixture(t *testing.T, command string, o treeSetup) *treeFixture {
 	f.tree = display.NewTree(f.term, display.TreeOptions{Now: f.clock.Now, ASCII: o.ascii, Interrupted: o.interrupted})
 	f.summary = &display.Summary{}
 	f.capture = &progresstest.Capture{}
-	f.bus = progress.NewBus(progress.Options{Sinks: []progress.Sink{f.capture, f.tree, f.summary}, Now: f.clock.Now})
+	f.bus = progress.NewBus(progress.BusOptions{Sinks: []progress.Sink{f.capture, f.tree, f.summary}, Now: f.clock.Now})
 	t.Cleanup(func() {
 		f.close()
 		progresstest.Check(t, f.capture.Events())
@@ -858,7 +858,7 @@ func TestTheTreeReadsTheRealClock(t *testing.T) {
 		s := &progresstest.Screen{}
 		tree := display.NewTree(display.NewTerminal(s, func() (int, int, error) { return 100, 24, nil }), display.TreeOptions{})
 		capture := &progresstest.Capture{}
-		bus := progress.NewBus(progress.Options{Sinks: []progress.Sink{capture, tree}})
+		bus := progress.NewBus(progress.BusOptions{Sinks: []progress.Sink{capture, tree}})
 		_, command := progress.Start(progress.WithBus(context.Background(), bus), progress.KindCommand, "exec")
 		tree.Start()
 		time.Sleep(999 * time.Millisecond)

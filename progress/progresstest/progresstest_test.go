@@ -82,7 +82,7 @@ func pool(ctx context.Context, name string, n, limit int, fail map[int]bool, can
 func watch(t *testing.T) (context.Context, *progress.Bus, *Capture) {
 	t.Helper()
 	c := &Capture{Lines: true}
-	bus := progress.NewBus(progress.Options{Sinks: []progress.Sink{c}})
+	bus := progress.NewBus(progress.BusOptions{Sinks: []progress.Sink{c}})
 	return progress.WithBus(context.Background(), bus), bus, c
 }
 
@@ -412,7 +412,7 @@ func TestTreeWritesANameAsItsOwnOnlyWhereItStandsAlone(t *testing.T) {
 	t.Parallel()
 
 	capture := &Capture{}
-	bus := progress.NewBus(progress.Options{Sinks: []progress.Sink{capture}})
+	bus := progress.NewBus(progress.BusOptions{Sinks: []progress.Sink{capture}})
 	ctx, step := progress.Start(progress.WithBus(context.Background(), bus), progress.KindStep, "s", progress.WithFlags(progress.Fold), progress.Total(4))
 	errs := map[string]error{
 		"c":     errors.New("context deadline exceeded"),

@@ -36,7 +36,7 @@ func TestAValueWithoutAConstantHasAName(t *testing.T) {
 func TestALookupSaysWhereItsAnswerCameFrom(t *testing.T) {
 	t.Parallel()
 
-	ctx, bus, capture := watched(t, progress.Options{})
+	ctx, bus, capture := watched(t, progress.BusOptions{})
 	_, span := progress.Start(ctx, progress.KindCall, "groups", progress.Cache("hit"), progress.Source("slurm"))
 	span.End(nil)
 	bus.Close()

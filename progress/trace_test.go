@@ -95,7 +95,7 @@ func TestRunsThatContinueOneTraceShareNoSpanID(t *testing.T) {
 	seen := map[progress.SpanID]int{}
 	for run := range 2 {
 		capture := &progresstest.Capture{}
-		bus := progress.NewBus(progress.Options{
+		bus := progress.NewBus(progress.BusOptions{
 			Sinks: []progress.Sink{capture}, Trace: tc.Trace, Parent: tc.Parent, TraceFlags: tc.Flags, TraceState: tc.State,
 		})
 		if got := bus.TraceContext(); got != tc {
@@ -120,7 +120,7 @@ func TestRunsThatContinueOneTraceShareNoSpanID(t *testing.T) {
 		}
 	}
 
-	bus := progress.NewBus(progress.Options{Parent: tc.Parent, TraceFlags: 1, TraceState: "rojo=1"})
+	bus := progress.NewBus(progress.BusOptions{Parent: tc.Parent, TraceFlags: 1, TraceState: "rojo=1"})
 	if got := bus.TraceContext(); got.Trace == (progress.TraceID{}) || got.Trace == tc.Trace || got.Parent != 0 || got.State != "" {
 		t.Errorf("a parent without a trace gave %+v, want a trace of its own and nothing else", got)
 	}

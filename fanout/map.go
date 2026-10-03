@@ -38,7 +38,7 @@ type Options[T any] struct {
 	Program string
 	// Classify is the fallback of progress.Classify for the errors of the
 	// items, which tells an item that ends canceled: the program's own
-	// rule, as progress.Options.Classify is the Bus's; nil is ClassTarget.
+	// rule, as progress.BusOptions.Classify is the Bus's; nil is ClassTarget.
 	Classify func(error) progress.Class
 	// Summarize sums up the items that failed of the n, as the error the
 	// step ends with; nil is Failure, with no noun. A program gives it
