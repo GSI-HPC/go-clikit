@@ -10,7 +10,7 @@
 # commit from before the workflow, or on one that changes it, verifies
 # nothing. The default branch therefore runs it on a schedule as well, and
 # then verifies every release tag there is, and that the module proxy serves
-# no version without one.
+# no version without one or from another commit than it names.
 
 name: Release
 
@@ -28,7 +28,7 @@ permissions:
 jobs:
   # From the default branch: a release tag that is not signed by a listed
   # signer fails this job, whatever commit it names, and so does a version on
-  # the module proxy whose tag is gone.
+  # the module proxy whose tag is gone or names another commit.
   audit-tags:
     name: Verify every release tag is signed
     if: github.event_name != 'push'
@@ -140,6 +140,15 @@ jobs:
           TAG: ${{ github.ref_name }}
           MODULE_FILE: ${{ github.workspace }}/go.mod
         run: go list -m "$(sed -n 's/^module //p' "$MODULE_FILE")@$TAG"
+
+      # The proxy keeps the content it fetched first under a version, and the
+      # fetch above returns it without complaint; so a tag pushed, fetched and
+      # deleted before this one leaves the proxy serving another commit.
+      - name: Refuse a version the module proxy serves from another commit
+        env:
+          TAG: ${{ github.ref_name }}
+          COMMIT: ${{ needs.verify-tag.outputs.commit }}
+        run: .github/scripts/module-proxy.sh check "$TAG" "$COMMIT"
 
       # A release that exists already, from an earlier attempt of this job, is
       # left as it is, so that the job can be run again.

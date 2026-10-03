@@ -4,11 +4,12 @@
 #
 # Tests the scripts of the release workflow against tags made in a scratch
 # repository, one case per way a tag has been shown to pass that should not:
-# verify-release-tag.sh, audit-release-tags.sh, check-release-version.sh and
-# publish-release.sh. The release workflow runs only on a tag push and on its
-# schedule, so this is where its steps are tested.
+# verify-release-tag.sh, audit-release-tags.sh, module-proxy.sh,
+# check-release-version.sh and publish-release.sh. The release workflow runs
+# only on a tag push and on its schedule, so this is where its steps are
+# tested.
 #
-# Needs git, ssh-keygen and gpg. Run from anywhere:
+# Needs git, ssh-keygen, gpg and jq. Run from anywhere:
 #
 #   .github/scripts/verify-release-tag_test.sh
 
@@ -195,10 +196,12 @@ old="$(git rev-parse HEAD)"
 git commit -q --allow-empty -m 'with the release workflow'
 sign listed v1.0.0 -m 'release v1.0.0'
 git tag not-a-release "$old"
-# The module proxy is a stand-in for curl that logs the URL it is asked for
-# and answers with PROXY_STATUS and the file PROXY_LIST, or fails with
-# CURL_EXIT. The proxy lists no version unless a case says otherwise.
-mkdir "$scratch/proxy-bin"
+# The module proxy is a stand-in for curl that logs the URL it is asked for,
+# or fails with CURL_EXIT. It answers a list with PROXY_STATUS and the file
+# PROXY_LIST, and the .info of a version with INFO_STATUS and the file of
+# that name in PROXY_INFO, or with 404 if there is none. The proxy lists no
+# version unless a case says otherwise.
+mkdir "$scratch/proxy-bin" "$scratch/proxy-info"
 cat > "$scratch/proxy-bin/curl" << 'CURL'
 #!/usr/bin/env bash
 set -euo pipefail
@@ -215,13 +218,32 @@ if [ "${CURL_EXIT:-0}" -ne 0 ]; then
   echo "curl: ($CURL_EXIT) could not connect" >&2
   exit "$CURL_EXIT"
 fi
-cp "$PROXY_LIST" "$out"
-printf '%s' "$PROXY_STATUS"
+case "$1" in
+  */@v/list)
+    cp "$PROXY_LIST" "$out"
+    printf '%s' "$PROXY_STATUS"
+    ;;
+  *.info)
+    if [ -f "$PROXY_INFO/${1##*/}" ]; then
+      cp "$PROXY_INFO/${1##*/}" "$out"
+      printf '%s' "${INFO_STATUS:-200}"
+    else
+      printf 'not found' > "$out"
+      printf 404
+    fi
+    ;;
+esac
 CURL
 chmod +x "$scratch/proxy-bin/curl"
 printf 'module github.com/Example-Org/kit\n\ngo 1.26.0\n' > "$scratch/audit.mod"
 : > "$scratch/proxy-list"
 export PROXY_LIST="$scratch/proxy-list" PROXY_STATUS=200 CURL_LOG="$scratch/curl.log"
+export PROXY_INFO="$scratch/proxy-info"
+# Has the proxy serve a version from a commit: info <version> <commit>
+info() {
+  printf '{"Version":"%s","Time":"2026-10-01T00:00:00Z","Origin":{"VCS":"git","URL":"https://example.org/kit","Hash":"%s","Ref":"refs/tags/%s"}}' \
+    "$1" "$2" "$1" > "$PROXY_INFO/$1.info"
+}
 audit() {
   PATH="$scratch/proxy-bin:$PATH" GO_MOD="$scratch/audit.mod" \
     MODULE_PROXY=https://proxy.example.org ALLOWED_SIGNERS="$1" ALLOWED_PGP_KEYS="$2" \
@@ -243,12 +265,53 @@ expect 'an audit after the bad tags are gone' pass '' audit "$listed" ''
 # proxy's list of versions.
 : > "$CURL_LOG"
 printf 'v1.0.0\n' > "$PROXY_LIST"
+released="$(git rev-parse 'refs/tags/v1.0.0^{commit}')"
+info v1.0.0 "$released"
 expect 'an audit of a version the module proxy serves with its tag' pass 'serves no other version' audit "$listed" ''
-want='https://proxy.example.org/github.com/!example-!org/kit/@v/list'
+want="$(printf '%s\n' 'https://proxy.example.org/github.com/!example-!org/kit/@v/list' \
+  'https://proxy.example.org/github.com/!example-!org/kit/@v/v1.0.0.info')"
 if [ "$(cat "$CURL_LOG")" != "$want" ]; then
   echo "FAIL the audit asked the module proxy for $(cat "$CURL_LOG") instead of $want"
   failures=$((failures + 1))
 fi
+# A tag pushed, fetched by the proxy and deleted, and then pushed again
+# under the same name on another commit, leaves the proxy serving the first.
+info v1.0.0 "$old"
+expect 'an audit of a version the module proxy serves from another commit than its tag' fail \
+  "the module proxy serves v1.0.0 from commit $old, but the tag v1.0.0 names $released" audit "$listed" ''
+expect 'an audit counting the versions served from another commit' fail \
+  '1 version(s) on the module proxy are not served from the commit their tag names' audit "$listed" ''
+printf '{"Version":"v1.0.0","Time":"2026-10-01T00:00:00Z"}' > "$PROXY_INFO/v1.0.0.info"
+expect 'an audit of a version the module proxy names no commit for' fail \
+  'does not say which commit it serves v1.0.0 from' audit "$listed" ''
+printf 'not JSON' > "$PROXY_INFO/v1.0.0.info"
+expect 'an audit of a version whose .info is no JSON' fail \
+  'does not say which commit it serves v1.0.0 from' audit "$listed" ''
+rm "$PROXY_INFO/v1.0.0.info"
+expect 'an audit of a version the module proxy has no .info for' fail 'v1.0.0.info answered 404' audit "$listed" ''
+info v1.0.0 "$released"
+INFO_STATUS=500 expect 'an audit when the module proxy fails on a .info' fail 'v1.0.0.info answered 500' \
+  audit "$listed" ''
+# The publishing job holds the version the proxy fetched to the commit it
+# verified, before it publishes the release.
+proxy_check() {
+  PATH="$scratch/proxy-bin:$PATH" GO_MOD="$scratch/audit.mod" \
+    MODULE_PROXY=https://proxy.example.org "$scripts/module-proxy.sh" check "$@"
+}
+expect 'a version the module proxy serves from the verified commit' pass \
+  "the module proxy serves v1.0.0 from $released" proxy_check v1.0.0 "$released"
+expect 'a version the module proxy serves from another commit' fail \
+  "serves v1.0.0 from commit $released, but the tag v1.0.0 names $old" proxy_check v1.0.0 "$old"
+: > "$CURL_LOG"
+info 'v1.1.0-!r!c.1' "$released"
+expect 'a version with upper-case letters' pass '' proxy_check v1.1.0-RC.1 "$released"
+if [ "$(cat "$CURL_LOG")" != 'https://proxy.example.org/github.com/!example-!org/kit/@v/v1.1.0-!r!c.1.info' ]; then
+  echo "FAIL the check asked the module proxy for $(cat "$CURL_LOG")"
+  failures=$((failures + 1))
+fi
+expect 'a check without a commit' fail 'usage' proxy_check v1.0.0
+expect 'the module proxy asked for nothing' fail 'usage' \
+  env GO_MOD="$scratch/audit.mod" "$scripts/module-proxy.sh"
 printf 'v1.0.0\r\n' > "$PROXY_LIST"
 expect 'an audit of a version list with CRLF line ends' pass '' audit "$listed" ''
 printf 'v0.0.4\nv1.0.0\n' > "$PROXY_LIST"
