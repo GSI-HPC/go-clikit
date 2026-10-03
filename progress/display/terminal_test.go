@@ -346,6 +346,11 @@ func TestAColourNotSetBackLeavesTheLineOpen(t *testing.T) {
 	_, _ = io.WriteString(out, "reverse\n")
 	f.counter.Draw()
 	f.shows(t, "once the line has ended", "line\n^[[41mred\n^[[31m^[[0ma log line\n^[[7mreverse\nanother log line\n0:02\n")
+
+	// Text that ends in an m and holds no sequence is text all the same.
+	_, _ = io.WriteString(out, "Continue with the program")
+	f.counter.Draw()
+	f.shows(t, "with a line open that ends in an m", "line\n^[[41mred\n^[[31m^[[0ma log line\n^[[7mreverse\nanother log line\nContinue with the program\n")
 }
 
 // A display that panics after it has drawn takes its region off the
