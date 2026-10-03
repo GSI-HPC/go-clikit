@@ -11,6 +11,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/GSI-HPC/go-clikit/fanout"
@@ -209,28 +210,29 @@ prog: 1 of 3 hosts failed: exe0002
 
 // A power-on in batches is counted as a whole, with the batch under way
 // and the pause between two; the notes the command writes between the
-// batches take the counter off, and it comes back below them.
+// batches take the counter off, and it comes back below them. The test
+// runs in a testing/synctest bubble, so that a frame is drawn during the
+// pause.
 func TestTheCounterOfAPowerOnInBatches(t *testing.T) {
 	t.Parallel()
+	synctest.Test(t, testTheCounterOfAPowerOnInBatches)
+}
+
+func testTheCounterOfAPowerOnInBatches(t *testing.T) {
 	s := newSession(t, "bmc power", counterDisplay)
-	batches := fanout.Batches(s.ctx, nodeset.MustParse("exe[1-4]"), fanout.BatchOptions{
+	o := duringPauses(fanout.BatchOptions{
 		Step:  "power on",
 		Size:  2,
 		Limit: 1,
 		Pause: 5 * time.Second,
-		After: func(time.Duration) <-chan time.Time {
-			s.draw()
-			ch := make(chan time.Time, 1)
-			ch <- s.clock.Now()
-			return ch
-		},
 		BeforePause: func(pause time.Duration) {
 			_, _ = fmt.Fprintf(s.errOut, "waiting %s before the next batch\n", pause)
 		},
 		Before: func(i, n int, batch *nodeset.NodeSet) {
 			_, _ = fmt.Fprintf(s.errOut, "powering on %s (%d of %d)\n", batch, i+1, n)
 		},
-	}, func(ctx context.Context, batch *nodeset.NodeSet) error {
+	}, func(time.Duration) { s.draw() })
+	batches := fanout.Batches(s.ctx, nodeset.MustParse("exe[1-4]"), o, func(ctx context.Context, batch *nodeset.NodeSet) error {
 		outcomes, _ := fanout.Map(ctx, batch.Expand(), fanout.MapOptions[string]{Limit: 1},
 			func(_ context.Context, node string) (struct{}, error) {
 				s.draw()
