@@ -160,7 +160,7 @@ func TestPlainLinesOfAPowerOnInBatches(t *testing.T) {
 		}
 		return failed
 	})
-	if batches[2].Ran {
+	if batches[2].Started {
 		t.Fatal("the batch after the one that failed was run")
 	}
 	checkScreen(t, f.end(batches[1].Err), `
