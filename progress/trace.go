@@ -41,8 +41,8 @@ const maxTraceState = 512
 // zeros, a letter in upper case and anything else that does not fit make
 // the traceparent invalid, and an invalid one is no trace context at all:
 // ok is false, and the tracestate is not looked at. The tracestate is kept
-// as it was given when it is at most 512 bytes of printable ASCII, and
-// left out otherwise.
+// as it was given when it is at most 512 bytes of printable ASCII and
+// tabs, and left out otherwise.
 func ParseTraceContext(traceparent, tracestate string) (tc TraceContext, ok bool) {
 	// "00-" + 32 digits + "-" + 16 digits + "-" + 2 digits.
 	const size = 55
@@ -91,13 +91,14 @@ func lowerHex(s string) ([]byte, bool) {
 }
 
 // validTraceState reports whether a tracestate may be recorded as it is:
-// printable ASCII, which is all W3C allows in one, and not too long.
+// printable ASCII, and the tabs W3C allows around the commas between its
+// members, which is all it allows in one, and not too long.
 func validTraceState(s string) bool {
 	if len(s) > maxTraceState {
 		return false
 	}
 	for i := range len(s) {
-		if c := s[i]; c < 0x20 || c > 0x7e {
+		if c := s[i]; (c < 0x20 && c != '\t') || c > 0x7e {
 			return false
 		}
 	}

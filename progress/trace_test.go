@@ -55,6 +55,7 @@ func TestParseTraceContext(t *testing.T) {
 		{"a tracestate without a valid traceparent", "00-" + trace + "-" + parent, state, false, 0, "", "", ""},
 
 		{"a tracestate with a control character is left out", valid, "rojo=1\x1b[2J", true, 0x01, "", trace, parent},
+		{"a tracestate with a tab around a comma is kept", valid, "rojo=1,\tcongo=2", true, 0x01, "rojo=1,\tcongo=2", trace, parent},
 		{"a tracestate that is not ASCII is left out", valid, "rojo=é", true, 0x01, "", trace, parent},
 		{"a tracestate too long is left out", valid, "rojo=" + strings.Repeat("a", 508), true, 0x01, "", trace, parent},
 		{"a tracestate of 512 bytes is kept", valid, "rojo=" + strings.Repeat("a", 507), true, 0x01, "rojo=" + strings.Repeat("a", 507), trace, parent},
