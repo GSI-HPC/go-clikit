@@ -97,7 +97,7 @@ func TestPlainLinesOfAFanOut(t *testing.T) {
 	t.Parallel()
 	f := newPlainFixture(t, "bmc power off")
 	nodes := []string{"exe1", "exe2", "exe3", "exe4", "exe5", "exe6"}
-	outcomes := fanout.Map(f.ctx, nodes, fanout.MapOptions[string]{Step: "power off", Limit: 1, Describe: onBMC},
+	outcomes, _ := fanout.Map(f.ctx, nodes, fanout.MapOptions[string]{Step: "power off", Limit: 1, Describe: onBMC},
 		func(_ context.Context, node string) (struct{}, error) {
 			f.draw(3 * time.Second)
 			if node == "exe3" || node == "exe5" {
@@ -207,7 +207,7 @@ exec: failed in 12s: 3 ok, 1 failed
 		f := newPlainFixture(t, "exec")
 		batches := fanout.Batches(f.ctx, nodeset.MustParse("exe[1-4]"), fanout.BatchOptions{Step: "power on", Size: 2, Limit: 1},
 			func(ctx context.Context, batch *nodeset.NodeSet) error {
-				outcomes := fanout.Map(ctx, batch.Expand(), fanout.MapOptions[string]{Limit: 1},
+				outcomes, _ := fanout.Map(ctx, batch.Expand(), fanout.MapOptions[string]{Limit: 1},
 					func(_ context.Context, node string) (struct{}, error) {
 						f.draw(time.Second)
 						if node == "exe1" {

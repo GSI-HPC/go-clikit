@@ -129,7 +129,12 @@ type Outcome[R any] struct {
 // with an error that says which of them made it, so that the item fails
 // rather than its worker end without a word. The release is called however
 // fn ended, before the item's target ends. Map returns once every call has
-// returned.
+// returned, and returns as well the error its step ended with, what
+// o.Summarize, or Failure, made of the items that failed: nil when none
+// did, and of ClassCanceled when every one that failed ended canceled. A
+// library returns it as the error of its own work, of the class its step
+// was given, which the outcomes alone cannot rebuild, since an item cut
+// short keeps the error its work returned.
 //
 // The work is reported under the span ctx carries as a step, o.Step, with
 // a target for each item, as every pool reports it: every target is
@@ -158,7 +163,7 @@ type Outcome[R any] struct {
 // those that failed. An item waiting
 // for o.Acquire is not yet running, and one it refused ends at once, as
 // MapOptions.Acquire says.
-func Map[T, R any](ctx context.Context, items []T, o MapOptions[T], fn func(ctx context.Context, item T) (R, error)) []Outcome[R] {
+func Map[T, R any](ctx context.Context, items []T, o MapOptions[T], fn func(ctx context.Context, item T) (R, error)) ([]Outcome[R], error) {
 	limit := o.Limit
 	if limit < 1 {
 		limit = DefaultLimit
@@ -250,7 +255,7 @@ func Map[T, R any](ctx context.Context, items []T, o MapOptions[T], fn func(ctx 
 		err = Failure(o.Noun, s)
 	}
 	step.End(err)
-	return out
+	return out, err
 }
 
 // refused ends the target of an item o.Acquire refused with err, before
