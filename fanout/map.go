@@ -4,6 +4,7 @@
 package fanout
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -29,16 +30,22 @@ type MapOptions[T any] struct {
 	// an Item with no Node, names an item the way fmt.Sprint prints it.
 	Describe func(T) Item
 	// PanicLog receives the stack of a panic in the work, in Acquire or
-	// in the release it gave, the front end's diagnostics; nil is the
-	// process's standard error.
+	// in the release it gave, the front end's diagnostics. Nil is the
+	// PanicLog of the Bus ctx carries, as progress.Bus.PanicLog tells it,
+	// and without a Bus the process's standard error.
 	PanicLog io.Writer
 	// Program names the program in the line that says the work panicked,
-	// and in the error a panic becomes, as Recovered does.
+	// and in the error a panic becomes, as Recovered does. Empty is the
+	// Program of the Bus ctx carries, and without one "the program" in
+	// the error and nothing in the line.
 	Program string
 	// Classify is the fallback of progress.Classify for the errors of the
 	// items, which tells an item that ends canceled: the program's own
-	// rule, as progress.BusOptions.Classify is the Bus's; nil, or an
-	// answer of ClassNone, is ClassTarget.
+	// rule. Nil is the rule of the Bus ctx carries, progress.Bus.Classify,
+	// by which the Bus classes the items' targets too, so that the two
+	// agree; without a Bus, nil, or an answer of ClassNone, is
+	// ClassTarget. A program sets it when what a pool's result says, such
+	// as its exit code, must not depend on whether a Bus is there.
 	Classify func(error) progress.Class
 	// Summarize sums up the items, as the error the step ends with; nil
 	// is Failure, with Noun. A program gives it the error its commands
@@ -167,6 +174,15 @@ func Map[T, R any](ctx context.Context, items []T, o MapOptions[T], fn func(ctx 
 	limit := o.Limit
 	if limit < 1 {
 		limit = DefaultLimit
+	}
+	// The program's identity is the Bus's, unless o says otherwise.
+	bus := progress.BusFrom(ctx)
+	o.Program = cmp.Or(o.Program, bus.Program())
+	if o.PanicLog == nil {
+		o.PanicLog = bus.PanicLog()
+	}
+	if o.Classify == nil {
+		o.Classify = bus.Classify
 	}
 	stepCtx, step := progress.Start(ctx, progress.KindStep, o.Step,
 		progress.WithFlags(progress.Fold|o.Flags), progress.Total(len(items)), progress.Limit(limit))

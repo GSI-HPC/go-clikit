@@ -427,6 +427,77 @@ func TestMapTakesTheProgramsRules(t *testing.T) {
 	}
 }
 
+// Without a Program, a PanicLog or a Classify of its own, Map takes the
+// Bus's, so that a library that calls it names the program, writes a
+// panic's stack and tells an item canceled as the program does; its own
+// options override the Bus's.
+func TestMapTakesTheProgramFromTheBus(t *testing.T) {
+	t.Parallel()
+
+	stopped := errors.New("stopped")
+	classify := func(err error) progress.Class {
+		if errors.Is(err, stopped) {
+			return progress.ClassCanceled
+		}
+		return progress.ClassNone
+	}
+	work := func(_ context.Context, node string) (struct{}, error) {
+		switch node {
+		case "exe1":
+			panic("boom")
+		case "exe2":
+			return struct{}{}, stopped
+		}
+		return struct{}{}, nil
+	}
+	for _, tc := range []struct {
+		name     string
+		o        fanout.MapOptions[string]
+		program  string
+		toBus    bool
+		canceled bool
+	}{
+		{"the Bus's", fanout.MapOptions[string]{}, "sind", true, true},
+		{"its own", fanout.MapOptions[string]{
+			Program:  "own",
+			Classify: func(error) progress.Class { return progress.ClassTarget },
+		}, "own", false, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			var busLog, ownLog strings.Builder
+			if !tc.toBus {
+				tc.o.PanicLog = &ownLog
+			}
+			bus := progress.NewBus(progress.BusOptions{Program: "sind", PanicLog: &busLog, Classify: classify})
+			defer bus.Close()
+			outcomes, _ := fanout.Map(progress.WithBus(context.Background(), bus), nodes(2), tc.o, work)
+
+			var p *fanout.PanicError
+			if !errors.As(outcomes[0].Err, &p) || p.Program != tc.program {
+				t.Errorf("exe1 = %+v, want a panic of %s", outcomes[0], tc.program)
+			}
+			log, other := busLog.String(), ownLog.String()
+			if !tc.toBus {
+				log, other = other, log
+			}
+			if !strings.HasPrefix(log, tc.program+": panic while working on exe1") || other != "" {
+				t.Errorf("the stack went to %q, and %q to the other log", log, other)
+			}
+			// The span of exe2 is classed by the Bus's rule; the class
+			// Summarize is told of is the resolved rule's.
+			var s fanout.Summary
+			o := tc.o
+			o.PanicLog = io.Discard
+			o.Summarize = func(got fanout.Summary) error { s = got; return nil }
+			fanout.Map(progress.WithBus(context.Background(), bus), []string{"exe2"}, o, work)
+			if s.Canceled != tc.canceled {
+				t.Errorf("Summary = %+v, want Canceled %t", s, tc.canceled)
+			}
+		})
+	}
+}
+
 // Without a Summarize of the program's, the step ends with Failure, which
 // names the items by Noun; a Summarize is called when nothing failed too,
 // with a Summary that is not canceled.

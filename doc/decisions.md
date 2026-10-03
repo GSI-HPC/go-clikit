@@ -14,12 +14,13 @@ edited: a later one supersedes it, and the earlier one's status names it.
 | [3](#3-what-the-kit-may-require) | What the kit may require | accepted |
 | [4](#4-a-release-is-a-signed-tag) | A release is a signed tag | accepted, superseded in part by [10](#10-a-daily-audit-holds-the-releases-to-their-record) |
 | [5](#5-progress-and-its-displays-are-the-kits-own) | Progress and its displays are the kit's own | accepted |
-| [6](#6-the-pools-are-the-kits-own) | The pools are the kit's own | accepted |
+| [6](#6-the-pools-are-the-kits-own) | The pools are the kit's own | accepted, refined by [12](#12-the-programs-identity-lives-on-the-bus) |
 | [7](#7-escapes-are-for-a-reader-not-for-decoding) | Escapes are for a reader, not for decoding | accepted, refined by [14](#14-the-escape-deny-list-may-grow-in-a-minor-release) |
 | [8](#8-widths-err-wide-and-follow-unicode-180) | Widths err wide, and follow Unicode 18.0 | accepted |
 | [9](#9-the-region-comes-off-one-line-a-row) | The region comes off one line a row | accepted |
 | [10](#10-a-daily-audit-holds-the-releases-to-their-record) | A daily audit holds the releases to their record | accepted |
-| [11](#11-a-deadline-ends-a-pools-items-as-an-interrupt-does) | A deadline ends a pool's items as an interrupt does | accepted |
+| [11](#11-a-deadline-ends-a-pools-items-as-an-interrupt-does) | A deadline ends a pool's items as an interrupt does | accepted, refined by [12](#12-the-programs-identity-lives-on-the-bus) |
+| [12](#12-the-programs-identity-lives-on-the-bus) | The program's identity lives on the Bus | accepted |
 | [13](#13-the-skip-error-lives-in-progress) | The skip error lives in progress | accepted |
 | [14](#14-the-escape-deny-list-may-grow-in-a-minor-release) | The escape deny-list may grow in a minor release | accepted |
 | [15](#15-a-new-or-stricter-check-rule-is-a-breaking-change) | A new or stricter Check rule is a breaking change | accepted |
@@ -277,7 +278,8 @@ quotes and escapes newlines.
 
 ## 6. The pools are the kit's own
 
-Status: accepted
+Status: accepted, refined by
+[decision 12](#12-the-programs-identity-lives-on-the-bus)
 
 ### Context
 
@@ -546,7 +548,8 @@ and withdrawn.
 
 ## 11. A deadline ends a pool's items as an interrupt does
 
-Status: accepted
+Status: accepted, refined by
+[decision 12](#12-the-programs-identity-lives-on-the-bus)
 
 ### Context
 
@@ -596,6 +599,54 @@ own time.
   which may be a timeout of its own, while its target ends canceled.
 - An item whose work fails for a reason of its own just as the context
   ends is counted as cut short, not as failed.
+
+## 12. The program's identity lives on the Bus
+
+Status: accepted
+
+### Context
+
+Decision 6 made the program's name, its rule for the class of an error and
+the error a step ends with options of each pool. The name, the panic log
+and the class rule were so given separately to the Bus, the event log, the
+terminal and every call of `fanout.Map`. A library that calls `Map` knows
+none of them: a panic in its work named no program and wrote its stack
+straight to standard error, over a live display, and `Map` told an item
+canceled by its own `Classify` while the Bus classed the item's target by
+the program's rule, so that the step and its targets could disagree.
+`Map` worked out the error its step ended with and dropped it, and
+`Summarize` was told of the items that failed in parallel slices and a
+bool named `interrupted`, which a deadline sets as well (decision 11).
+
+### Decision
+
+- The program's name, its class rule and its panic log are options of the
+  Bus, which `Bus.Program`, `Bus.PanicLog` and `Bus.Classify` hand on. A
+  pool takes them from the Bus its context carries; its own options,
+  `MapOptions.Program`, `PanicLog` and `Classify`, override the Bus's, and
+  without either it falls back to "the program", standard error and
+  `ClassTarget`.
+- The rule that tells an item canceled, for the step's summary, is the one
+  that classes the item's target: the pool's override, or else the Bus's.
+- The options stay, as overrides: a program whose exit code follows a
+  pool's result sets `Classify`, so that the result does not depend on
+  whether a Bus is there, as it is not with no display.
+- `Recovered(log, program, target, v)` stays the explicit form, for code
+  that has a log and no Bus; a library with a Bus calls it with the Bus's
+  `PanicLog` and `Program`. `Batches` recovers no panic and has none of
+  these options.
+- `Map` returns the error its step ended with. `Summarize` and `Failure`
+  take a `Summary`, a struct that can grow, and decision 11's
+  `interrupted` is its `Canceled`.
+
+### Costs
+
+- Without its own `Classify`, what a pool's step and `Summary.Canceled`
+  say follows the Bus's rule when there is a Bus, and `ClassTarget`
+  otherwise; a program that needs one answer either way sets the option.
+- The program's identity is still given in more than one place for the
+  parts that do not take it from a Bus: `Recovered`, and the terminal a
+  display draws on.
 
 ## 13. The skip error lives in progress
 

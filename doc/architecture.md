@@ -159,9 +159,9 @@ The kit knows no program. What depends on one is a parameter or a hook:
 
 | What | Where |
 | --- | --- |
-| The program's name, in the line that says a sink, a display or a pool's work panicked, and in the error a panic becomes | `progress.BusOptions.Program`, `display.TerminalOptions.Program`, `fanout.MapOptions.Program`, `fanout.Recovered` |
+| The program's name, in the line that says a sink, a display or a pool's work panicked, and in the error a panic becomes | `progress.BusOptions.Program`, `display.TerminalOptions.Program`, `fanout.MapOptions.Program` in place of the Bus's, `fanout.Recovered` |
 | The program's name and version on the event log's first line | `progress.BusOptions.Program`, which the Bus hands the log in `progress.Run`, or `progress.LogOptions.Program` in its place; `progress.LogOptions.Version` |
-| The class of an error that says none of its own, such as the program's rule for its exit codes | `progress.BusOptions.Classify`, `fanout.MapOptions.Classify`, `progresstest.Classify` |
+| The class of an error that says none of its own, such as the program's rule for its exit codes | `progress.BusOptions.Classify`, `fanout.MapOptions.Classify` in place of the Bus's, `progresstest.Classify` |
 | The error a pool's step ends with, such as the program's exit code on the kit's summary | `fanout.MapOptions.Summarize`, which is given a `fanout.Summary`, with `fanout.Failure` as the default |
 | The noun for the targets, such as "1 host" and "480 hosts"; Plain says "1 target" and "480 targets" without one | `display.PlainOptions.Noun`, `fanout.MapOptions.Noun`, `fanout.Failure` |
 | What a display names an item by, and what an item needs besides its place in the pool | `fanout.MapOptions.Describe`, which returns a `fanout.Item`, and `fanout.MapOptions.Acquire` |
@@ -173,7 +173,11 @@ A Bus hands on what it was told: `Bus.Program`, `Bus.PanicLog` and
 `Bus.Classify` answer for the Bus that `progress.BusFrom` finds in a
 context, and for a nil Bus with the defaults, so that a library that runs
 work of its own names the program, writes its panics and classes its errors
-as the Bus does.
+as the Bus does. `fanout.Map` takes them so: its own `Program`, `PanicLog`
+and `Classify` override the Bus's, and without a Bus or an option of its
+own it falls back to "the program", standard error and `ClassTarget`. The
+rule that tells an item canceled is the one that classes its target, so
+the step and its targets agree (decision 12).
 
 What stays in the program: its flags and environment variables, which display
 to draw and whether the terminal can show one, its exit codes, and reading
