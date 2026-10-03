@@ -50,7 +50,8 @@ import (
 // Bus is closed.
 type Capture struct {
 	// Lines makes the capture ask for lines of output, as a live display
-	// does, so that progress.Tee produces them.
+	// does, so that progress.Tee produces them. It is read once, when the
+	// Bus is made (see progress.LineSink); set it before progress.NewBus.
 	Lines bool
 
 	mu     sync.Mutex
