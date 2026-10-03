@@ -153,13 +153,30 @@ func (w writer) Write(p []byte) (int, error) {
 	n, err := w.w.Write(p)
 	if n > 0 {
 		wasOpen := t.open
-		t.open = p[n-1] != '\n'
+		if text := trimColours(p[:n]); len(text) > 0 {
+			t.open = text[len(text)-1] != '\n'
+		}
 		if wasOpen && !t.open && t.suspended == 0 {
 			// The line the lines waited for has ended.
 			t.writeWaiting()
 		}
 	}
 	return n, err
+}
+
+// trimColours returns p without the sequences that set colours and other
+// attributes of text (SGR, ESC [ … m) at its end, which take no column and
+// leave the cursor where it is: a write that ends a line and then sets the
+// colour back has left no line open. Any other sequence is text.
+func trimColours(p []byte) []byte {
+	for len(p) > 0 && p[len(p)-1] == 'm' {
+		start := bytes.LastIndex(p, []byte("\x1b["))
+		if start < 0 || strings.Trim(string(p[start+2:len(p)-1]), "0123456789;:") != "" {
+			break
+		}
+		p = p[:start]
+	}
+	return p
 }
 
 // Lines returns a writer to w, a stream that shows on the terminal, for
@@ -171,9 +188,10 @@ func (w writer) Write(p []byte) (int, error) {
 // the command has a line open, such as a question it asks itself; the next
 // frame, the write that ends the open line, the resume and Close write
 // them, in order, and so does a write of the command's, before its own
-// bytes. A line that does not end waits for its end, and Close ends it.
-// What waits is bounded, 256 KiB: a line past that is left out, and a line
-// written with the others says how many were.
+// bytes. A write of the command's that ends a line and then sets a colour
+// (ESC [ … m) leaves no line open. A line that does not end waits for its
+// end, and Close ends it. What waits is bounded, 256 KiB: a line past that
+// is left out, and a line written with the others says how many were.
 //
 // w must not be a writer of the Terminal's own. What is written is not
 // changed, and Write reports it all written: the lines are a courtesy.
