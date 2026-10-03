@@ -219,7 +219,8 @@ func TestTheGoldenLogKeepsTheLinesFirstReleased(t *testing.T) {
 // version 1 knows them all: a value added without a name, or not in the
 // fixture, fails this test. The values are counted in the source, so that
 // none is missed here. Every key an event is logged with is on a line of
-// the fixture too, and so is every value of Cache.
+// the fixture too, and so is every example of Cache the log's reference
+// gives.
 func TestEveryValueHasANameInTheLog(t *testing.T) {
 	t.Parallel()
 
@@ -281,7 +282,8 @@ func TestEveryValueHasANameInTheLog(t *testing.T) {
 		}
 	}
 
-	// Cache is a string, but one of a set that the log's reference lists.
+	// Cache is the program's to choose; the log's reference gives these
+	// as examples.
 	for _, name := range []string{"hit", "miss", "memory", "disk"} {
 		if !said("cache", name) {
 			t.Errorf("%s has no line whose %q is %q", logFixture, "cache", name)

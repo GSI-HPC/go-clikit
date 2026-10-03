@@ -62,9 +62,9 @@ runs that write to a pipe or to NFS at once each need a file of their own.
 | `total`, `limit`, `batch` | How many targets a step or a batch expects, how many it works on at once, and a batch's place among its step's, `2/5` |
 | `message` | One short line for a display, such as the question a confirmation asks |
 | `method`, `path`, `httpStatus` | The request of an HTTP call, and the status of its answer |
-| `cache`, `source` | Where a lookup was answered from, `hit`, `miss`, `memory` or `disk`; and the kind of source a secret or a credential was read from, never the value |
+| `cache`, `source` | Where a lookup was answered from, such as `hit`, `miss`, `memory` or `disk`; and the kind of source a secret or a credential was read from, never the value |
 | `timeout` | The bound of a call, or the length of a wait, in seconds |
-| `exit` | The exit code of a remote command; `0` is written, and a command that gave none has no `exit` |
+| `exit` | The exit code of a command; `0` is written, and a command that gave none has no `exit` |
 | `status` | How the span ended: `ok`, `failed`, `canceled` or `skipped` |
 | `class` | Why a span that failed did: `target`, `transport`, `timeout`, `auth`, `pin`, `usage` or `canceled` |
 | `err` | The error the span ended with, on one line |
@@ -126,9 +126,11 @@ has returned, after which the writer may be closed.
 `progress/testdata/log-v1.jsonl` is a run that has every key this document
 lists, but `program`, which came after it and which a test of its own checks
 on the first line, and every value this document lists for a key: each
-`type`, `kind`, `flags`, `state`, `status`, `class`, `stream` and `cache`.
-Of the keys whose values are the program's to choose, text such as `name`
-and `err` and the kind of source a `source` names, it has an example each.
+`type`, `kind`, `flags`, `state`, `status`, `class` and `stream`. Of the
+keys whose values are the program's to choose, text such as `name` and
+`err`, where a lookup was answered from, `cache`, and the kind of source a
+`source` names, it has an example each, and each of the examples this
+document gives for `cache`.
 The span ids, which each Bus draws at random, are written as `#1`, `#2` and
 so on in the order they first appear. The test that writes it compares what
 the log writes with it, line for line, and fails on any difference; another

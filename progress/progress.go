@@ -60,11 +60,11 @@ const (
 	KindStep
 	// KindBatch is one of the batches a staggered action runs in turn.
 	KindBatch
-	// KindTarget is one node, service processor, role, name or port that
-	// a step works on.
+	// KindTarget is one thing a step works on, such as a host, a
+	// container, a file or a port.
 	KindTarget
-	// KindCall is one request made for a target: an ssh command, a
-	// Redfish request, a copy, a lookup.
+	// KindCall is one request made for a target, such as a remote
+	// command, an HTTP request, a copy or a lookup.
 	KindCall
 	// KindWait is time spent waiting on purpose: the confirmation, the
 	// pause between batches.
@@ -152,6 +152,10 @@ func (s Status) String() string {
 
 // Class says in a word why a span failed, for a display to group failures
 // by. Classify tells it from the error.
+//
+// The values defined here are the event log's vocabulary: a program maps
+// its own failures onto them, through a Classifier or BusOptions.Classify.
+// Values may be added in a minor release.
 type Class uint8
 
 const (
@@ -160,13 +164,15 @@ const (
 	// ClassTarget is a target that answered and said no, such as a
 	// command that exited non-zero.
 	ClassTarget
-	// ClassTransport is a host that could not be reached or kept.
+	// ClassTransport is a peer that could not be reached, or whose
+	// connection was lost.
 	ClassTransport
 	// ClassTimeout is work that ran out of time.
 	ClassTimeout
 	// ClassAuth is an account that was refused.
 	ClassAuth
-	// ClassPin is a certificate that does not match the one pinned.
+	// ClassPin is a peer whose identity does not match the one expected,
+	// such as a pinned TLS certificate or a known ssh host key.
 	ClassPin
 	// ClassUsage is a request refused before anything was contacted.
 	ClassUsage
@@ -321,11 +327,12 @@ const (
 // bag of free-form attributes: a value without a field here cannot reach a
 // sink, and so reaches no log or exporter either.
 type Fields struct {
-	// Node is what a display folds finished targets by: the node, the
-	// service processor, the role, the name or the port. It may be a node
-	// set, such as the nodes of a batch.
+	// Node is what a display folds finished targets by: the target as the
+	// program names it, such as a host, a container, a file or a port. It
+	// may be a node set, such as the nodes of a batch.
 	Node string
-	// Host is the address the work goes to, and Role its host role.
+	// Host is the address the work goes to, and Role the target's role,
+	// as the program names it.
 	Host, Role string
 	// Total is how many targets to expect below a step or a batch. It
 	// only ever grows: a smaller Total given later is ignored.
@@ -337,19 +344,19 @@ type Fields struct {
 	// Message is one short line for a display, such as the question a
 	// confirmation asks.
 	Message string
-	// Method and Path are the request of a Redfish call, and HTTPStatus
+	// Method and Path are the request of an HTTP call, and HTTPStatus
 	// its answer.
 	Method, Path string
 	HTTPStatus   int
-	// Cache says where a lookup was answered from: "hit", "miss",
-	// "memory" or "disk".
+	// Cache says where a lookup was answered from, such as "hit",
+	// "miss", "memory" or "disk".
 	Cache string
 	// Source is the kind of source a secret or a credential was read
 	// from, such as "age", "sops", "prompt" or "command"; never the value.
 	Source string
 	// Timeout is the bound of a call, or the length of a wait.
 	Timeout time.Duration
-	// Exit is the exit code of a remote command, nil when there was none.
+	// Exit is the exit code of a command, nil when there was none.
 	Exit *int
 }
 
@@ -370,7 +377,7 @@ type Event struct {
 	Span, Parent SpanID
 	// Kind is the level of the tree the span is on.
 	Kind Kind
-	// Name says what the span is, in few words: "ssh", "redfish",
+	// Name says what the span is, in few words: "ssh", "copy",
 	// "reset the machines", or a target's name.
 	Name string
 	// Flags are the span's flags, which say how displays show it.
@@ -444,7 +451,7 @@ type Suspender interface {
 }
 
 // Classifier is an error that says its own Class, such as a certificate
-// that does not match its pin or an account a service processor refused.
+// that does not match its pin or an account that was refused.
 // ClassNone leaves the error to the rules of Classify.
 type Classifier interface {
 	// ProgressClass returns the error's class.
@@ -509,7 +516,7 @@ func Batch(i, n int) Option {
 // Message sets Message.
 func Message(s string) Option { return func(o *options) { o.Message = s } }
 
-// HTTP sets the Method and Path of a Redfish call.
+// HTTP sets the Method and Path of an HTTP request.
 func HTTP(method, path string) Option {
 	return func(o *options) { o.Method, o.Path = method, path }
 }
