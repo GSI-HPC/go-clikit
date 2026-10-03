@@ -223,9 +223,10 @@ func call[T, R any](ctx context.Context, log io.Writer, program, name string, it
 // with the errors errs: "k of n <noun> failed: <names>", or "k of n failed:
 // <names>" without a noun, with each error that is not nil underneath, so
 // that errors.Is and errors.As still find a cancellation among them. The
-// names are written as a node set when each reads as one host name in one,
-// and otherwise as a list separated by commas, in the order given, so that
-// a name such as "config volume" is not read as two hosts. Its progress
+// names are written as a node set when each reads as one host name in one
+// and none repeats, and otherwise as a list separated by commas, in the
+// order given, so that a name such as "config volume" is not read as two
+// hosts and the list names as many as the count. Its progress
 // class is ClassCanceled when interrupted says that the interrupt ended the
 // items, since the error of an item is what its work returned, which need
 // not say so, and ClassTarget otherwise. It is nil when none failed.
@@ -255,7 +256,7 @@ func Failure(noun string, n int, names []string, errs []error, interrupted bool)
 }
 
 // list names items as a node set when every name reads as one host name in
-// one, and as a list separated by commas otherwise.
+// one and none repeats, and as a list separated by commas otherwise.
 func list(names []string) string {
 	set := nodeset.New()
 	for _, name := range names {
@@ -264,6 +265,11 @@ func list(names []string) string {
 			return strings.Join(names, ",")
 		}
 		set = set.Union(one)
+	}
+	// A node set holds a name once, so names that repeat are listed as
+	// given, as many as the count says.
+	if set.Len() != len(names) {
+		return strings.Join(names, ",")
 	}
 	return set.String()
 }
