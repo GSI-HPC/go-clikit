@@ -181,7 +181,7 @@ func TestMapTurnsAPanicIntoThatItemsFailure(t *testing.T) {
 	for i, o := range outcomes {
 		if i == 1 {
 			var p *fanout.PanicError
-			if o.Value != nil || !errors.As(o.Err, &p) || p.Program != "sind" ||
+			if o.Value != nil || !errors.As(o.Err, &p) || p.Program != "sind" || p.Target != "exe2" ||
 				o.Err.Error() != `sind panicked; this is a bug, please report it: "assignment to entry in nil map"` {
 				t.Errorf("exe2 = %+v, want no value and an error saying sind panicked", o)
 			}

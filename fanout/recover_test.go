@@ -4,12 +4,15 @@
 package fanout_test
 
 import (
+	"context"
+	"errors"
 	"io"
 	"os"
 	"strings"
 	"testing"
 
 	"github.com/GSI-HPC/go-clikit/fanout"
+	"github.com/GSI-HPC/go-clikit/progress"
 )
 
 // Without a log, the stack of a panic goes to the process's standard
@@ -47,5 +50,29 @@ func TestRecoveredEscapesTheTarget(t *testing.T) {
 	line, _, _ := strings.Cut(log.String(), "\n")
 	if want := `prog: panic while working on evil\x1b]0;pwned\x07\x1b[2J\nnext: "boom"`; line != want {
 		t.Errorf("the log's first line reads %q, want %q", line, want)
+	}
+}
+
+// A PanicError keeps what the panic was called with and the target, but
+// wraps nothing: a panic with the context's error, a skip or an error of
+// a class of its own is a bug, which fails its item as any other panic.
+func TestPanicErrorKeepsTheValueAndWrapsNothing(t *testing.T) {
+	t.Parallel()
+
+	for _, v := range []error{context.Canceled, progress.Skip("not now"), unreachable{errors.New("no route")}} {
+		err := fanout.Recovered(io.Discard, "prog", "exe1", v)
+		var p *fanout.PanicError
+		if !errors.As(err, &p) || p.Value != any(v) || p.Target != "exe1" || p.Program != "prog" {
+			t.Errorf("Recovered(%v) = %#v, want a PanicError that keeps it", v, err)
+		}
+		if errors.Is(err, v) || errors.Is(err, progress.ErrSkipped) {
+			t.Errorf("errors.Is finds %v in the panic's error", v)
+		}
+		if got := progress.Classify(err, nil); got != progress.ClassTarget {
+			t.Errorf("a panic with %v is classed %s, want target", v, got)
+		}
+		if want := `prog panicked; this is a bug, please report it: "` + v.Error() + `"`; err.Error() != want {
+			t.Errorf("Error() = %q, want %q", err, want)
+		}
 	}
 }
