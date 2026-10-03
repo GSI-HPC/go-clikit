@@ -98,9 +98,10 @@ go-test-coverage: `go install github.com/vladopajic/go-test-coverage/v2@latest`.
   such as "hosts", are parameters, and exit-code rules stay in the program,
   behind hooks such as `Classify`.
 - Interfaces beyond the Go API: the six span kinds, the JSONL event log
-  (version 1: keys may be added, never renamed or removed), and the text the
-  displays draw, which consumers compare in their tests. Changing any of
-  them is a breaking change.
+  (version 1: keys may be added, never renamed or removed), the text the
+  displays draw, which consumers compare in their tests, and the rules
+  `progresstest.Check` enforces (decision 15). Changing any of them is a
+  breaking change; a new or stricter `Check` rule is one too.
 - A library that reports spans costs nothing without a Bus: no allocation
   on that path, which a benchmark or `testing.AllocsPerRun` keeps honest.
 - Fuzz targets sit next to the code, and a failing input found by CI is

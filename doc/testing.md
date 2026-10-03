@@ -29,6 +29,12 @@ what it reports. `Capture` is a sink that keeps the events of a Bus, and
 - and no text holds anything `termtext.Escape` would escape, or is
   longer than its bound.
 
+Each rule is a promise the progress package makes to every sink, and
+programs hold their own tests to it, so the rules are an interface beyond
+the Go API (decision 15). A new or stricter rule is a breaking change,
+named in the release notes; a rule that catches what an existing promise
+already forbade is a fix. No option selects which rules run.
+
 `Watch` gives a test a Bus of its own and a `Watcher`, whose `Finish`
 checks the events, closes the Bus and draws them as a tree. It checks
 before the Bus is closed, which would end a span left open and hide it,
