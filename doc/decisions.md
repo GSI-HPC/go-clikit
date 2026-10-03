@@ -180,9 +180,9 @@ unpublish it.
   `RELEASE_ALLOWED_SIGNERS` (SSH) or `RELEASE_ALLOWED_PGP_KEYS` (OpenPGP)
   repository variable signed under the name it was pushed as, and a tag the
   go command would not accept as a version of this module. It tests the
-  tagged commit on both Go lines, publishes the GitHub release with the tag
-  body as its notes, and fetches the version through proxy.golang.org, so
-  that pkg.go.dev lists it.
+  tagged commit on both Go lines, fetches the version through
+  proxy.golang.org, so that pkg.go.dev lists it, and publishes the GitHub
+  release with the tag body as its notes.
 - A tag is never moved or deleted. A broken release is withdrawn with a
   `retract` directive in `go.mod`, which ships in the next release.
 - The module stays at v0 while its API settles, and a v0 minor release may
