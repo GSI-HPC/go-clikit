@@ -443,7 +443,7 @@ func TestSpanIDsAreNeverZeroAndNeverShared(t *testing.T) {
 	seen := map[progress.SpanID]bool{}
 	for range 2 {
 		capture := &progresstest.Capture{}
-		bus := progress.NewBus(progress.BusOptions{Sinks: []progress.Sink{capture}, Trace: trace})
+		bus := progress.NewBus(progress.BusOptions{Sinks: []progress.Sink{capture}, Trace: progress.TraceContext{Trace: trace}})
 		if bus.Trace() != trace {
 			t.Errorf("Trace() = %s, want %s", bus.Trace(), trace)
 		}

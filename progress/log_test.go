@@ -88,7 +88,7 @@ func TestTheEventLogWritesEveryEventOnALineOfItsOwn(t *testing.T) {
 	}
 	clock := newClock()
 	log, events := logged(t, progress.BusOptions{
-		Now: clock.Now, Trace: tc.Trace, Parent: tc.Parent, TraceFlags: tc.Flags, TraceState: tc.State,
+		Now: clock.Now, Trace: tc,
 	}, func(busCtx context.Context) {
 		ctx, cmd := progress.Start(busCtx, progress.KindCommand, "exec", progress.WithFlags(progress.DryRun))
 		_, cred := progress.Start(ctx, progress.KindCall, "credential bmc", progress.WithFlags(progress.Hidden), progress.Source("env"))
@@ -366,7 +366,7 @@ func TestTheEventLogSaysWhereItsTraceCameFrom(t *testing.T) {
 		t.Errorf("the first line of a trace that began here: %v", here)
 	}
 	tc, _ := progress.ParseTraceContext("00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00", "")
-	unsampled := first(progress.BusOptions{Trace: tc.Trace, Parent: tc.Parent, TraceFlags: tc.Flags})
+	unsampled := first(progress.BusOptions{Trace: tc})
 	if unsampled["parent"] != "00f067aa0ba902b7" || unsampled["traceFlags"] != "00" || unsampled["traceState"] != nil {
 		t.Errorf("the first line of a trace not sampled: %v", unsampled)
 	}
@@ -731,7 +731,7 @@ func TestTwoRunsAppendingToOneFileCanBeToldApart(t *testing.T) {
 			}
 			defer func() { _ = f.Close() }()
 			log := progress.NewLog(f, progress.LogOptions{Run: run})
-			bus := progress.NewBus(progress.BusOptions{Sinks: []progress.Sink{log}, Trace: trace})
+			bus := progress.NewBus(progress.BusOptions{Sinks: []progress.Sink{log}, Trace: progress.TraceContext{Trace: trace}})
 			ctx := progress.WithBus(context.Background(), bus)
 			for i := range events / 2 {
 				_, s := progress.Start(ctx, progress.KindCall, "ssh", progress.Node(fmt.Sprintf("exe%04d", i)))

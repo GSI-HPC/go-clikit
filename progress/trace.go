@@ -11,6 +11,7 @@ import "encoding/hex"
 // A Bus records where its trace came from, for an event log, and changes
 // nothing else by it: a trace the other program does not sample is shown
 // and logged all the same.
+// A Bus takes its trace context as BusOptions.Trace.
 type TraceContext struct {
 	// Trace is the trace the spans belong to.
 	Trace TraceID
