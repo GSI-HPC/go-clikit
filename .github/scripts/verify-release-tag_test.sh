@@ -388,23 +388,58 @@ AUDIT_MOD="$scratch/retract.mod" expect 'an audit of a version go.mod does not r
 retracting '// retract v0.0.4'
 AUDIT_MOD="$scratch/retract.mod" expect 'an audit of a go.mod naming a version in a comment' fail \
   'no tag v0.0.4' audit "$listed" ''
+# A retraction answers the version as the module proxy serves it: a tag
+# pushed again later is held to the commit the proxy serves.
+retracting 'retract v0.0.4 // Pushed by someone else.'
+info v0.0.4 "$old"
+git tag -a v0.0.4 -m 'release v0.0.4' "$released"
+AUDIT_MOD="$scratch/retract.mod" expect 'an audit of a retracted version pushed again on another commit' fail \
+  'retracts v0.0.4, which does not acknowledge this: the tag of a retracted version still has to name the commit' \
+  audit "$listed" ''
+AUDIT_MOD="$scratch/retract.mod" expect 'an audit counting a retracted version pushed again on another commit' fail \
+  '1 version(s) on the module proxy are not served from the commit their tag names' audit "$listed" ''
+git tag -d v0.0.4 > /dev/null
+git tag -a v0.0.4 -m 'release v0.0.4' "$old"
+AUDIT_MOD="$scratch/retract.mod" expect 'an audit of a retracted version pushed again on the commit the proxy serves' pass \
+  '::warning::v0.0.4 is not signed by a key' audit "$listed" ''
+git tag -d v0.0.4 > /dev/null
+rm "$PROXY_INFO/v0.0.4.info"
 printf 'v1.0.0\n' > "$PROXY_LIST"
 info v1.0.0 "$old"
 retracting 'retract v1.0.0 // Pushed again on another commit.'
-AUDIT_MOD="$scratch/retract.mod" expect 'an audit of a version served from another commit that go.mod retracts' pass \
-  'retracts v1.0.0, which acknowledges this' audit "$listed" ''
+AUDIT_MOD="$scratch/retract.mod" expect 'an audit of a version served from another commit that go.mod retracts' fail \
+  'retracts v1.0.0, which does not acknowledge this' audit "$listed" ''
 info v1.0.0 "$released"
 git tag -a v0.0.6 -m 'release v0.0.6' "$old"
 retracting 'retract v0.0.6 // Not signed.'
+AUDIT_MOD="$scratch/retract.mod" expect 'an audit of a retracted unsigned tag the module proxy has not fetched' fail \
+  'the module proxy does not say that it serves v0.0.6 from the commit the tag names' audit "$listed" ''
+printf 'v0.0.6\nv1.0.0\n' > "$PROXY_LIST"
+info v0.0.6 "$old"
 AUDIT_MOD="$scratch/retract.mod" expect 'an audit of an unsigned tag that go.mod retracts' pass \
   '::warning::v0.0.6 is not signed by a key' audit "$listed" ''
 git tag -a v0.0.7 -m 'release v0.0.7' "$old"
 AUDIT_MOD="$scratch/retract.mod" expect 'an audit of an unsigned tag next to one that go.mod retracts' fail \
   '1 of 3 release tag(s)' audit "$listed" ''
-git tag -d v0.0.6 v0.0.7 > /dev/null
+git tag -d v0.0.7 > /dev/null
+# A retracted tag moved later names content that nobody withdrew.
+git tag -f -a v0.0.6 -m 'release v0.0.6' "$released" > /dev/null
+AUDIT_MOD="$scratch/retract.mod" expect 'an audit of a retracted unsigned tag moved to another commit' fail \
+  "the module proxy serves v0.0.6 from commit $old, but the tag v0.0.6 names $released" audit "$listed" ''
+unrecorded v0.0.6 "$released_time"
+AUDIT_MOD="$scratch/retract.mod" expect 'an audit of a retracted unsigned tag the module proxy names no commit for' fail \
+  'the module proxy does not say that it serves v0.0.6 from the commit the tag names' audit "$listed" ''
+git tag -d v0.0.6 > /dev/null
+rm "$PROXY_INFO/v0.0.6.info"
+printf 'v1.0.0\n' > "$PROXY_LIST"
 retracting 'retract v0.0.8 // Deleted.'
 AUDIT_MOD="$scratch/retract.mod" expect 'an audit of a pinned release whose tag is gone that go.mod retracts' pass \
   'retracts v0.0.8' audit "$listed" '' "v0.0.8 $(printf '%040d' 0)"
+git tag -a v0.0.8 -m 'release v0.0.8' "$old"
+AUDIT_MOD="$scratch/retract.mod" expect 'an audit of a retracted pinned release whose tag is pushed again' fail \
+  'the module proxy does not say that it serves v0.0.8 from the commit the tag names' \
+  audit "$listed" '' "v0.0.8 $(printf '%040d' 0)"
+git tag -d v0.0.8 > /dev/null
 PROXY_STATUS=404 expect 'an audit of a module the proxy has not fetched' pass '' audit "$listed" ''
 PROXY_STATUS=410 expect 'an audit of a module the proxy refuses as gone' pass '' audit "$listed" ''
 PROXY_STATUS=500 expect 'an audit when the module proxy fails' fail 'answered 500' audit "$listed" ''
