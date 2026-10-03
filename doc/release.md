@@ -68,12 +68,12 @@ of the commit the tag names, which fails. That time is the committer date,
 which whoever makes a commit chooses, so it catches a tag moved to another
 commit of the history but not a commit made to match it: it is a
 consistency check, not a proof. The tag of an unverified version is still
-verified like any other, and its signature is what holds it to a commit. A failed run of the job *Verify every
-release tag is signed* is the alarm: its log names the tag or the version.
-Investigate it as a compromise, and withdraw the version as below, which
-clears the alarm for what the withdrawal answers. GitHub disables scheduled
-workflows in a repository with no activity for 60 days; enable the
-workflow again when that happens.
+verified like any other, and its signature is what holds it to a commit.
+A failed run of the job *Verify every release tag is signed* is the alarm:
+its log names the tag or the version. Investigate it as a compromise, and
+withdraw the version as below, which clears the alarm for what the
+withdrawal answers. GitHub disables scheduled workflows in a repository
+with no activity for 60 days; enable the workflow again when that happens.
 
 The audit reads the proxy's list of the module's versions, not the feed at
 index.golang.org. The feed records every version the proxy has fetched, but
@@ -117,11 +117,14 @@ releases before it expires.
 ## Withdrawing a release
 
 Never move or delete a tag you pushed as a release: the module proxy and
-the checksum database keep it regardless. The one exception is a tag that
-was not pushed as a release, such as one an intruder moved, or deleted and
-pushed again, which the audit below asks you to restore or delete. Add a
-`retract` directive with the reason to `go.mod` and ship it in the next
-release:
+the checksum database keep it regardless. There are two exceptions
+([decision 10](decisions.md#10-a-daily-audit-holds-the-releases-to-their-record)).
+A tag that was not pushed as a release, such as one an intruder moved, or
+deleted and pushed again, is restored to the tag the proxy fetched, or
+deleted, as the audit below asks. A bad tag of a retracted version whose
+commit nothing records is deleted, even one you pushed as a release, as
+below. To withdraw a version, add a `retract` directive with the reason to
+`go.mod` and ship it in the next release:
 
 ```go
 retract v0.2.0 // Tagged from the wrong commit.
