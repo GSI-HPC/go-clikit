@@ -50,3 +50,26 @@ func Classify(err error, fallback func(error) Class) Class {
 	}
 	return ClassTarget
 }
+
+// ErrSkipped says that work was left out on purpose, such as a call a dry
+// run only records, or the work for a node a command no longer tries
+// once it found the node unreachable: not a failure. Span.End ends a span
+// whose error is ErrSkipped, as errors.Is tells, skipped, and the pools of
+// fanout do not count such an item among those that failed. Test for it
+// with errors.Is, since the error Skip returns, and one that wraps it,
+// say why instead.
+var ErrSkipped = errors.New("skipped")
+
+// Skip returns an error that says work was left out on purpose, for the
+// reason given: its text is reason, and errors.Is finds ErrSkipped in it.
+// Span.End ends a span with it skipped, with reason as its Err, as
+// Span.Skip does.
+func Skip(reason string) error { return &skipped{reason: reason} }
+
+// skipped is the error of work left out on purpose, as Skip makes it.
+type skipped struct{ reason string }
+
+func (s *skipped) Error() string { return s.reason }
+
+// Is reports that the error is ErrSkipped.
+func (s *skipped) Is(target error) bool { return target == ErrSkipped }
