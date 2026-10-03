@@ -9,8 +9,10 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"runtime"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"testing/synctest"
 	"time"
@@ -416,6 +418,20 @@ func TestALineOfASpanThatEndedWhileItWasParsedIsNotShown(t *testing.T) {
 	}
 }
 
+// A line that had not ended, and then ends in a write whose parser ends the
+// span, is not shown, nor is an empty line in its place.
+func TestALineEndedByAWriteThatEndsTheSpanIsNotShown(t *testing.T) {
+	t.Parallel()
+
+	ctx, call, capture := showing(t, progress.Options{})
+	w := progress.Tee(ctx, io.Discard, progress.Stdout, func(progress.Stream, string) { call.End(nil) })
+	fmt.Fprint(w, "do")
+	fmt.Fprint(w, "ne\n")
+	if got := shown(capture); len(got) != 0 {
+		t.Errorf("lines shown: %q", got)
+	}
+}
+
 // A long line without an end costs as much as the same output in lines: a
 // piece cut from it does not copy what is left of it each time.
 func TestALongLineWithoutAnEndIsCutInLinearTime(t *testing.T) {
@@ -495,5 +511,37 @@ func TestTheLineThatWaitsAndTheUnfinishedOneAreBothSentAtTheEnd(t *testing.T) {
 	events := capture.Events()
 	if end := events[len(events)-1]; end.Type != progress.TypeEnd || end.Dropped != 0 {
 		t.Errorf("the End reports %d lines dropped, want none", end.Dropped)
+	}
+}
+
+// A span that runs many commands keeps none of their writers once they are
+// done, whether their output ended with a line or not, and still sends the
+// unfinished line before its End.
+func TestASpanKeepsNoWriterOfACommandThatIsDone(t *testing.T) {
+	t.Parallel()
+
+	ctx, call, capture := showing(t, progress.Options{})
+	const commands = 100
+	var collected atomic.Int32
+	for i := range commands {
+		buf := new(bytes.Buffer)
+		runtime.AddCleanup(buf, func(n *atomic.Int32) { n.Add(1) }, &collected)
+		w := progress.Tee(ctx, buf, progress.Stdout, nil)
+		fmt.Fprint(w, "tick\n")
+		if i == commands-1 {
+			fmt.Fprint(w, "tock")
+		}
+	}
+	deadline := time.Now().Add(5 * time.Second)
+	for collected.Load() < commands && time.Now().Before(deadline) {
+		runtime.GC()
+		time.Sleep(10 * time.Millisecond)
+	}
+	if n := collected.Load(); n < commands {
+		t.Errorf("%d of %d writers kept by the span after their commands were done", commands-n, commands)
+	}
+	call.End(nil)
+	if got := shown(capture); len(got) == 0 || got[len(got)-1] != "tock" {
+		t.Errorf("the unfinished line was not sent at the End: %q", got[max(0, len(got)-1):])
 	}
 }

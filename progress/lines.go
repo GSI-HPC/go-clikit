@@ -43,7 +43,10 @@ type lineState struct {
 	// since counts the lines left out since the last one sent, and
 	// dropped all of them.
 	since, dropped int
-	tees           []*tee
+	// tails are the tails that hold a line that has not ended, to be sent
+	// before the End; a tail is listed only while it holds one, so that a
+	// span that runs many commands keeps nothing of those that are done.
+	tails []*tail
 }
 
 // Tee returns a writer that writes to w, and cuts what it writes into
@@ -65,40 +68,34 @@ type lineState struct {
 // ends is sent before the End. The End sends the line that waits, and what
 // is left of the lines that did not end, though it finds no place for
 // them: of those, the newest of each stream, so that the last line of
-// stdout and that of stderr both reach the sinks.
+// stdout and that of stderr both reach the sinks. Until the End, the span
+// keeps the line of a writer that has not ended, but neither the writer
+// nor anything of one whose output ended with a line.
 //
 // Tee returns w itself when nothing needs the lines. The lines never fail a
 // write: what Write returns is what w returned.
 func Tee(ctx context.Context, w io.Writer, st Stream, parse func(Stream, string)) io.Writer {
 	s := SpanFrom(ctx)
-	if s != nil && s.flags&ShowLines == 0 {
+	if s != nil && (s.flags&ShowLines == 0 || !s.wantsLines()) {
 		s = nil
 	}
 	if s == nil && parse == nil {
 		return w
 	}
-	t := &tee{w: w, stream: st, parse: parse, span: s}
-	if s != nil && !s.watch(t) {
-		t.span = nil
-		if parse == nil {
-			return w
-		}
+	t := &tee{w: w, stream: st, parse: parse}
+	if s != nil {
+		t.tail = &tail{stream: st, span: s}
 	}
 	return t
 }
 
-// watch registers t to be sent s's lines, if a sink wants them and s has
-// not ended.
-func (s *Span) watch(t *tee) bool {
+// wantsLines reports whether a sink wants the lines of s, which has not
+// ended.
+func (s *Span) wantsLines() bool {
 	b := s.bus
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	if b.closed || !b.lines || s.state == StateEnded {
-		return false
-	}
-	ls := s.lineState()
-	ls.tees = append(ls.tees, t)
-	return true
+	return !b.closed && b.lines && s.state != StateEnded
 }
 
 func (s *Span) lineState() *lineState {
@@ -112,16 +109,29 @@ type tee struct {
 	w      io.Writer
 	stream Stream
 	parse  func(Stream, string)
+	// tail is nil when no display wants the lines.
+	tail *tail
 
 	mu sync.Mutex
-	// span is nil when no display wants the lines, or once it has ended.
-	span *Span
 	// parsed is the line so far for the parser, and long is set when it
 	// is too long to be one.
 	parsed []byte
 	long   bool
+}
+
+// tail is the part of a tee a display needs, apart from the tee so that
+// the span that lists it keeps neither the writer nor the parser's line.
+type tail struct {
+	stream Stream
+
+	mu sync.Mutex
+	// span is nil once it has ended.
+	span *Span
 	// shown is the part of the line so far not yet sent to the display.
 	shown []byte
+
+	// listed is set while the span lists the tail; b.mu guards it.
+	listed bool
 }
 
 func (t *tee) Write(p []byte) (int, error) {
@@ -132,69 +142,99 @@ func (t *tee) Write(p []byte) (int, error) {
 	return n, err
 }
 
-// frame cuts p into lines, and hands them on once t.mu is let go of: a
-// span's End takes t.mu while it holds the Bus lock, so the lock is never
-// taken the other way round.
+// frame cuts p into lines, and hands them on once t.mu and the tail's lock
+// are let go of: a span's End takes the tail's lock while it holds the Bus
+// lock, so the locks are never taken the other way round.
 func (t *tee) frame(p []byte) {
 	var parsed, shown []string
+	var span *Span
+	if t.parse != nil {
+		parsed = t.lines(p)
+	}
+	if t.tail != nil {
+		span, shown = t.tail.cut(p)
+	}
+	for _, line := range parsed {
+		t.parse(t.stream, line)
+	}
+	if span != nil {
+		span.show(t.tail, shown)
+	}
+}
+
+// lines returns the lines of p that ended, for the parser.
+func (t *tee) lines(p []byte) []string {
+	var lines []string
 	t.mu.Lock()
-	span := t.span
+	defer t.mu.Unlock()
 	for len(p) > 0 {
 		i := bytes.IndexByte(p, '\n')
 		part := p
 		if i >= 0 {
 			part = p[:i]
 		}
-		if t.parse != nil && !t.long {
+		if !t.long {
 			if len(t.parsed)+len(part) > maxParsedLine {
 				t.long, t.parsed = true, t.parsed[:0]
 			} else {
 				t.parsed = append(t.parsed, part...)
 			}
 		}
-		if span != nil {
-			shown = t.pieces(shown, part)
-		}
 		if i < 0 {
 			break
 		}
-		if t.parse != nil {
-			if !t.long {
-				parsed = append(parsed, string(bytes.TrimSuffix(t.parsed, []byte("\r"))))
-			}
-			t.parsed, t.long = t.parsed[:0], false
+		if !t.long {
+			lines = append(lines, string(bytes.TrimSuffix(t.parsed, []byte("\r"))))
 		}
-		if span != nil && len(t.shown) > 0 {
-			shown = append(shown, string(t.shown))
-			t.shown = t.shown[:0]
+		t.parsed, t.long = t.parsed[:0], false
+		p = p[i+1:]
+	}
+	return lines
+}
+
+// cut returns the lines and pieces of p for the display, and the span to
+// send them to, which is nil once it has ended.
+func (tl *tail) cut(p []byte) (*Span, []string) {
+	var lines []string
+	tl.mu.Lock()
+	defer tl.mu.Unlock()
+	if tl.span == nil {
+		return nil, nil
+	}
+	for len(p) > 0 {
+		i := bytes.IndexByte(p, '\n')
+		part := p
+		if i >= 0 {
+			part = p[:i]
+		}
+		lines = tl.pieces(lines, part)
+		if i < 0 {
+			break
+		}
+		if len(tl.shown) > 0 {
+			lines = append(lines, string(tl.shown))
+			tl.shown = tl.shown[:0]
 		}
 		p = p[i+1:]
 	}
-	t.mu.Unlock()
-
-	for _, line := range parsed {
-		t.parse(t.stream, line)
-	}
-	if span != nil {
-		span.show(t.stream, shown)
-	}
+	return tl.span, lines
 }
 
 // pieces adds part to the line so far, and appends to lines the pieces of
 // 4 KiB it is cut into. The line so far is filled to one byte past a piece,
 // which is all runeCut looks at, and never holds more: so a long write is
-// copied once, not once for each piece cut from it. t.mu is held.
-func (t *tee) pieces(lines []string, part []byte) []string {
+// copied once, not once for each piece cut from it. tl.mu is held.
+func (tl *tail) pieces(lines []string, part []byte) []string {
 	for {
-		n := min(cutLine+1-len(t.shown), len(part))
-		t.shown = append(t.shown, part[:n]...)
+		n := min(cutLine+1-len(tl.shown), len(part))
+		tl.shown = append(tl.shown, part[:n]...)
 		part = part[n:]
-		if len(t.shown) < cutLine {
+		if len(tl.shown) < cutLine {
 			return lines
 		}
-		k := runeCut(t.shown, cutLine)
-		lines = append(lines, string(t.shown[:k]))
-		t.shown = append(t.shown[:0], t.shown[k:]...)
+		k := runeCut(tl.shown, cutLine)
+		lines = append(lines, string(tl.shown[:k]))
+		tl.shown = append(tl.shown[:0], tl.shown[k:]...)
 	}
 }
 
@@ -213,23 +253,38 @@ func runeCut[T string | []byte](p T, n int) int {
 	return n
 }
 
-// show offers lines to the sinks, then the line held back if a token has
-// come free since.
-func (s *Span) show(st Stream, lines []string) {
+// show offers lines of tl to the sinks, then the line held back if a token
+// has come free since, and lists tl while it holds a line that has not
+// ended.
+func (s *Span) show(tl *tail, lines []string) {
 	b := s.bus
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	if b.closed || s.state == StateEnded {
+		tl.mu.Lock()
+		tl.span, tl.shown = nil, nil
+		tl.mu.Unlock()
 		return
 	}
 	ls := s.lineState()
 	ls.refill(b.now())
 	for _, line := range lines {
-		s.offer(st, line)
+		s.offer(tl.stream, line)
 	}
 	if ls.hasPending && ls.tokens > 0 {
 		ls.tokens--
 		s.sendPending()
+	}
+	tl.mu.Lock()
+	unended := len(tl.shown) > 0
+	tl.mu.Unlock()
+	if unended != tl.listed {
+		if unended {
+			ls.tails = append(ls.tails, tl)
+		} else {
+			ls.tails = slices.DeleteFunc(ls.tails, func(o *tail) bool { return o == tl })
+		}
+		tl.listed = unended
 	}
 }
 
@@ -317,7 +372,7 @@ type heldLine struct {
 	text   string
 }
 
-// flushLines sends what the tees of s hold of an unfinished line and the
+// flushLines sends what the tails of s hold of an unfinished line and the
 // line held back, before s ends, and returns how many lines were dropped
 // in all. b.mu is held.
 //
@@ -340,21 +395,22 @@ func (s *Span) flushLines() int {
 		held = append(held, heldLine{ls.pendingOn, ls.pending})
 		ls.hasPending, ls.pending = false, ""
 	}
-	for _, t := range ls.tees {
-		t.mu.Lock()
-		rest := string(t.shown)
-		t.span, t.shown = nil, nil
-		t.mu.Unlock()
+	for _, tl := range ls.tails {
+		tl.mu.Lock()
+		rest := string(tl.shown)
+		tl.span, tl.shown, tl.listed = nil, nil, false
+		tl.mu.Unlock()
 		switch {
 		case rest == "":
+			// A write ended the line, and has yet to show it.
 		case ls.tokens > 0:
 			ls.tokens--
-			s.sendLine(t.stream, rest)
+			s.sendLine(tl.stream, rest)
 		default:
-			held = s.hold(held, heldLine{t.stream, rest})
+			held = s.hold(held, heldLine{tl.stream, rest})
 		}
 	}
-	ls.tees = nil
+	ls.tails = nil
 	for _, h := range held {
 		s.sendLine(h.stream, h.text)
 	}
