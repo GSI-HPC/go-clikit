@@ -34,7 +34,8 @@ and `Watch` one whose events are checked, and drawn as a tree, when the test
 asks. Both check before the Bus is closed, which would end a span left open
 and hide it. `Capture.Tree` draws the spans as an indented tree that does not
 depend on how concurrent work was scheduled: targets that read the same are
-folded into one line naming them as a node set, and siblings are sorted, so
+folded into one line naming them as a node set, or listing them when one is
+no node or a target ran twice under one name, and siblings are sorted, so
 tests compare trees whole. `Check`'s own reporting is tested with a fake
 `testing.TB`, and a test that walks `progress.Event` and `progress.Fields`
 fails when a text field is added that `Check` does not check or `Tree` does
