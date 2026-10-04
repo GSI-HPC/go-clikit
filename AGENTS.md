@@ -133,10 +133,10 @@ go-test-coverage: `go install github.com/vladopajic/go-test-coverage/v2@latest`.
   merge PRs.
 - Ask the maintainer before commenting on issues or PRs, and never
   @-mention anyone.
-- Conventional Commits (`feat:`, `fix:`, `docs:`, `test:`, `refactor:`,
-  `build:`, `ci:`), with the package as the scope (`feat(progress): …`),
-  one logical change per commit, bullet-list bodies that say what changed
-  and why, without development narrative.
+- Conventional Commits (`feat:`, `fix:`, `perf:`, `docs:`, `test:`,
+  `refactor:`, `build:`, `ci:`), with the package as the scope
+  (`feat(progress): …`), one logical change per commit, bullet-list bodies
+  that say what changed and why, without development narrative.
 - Commits by Claude Code are authored as `Claude <noreply@anthropic.com>`
   and carry a `Co-Authored-By: Claude …` trailer. Keep both; the README AI
   disclosure relies on them.
