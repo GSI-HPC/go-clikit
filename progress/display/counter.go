@@ -41,7 +41,16 @@ type Counter struct {
 	start time.Time
 	g     glyphs
 
-	mu    sync.Mutex
+	mu     sync.Mutex
+	counts counting
+
+	ticker ticker
+}
+
+// counting is what the line of a counter is drawn from, which a Tree keeps
+// too, for the line it draws in its place on a terminal too small for it,
+// so that each event is counted once for both. Its owner's lock guards it.
+type counting struct {
 	tally progress.Tally
 	// named are the open steps that have a name and the command, the
 	// newest last, which the line names when no counted step is under way.
@@ -50,8 +59,6 @@ type Counter struct {
 	// its name for a step or the command that has one, otherwise the
 	// label of the span above it.
 	labels map[progress.SpanID]string
-
-	ticker ticker
 }
 
 type named struct {
@@ -73,12 +80,6 @@ type CounterOptions struct {
 // display before.
 func NewCounter(term *Terminal, o CounterOptions) *Counter {
 	term.attach(nil)
-	return newCounter(term, o)
-}
-
-// newCounter returns a counter on term without making it term's display,
-// as the Tree draws one in its place on a small terminal.
-func newCounter(term *Terminal, o CounterOptions) *Counter {
 	c := &Counter{term: term, now: o.Now, g: glyphsFor(o.ASCII)}
 	if c.now == nil {
 		c.now = time.Now
@@ -102,7 +103,7 @@ func (c *Counter) Draw() {
 	line := func() string {
 		c.mu.Lock()
 		defer c.mu.Unlock()
-		return c.line(now)
+		return c.counts.line(now, c.start, c.g)
 	}()
 	c.term.draw([]string{line})
 }
@@ -115,9 +116,15 @@ func (c *Counter) Close() { c.ticker.close(c.term) }
 func (c *Counter) Handle(e progress.Event) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	c.tally.Add(e)
+	c.counts.add(e)
+}
+
+// add counts e in, and returns what the tally says of the step or batch e
+// counts towards, as progress.Tally.Add does.
+func (c *counting) add(e progress.Event) (progress.Count, bool) {
+	count, counted := c.tally.Add(e)
 	if e.Kind == progress.KindTarget {
-		return
+		return count, counted
 	}
 	titled := (e.Kind == progress.KindCommand || e.Kind == progress.KindStep) && e.Name != ""
 	switch e.Type {
@@ -142,6 +149,7 @@ func (c *Counter) Handle(e progress.Event) {
 			}
 		}
 	}
+	return count, counted
 }
 
 // Suspend takes the line off the terminal until Resume.
@@ -150,14 +158,14 @@ func (c *Counter) Suspend() { c.term.suspend() }
 // Resume lets the line back.
 func (c *Counter) Resume() { c.term.resume() }
 
-// line is the line to draw at now. c.mu is held.
-func (c *Counter) line(now time.Time) string {
+// line is the line to draw at now, for a command that started at start.
+func (c *counting) line(now, start time.Time, g glyphs) string {
 	var segments []string
 	for _, root := range c.tally.Roots() {
 		if root.Flags&progress.Hidden == 0 {
 			// A step with no name is called by the span above it.
 			root.Name = cmp.Or(root.Name, c.labels[root.Span])
-			segments = append(segments, segment(root, c.g.sep))
+			segments = append(segments, segment(root, g.sep))
 		}
 	}
 	if len(segments) == 0 && len(c.named) > 0 {
@@ -165,9 +173,9 @@ func (c *Counter) line(now time.Time) string {
 	}
 	line := strings.Join(segments, " | ")
 	if line != "" {
-		line += c.g.sep
+		line += g.sep
 	}
-	return line + elapsed(now.Sub(c.start))
+	return line + elapsed(now.Sub(start))
 }
 
 // segment says how far one counted step has got, its parts split by sep,
