@@ -25,6 +25,7 @@ names it.
 | [13](#13-the-skip-error-lives-in-progress) | The skip error lives in progress | accepted |
 | [14](#14-the-escape-deny-list-may-grow-in-a-minor-release) | The escape deny-list may grow in a minor release | accepted |
 | [15](#15-a-new-or-stricter-check-rule-is-a-breaking-change) | A new or stricter Check rule is a breaking change | accepted |
+| [16](#16-a-large-set-of-targets-is-folded-again-once-a-second) | A large set of targets is folded again once a second | accepted |
 
 ## 1. Apache-2.0, and GSI holds the copyright
 
@@ -770,3 +771,42 @@ the program had not changed.
   `Check` holds anyone's tests to it.
 - Telling a fix from a stricter rule is a judgement, made in review by
   whether the promise was already written down.
+
+## 16. A large set of targets is folded again once a second
+
+Status: accepted
+
+### Context
+
+The tree folds the targets of a step that have ended into node sets, one
+row for those that ended well, one for each way they failed, and one each
+for those interrupted and those left out. A frame folded a set again
+whenever it had changed since the frame before, which a step whose targets
+end one after another does between any two frames, ten times a second.
+Folding costs O(n log n) in the names, and the tree draws a frame under its
+lock, which the Bus waits for while it hands the tree an event, and every
+worker that reports one waits for the Bus. A frame over a step whose
+targets were ending cost 2.1 ms at 10,000 targets, 3.5 ms at 16,000 and
+7.1 ms at 30,000, against 50 µs at 300. The row of the step counts the
+targets as they end from a tally, which costs nothing to read.
+
+### Decision
+
+- A set of more than 256 names is folded again at most once a second: a
+  frame drawn within the second draws its row as it was last folded. A
+  smaller set is folded again for every frame it changed for.
+- The row of the step counts every target that has ended, and a row that
+  says how many failed rows are left out counts the sets as they are.
+- The line a step leaves when it ends, with its failures below it, names
+  every target.
+- The 256 names and the second are constants, not options, and `Tree`'s
+  doc comment states them.
+
+### Costs
+
+- A row of more than 256 names can leave out the targets that ended in the
+  last second, while the count of the step's row includes them.
+- The text the tree draws changes: a consumer's test that draws frames less
+  than a second apart over more than 256 targets sees the fold of the
+  earlier frame. Decision 5 makes that a breaking change, named in the
+  release notes.

@@ -34,6 +34,13 @@ const (
 	// it, is done without ever being drawn: a row for it would only
 	// flicker.
 	quick = 100 * time.Millisecond
+	// refoldAbove is how many names a set of targets may hold and still
+	// be folded again for every frame it changed for; a larger one is
+	// folded again once every refoldEvery. Folding 10,000 names takes
+	// milliseconds, under the lock the Bus waits for, and the row of the
+	// step counts the targets as they end anyway.
+	refoldAbove = 256
+	refoldEvery = time.Second
 )
 
 // glyphs are the marks a display draws with.
@@ -77,11 +84,14 @@ func glyphsFor(ascii bool) glyphs {
 // progress.Tally counts them. The targets of a step are folded: those that
 // ended well into one node set, those that failed into one row for each
 // class and error they share, with a target's own name read as {}, those
-// interrupted and those left out into one row each. Those still queued are
-// only counted, and those running are listed, the longest running first,
-// with how long they have run, against the bound of the request they wait
-// for when it has one, and what that request is, or the last line of
-// output for a step that shows lines. A pause counts down.
+// interrupted and those left out into one row each. A row that names more
+// than 256 targets is folded again at most once a second, so it may leave
+// out those that ended since, which the step's count includes; the line
+// the step leaves names every one. Those still queued are only counted,
+// and those running are listed, the longest running first, with how long
+// they have run, against the bound of the request they wait for when it
+// has one, and what that request is, or the last line of output for a
+// step that shows lines. A pause counts down.
 //
 // A hidden span is drawn only once it has run for a second, and a line is
 // left for it only when it failed or took that long. A span that ends well
@@ -594,9 +604,11 @@ func inName(r rune) bool {
 type names struct {
 	set   *nodeset.NodeSet
 	other []string
-	// text is what the names read, when it is not stale.
-	text  string
-	stale bool
+	// text is what the names read, when it is not stale, as they were
+	// folded at folded.
+	text   string
+	stale  bool
+	folded time.Time
 }
 
 func (n *names) add(name string) {
@@ -628,6 +640,19 @@ func (n *names) len() int {
 		size += n.set.Len()
 	}
 	return size
+}
+
+// drawn is what the names read in a frame drawn at now: what they read when
+// they were last folded, when there are more than refoldAbove of them and
+// that was less than refoldEvery ago.
+func (n *names) drawn(now time.Time) string {
+	if n.stale && n.len() > refoldAbove && now.Sub(n.folded) < refoldEvery {
+		return n.text
+	}
+	if n.stale {
+		n.folded = now
+	}
+	return n.String()
 }
 
 func (n *names) String() string {
@@ -859,16 +884,16 @@ func (f *frame) below(s *treeSpan, depth int) {
 			return pad + g.failed + " " + g.more + " " + more(left, len(folded.failures), "failed")
 		}}
 		for _, fl := range folded.failures {
-			failures.rows = append(failures.rows, fmt.Sprintf("%s%s %s  %s", pad, g.failed, fl.names.String(), fl.text))
+			failures.rows = append(failures.rows, fmt.Sprintf("%s%s %s  %s", pad, g.failed, fl.names.drawn(f.now), fl.text))
 			failures.weights = append(failures.weights, fl.names.len())
 		}
 		f.parts = append(f.parts, failures)
 	}
 	if folded != nil && folded.canceled.len() > 0 {
-		f.row(depth, g.canceled+" "+folded.canceled.String()+"  canceled")
+		f.row(depth, g.canceled+" "+folded.canceled.drawn(f.now)+"  canceled")
 	}
 	if folded != nil && folded.skipped.len() > 0 {
-		text := g.skipped + " " + folded.skipped.String() + "  skipped"
+		text := g.skipped + " " + folded.skipped.drawn(f.now) + "  skipped"
 		if folded.reason != "" {
 			text += ": " + folded.reason
 		}
@@ -899,7 +924,7 @@ func (f *frame) below(s *treeSpan, depth int) {
 		f.parts = append(f.parts, list)
 	}
 	if folded != nil && folded.ok.len() > 0 {
-		f.row(depth, g.ok+" "+folded.ok.String())
+		f.row(depth, g.ok+" "+folded.ok.drawn(f.now))
 	}
 }
 
