@@ -22,6 +22,11 @@ floor:
 	GOTOOLCHAIN=go$$($(GO) list -m -f '{{.GoVersion}}') $(GO) vet ./...
 	GOTOOLCHAIN=go$$($(GO) list -m -f '{{.GoVersion}}') $(GO) test ./...
 
+## costs: run the cost tests of the live tree without the race detector, as CI does
+.PHONY: costs
+costs:
+	$(GO) test -count=1 -v -run '^TestTheCostOfALargeStep$$' ./progress/display/
+
 ## cover: measure coverage and hold every file to 100% (.testcoverage.yml)
 .PHONY: cover
 cover:

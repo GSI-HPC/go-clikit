@@ -52,8 +52,9 @@ minor release (see Compatibility).
   the packages fit together, `event-log.md` describes the event log,
   `testing.md` says how the kit is tested, `decisions.md` records what was
   decided and why, and `release.md` says how a release is cut.
-- `.github/workflows/ci.yml`: tests on both Go lines and on macOS, coverage,
-  fuzzing, lint, Markdown, REUSE, govulncheck and the tag verification test.
+- `.github/workflows/ci.yml`: tests on both Go lines and on macOS, the cost
+  tests, coverage, fuzzing, lint, Markdown, REUSE, govulncheck and the tag
+  verification test.
   `release.yml`: verifies a pushed `v*` tag and publishes the release.
 - `.github/actions/setup-go`: Go at the newest patch of the `floor` (go.mod)
   or `current` (mise.toml) release line.
@@ -66,6 +67,7 @@ mise install          # Go and golangci-lint at the versions CI uses
 make lint             # golangci-lint v2 (.golangci.yml, gofmt + goimports)
 make test             # go test -race ./...
 make floor            # vet and test with the go line of go.mod
+make costs            # the live tree's cost tests, without the race detector, as CI runs them
 make cover            # go-test-coverage: every file at 100% (.testcoverage.yml)
 make fuzz             # every fuzz target for 60 s, as CI runs them (FUZZTIME, FUZZ)
 make tidy             # go mod tidy and go mod verify
