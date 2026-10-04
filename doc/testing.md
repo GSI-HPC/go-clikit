@@ -5,8 +5,9 @@
 
 `make test` runs every test under the race detector, `make floor` vets and
 tests with the Go release `go.mod` names, `make cover` holds every file to
-100% of its statements, and `make fuzz` runs the fuzz targets for a minute
-each. CI runs all of them, the tests on Linux and on macOS as well, since the
+100% of its statements, `make fuzz` runs the fuzz targets for a minute
+each, and `make costs` measures what the live tree costs on a large step.
+CI runs all of them, the tests on Linux and on macOS as well, since the
 displays draw on terminals and the programs that use them run on both.
 
 Tests use the standard library alone, table-driven, with `t.Errorf` and
@@ -142,15 +143,23 @@ Bus and without one.
 The tree keeps every event under its lock while the Bus waits, and every
 worker that reports an event waits for the Bus, so what the tree spends on
 an event or a frame slows the work itself. Programs draw it over steps of
-tens of thousands of targets. The tests in `progress/display`'s
-`scale_test.go` hold its cost to the number of targets rather than to a
-number of milliseconds, which would depend on the machine: each runs the
-same work at two sizes, takes the best of five runs of each, and fails when
-the larger costs several times more than the sizes alone explain. Work
-quadratic in the targets misses that by an order of magnitude at thirty
-times as many. The race detector slows some code more than other code, so
-the tests skip under it: `make floor` runs them, and `make test` and CI,
-which run every test under the race detector, do not.
+tens of thousands of targets. `TestTheCostOfALargeStep`, in
+`progress/display`'s `scale_test.go`, holds its cost to the number of
+targets rather than to a number of milliseconds, which would depend on the
+machine: each of its parts runs the same work at two sizes, takes the best
+of five runs of each, and fails when the larger costs several times more
+than the sizes alone explain. Work quadratic in the targets misses that by
+an order of magnitude at thirty times as many. Each part logs how many
+times as long the larger size took, the two times and its limit, so that
+the log of a run with `-v` shows how much room each has.
+
+The race detector slows some code more than other code, so the test skips
+under it, and `make test` and CI's test jobs, which run every test under
+the race detector, leave it out. `make costs` runs it without the race
+detector, and so does CI, in a job of its own, Costs, alone on its runner,
+so that no other package's tests compete for the CPU while it measures
+([decision 17](decisions.md#17-the-cost-tests-run-in-ci-alone)).
+`make floor` runs it too.
 
 ## The event log
 

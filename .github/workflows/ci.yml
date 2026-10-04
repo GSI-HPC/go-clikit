@@ -44,6 +44,21 @@ jobs:
       - name: Test under the race detector
         run: go test -race ./...
 
+  # The cost tests of the live tree time it, so they skip under the race
+  # detector the test jobs use. They run here without it, alone on their
+  # runner, so that no other package's tests compete for its CPU, and each
+  # logs how many times as long its larger size took, against its limit
+  # (doc/decisions.md, decision 17).
+  costs:
+    name: Costs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup-go
+
+      - name: Measure the cost of a large step
+        run: make costs
+
   coverage:
     name: Coverage
     runs-on: ubuntu-latest

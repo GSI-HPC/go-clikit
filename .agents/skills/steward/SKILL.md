@@ -44,6 +44,7 @@ description: Drive a go-clikit pull request to a mergeable state. Covers the loc
 | Job | Runs |
 |-----|------|
 | Test (Go floor, ubuntu-latest), Test (Go current, ubuntu-latest), Test (Go current, macos-latest) | `go vet` and `go test -race` with the newest patch of the release line in `go.mod`, and in `mise.toml` |
+| Costs | `make costs`: the cost tests of the live tree, without the race detector, alone on their runner; each logs how many times as long its larger size took, and its limit |
 | Coverage | go-test-coverage against `.testcoverage.yml` |
 | Fuzz (FuzzEscape), Fuzz (FuzzTruncate), Fuzz (FuzzSanitize) | `make fuzz` with one target for 60 s; a failing input is uploaded as the `fuzz-corpus-<target>` artifact, to be committed under the package's `testdata/fuzz/` |
 | Lint | `make tidy` leaves `go.mod` and `go.sum` unchanged, golangci-lint (depguard enforces decision 3) |
@@ -54,6 +55,12 @@ description: Drive a go-clikit pull request to a mergeable state. Covers the loc
 
 - Every failure is this PR's to root-cause and fix. Never skip or disable a
   test, or lower a coverage threshold.
+- Costs fails when a cost test takes more times as long at its larger size
+  than its limit allows, which the log says. Treat it as a regression in
+  the tree until shown otherwise: work quadratic in the targets misses by
+  several times. A ratio just over its limit on a change that leaves the
+  tree alone points at the runner; widen the gap between the two sizes,
+  never raise the limit or re-run until green (decision 17).
 - Vulnerabilities fails for a new advisory against the standard library
   without any change in the PR. Say so on the PR; the fix is a Go patch
   release, which the job picks up when it is out.

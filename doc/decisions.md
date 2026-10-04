@@ -26,6 +26,7 @@ names it.
 | [14](#14-the-escape-deny-list-may-grow-in-a-minor-release) | The escape deny-list may grow in a minor release | accepted |
 | [15](#15-a-new-or-stricter-check-rule-is-a-breaking-change) | A new or stricter Check rule is a breaking change | accepted |
 | [16](#16-a-large-set-of-targets-is-folded-again-once-a-second) | A large set of targets is folded again once a second | accepted |
+| [17](#17-the-cost-tests-run-in-ci-alone) | The cost tests run in CI, alone | accepted |
 
 ## 1. Apache-2.0, and GSI holds the copyright
 
@@ -810,3 +811,42 @@ targets as they end from a tally, which costs nothing to read.
   than a second apart over more than 256 targets sees the fold of the
   earlier frame. Decision 5 makes that a breaking change, named in the
   release notes.
+
+## 17. The cost tests run in CI, alone
+
+Status: accepted
+
+### Context
+
+`TestTheCostOfALargeStep` holds what the live tree costs on a large step
+to the number of its targets, by timing the same work at two sizes. Two of
+the regressions it catches, a pass over a step's targets as each ends and
+a search through the rows of failures, allocate nothing, so no count of
+allocations could stand in for the clock. The race detector slows some
+code more than other code, so the test skips under it, and CI ran every
+test under the race detector: nothing in CI would have noticed the tree's
+work growing quadratic in its targets again, only `make floor` on a
+contributor's machine. A shared runner's timings vary, though, and every
+failed check here is root-caused, so a check that fails by chance costs
+time and trust.
+
+### Decision
+
+- CI runs the test in a job of its own, Costs, as `make costs` does:
+  without the race detector, with the current Go line, alone on its runner
+  so that no other package's tests compete for the CPU while it measures.
+  It runs on Linux alone: the costs are the tree's, and macOS would say
+  nothing more about them.
+- Each part logs how many times as long its larger size took, the two
+  times and its limit, so that every run's log shows how much room it has.
+- A part over its limit is a regression in the tree until shown
+  otherwise. If the parts run close to their limits on changes that leave
+  the tree alone, the gap between the two sizes is widened, which sets
+  work linear and quadratic in the targets further apart. A limit is not
+  raised to pass, and the job is not re-run until green.
+
+### Costs
+
+- Every CI run takes one more runner, for about half a minute.
+- A check that times code on a shared machine can still fail by chance.
+  Its log then says which part, by how much, and how long each size took.
