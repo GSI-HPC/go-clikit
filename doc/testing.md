@@ -137,6 +137,21 @@ suspending the displays and passing output through `Tee`. Each asks for no
 allocation at all. `BenchmarkTargetLifecycle` measures the lifecycle with a
 Bus and without one.
 
+## The cost of a large step
+
+The tree keeps every event under its lock while the Bus waits, and every
+worker that reports an event waits for the Bus, so what the tree spends on
+an event or a frame slows the work itself. Programs draw it over steps of
+tens of thousands of targets. The tests in `progress/display`'s
+`scale_test.go` hold its cost to the number of targets rather than to a
+number of milliseconds, which would depend on the machine: each runs the
+same work at two sizes, takes the best of five runs of each, and fails when
+the larger costs several times more than the sizes alone explain. Work
+quadratic in the targets misses that by an order of magnitude at thirty
+times as many. The race detector slows some code more than other code, so
+the tests skip under it: `make floor` runs them, and `make test` and CI,
+which run every test under the race detector, do not.
+
 ## The event log
 
 The log is compared line for line with `progress/testdata/log-v1.jsonl`, with

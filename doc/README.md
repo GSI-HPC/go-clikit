@@ -12,7 +12,7 @@ which pkg.go.dev publishes:
 | --- | --- |
 | [architecture.md](architecture.md) | How the kit came to be, how the packages fit together, what runs on which goroutine, the hooks a program fills in, and the convention for standard error |
 | [event-log.md](event-log.md) | The JSONL event log as an interface: its lines, keys and values, the rule for versions, and what never goes in |
-| [testing.md](testing.md) | What is tested and how: the contract of the events, fake clocks, the Screen, the pools, fuzzing and the path that allocates nothing |
+| [testing.md](testing.md) | What is tested and how: the contract of the events, fake clocks, the Screen, the pools, fuzzing, the path that allocates nothing and the cost of a large step |
 | [decisions.md](decisions.md) | What was decided, why, and what it costs, the measured comparison with other display and pool libraries among it |
 | [release.md](release.md) | Cutting, withdrawing and verifying a release |
 

@@ -39,7 +39,8 @@ minor release (see Compatibility).
   `testdata/log-v1.jsonl` is the golden event log.
 - `progress/display/`: `terminal.go`, the `Terminal` and its writers;
   `tree.go`, `counter.go`, `plain.go` and `summary.go`, one display each.
-  `contract_test.go` holds the displays to their promises on a `Screen`.
+  `contract_test.go` holds the displays to their promises on a `Screen`,
+  and `scale_test.go` the tree's cost to the number of targets.
 - `progress/progresstest/`: `progresstest.go`, `Capture`, `Check`,
   `Watch`, `Watcher` and `Tree`; `screen.go`, `Screen`.
 - `fanout/`: `each.go`, `Each` and the package comment; `map.go`, `Map`,
