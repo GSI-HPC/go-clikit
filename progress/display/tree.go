@@ -70,11 +70,11 @@ func glyphsFor(ascii bool) glyphs {
 // and a line above them for each step once it has finished:
 //
 //	✓ configuring the network boot  2.3s
-//	provision reinstall · 4:12
+//	provision reinstall · 4:12.6
 //	  setting the machines to boot from the network once  312/480 · 1 failed · 8 running · 159 queued
 //	    ✗ exe0007  transport: {}: dial tcp: i/o timeout
-//	    ▸ exe0313  4s  PATCH /redfish/v1/Systems/1
-//	    ▸ exe0314  3s  GET /redfish/v1/Systems/1
+//	    ▸ exe0313  4.8s  PATCH /redfish/v1/Systems/1
+//	    ▸ exe0314  3.1s  GET /redfish/v1/Systems/1
 //	    … 6 more running
 //	    ✓ exe[0001-0006,0008-0312]
 //
@@ -91,7 +91,9 @@ func glyphsFor(ascii bool) glyphs {
 // and those running are listed, the longest running first, with how long
 // they have run, against the bound of the request they wait for when it
 // has one, and what that request is, or the last line of output for a
-// step that shows lines. A pause counts down.
+// step that shows lines. The command's time and how long each span has run
+// tick in tenths of a second, so a frame differs from the one before while
+// anything runs. A pause counts down in whole seconds.
 //
 // A hidden span is drawn only once it has run for a second, and a line is
 // left for it only when it failed or took that long. A span that ends well
@@ -861,7 +863,7 @@ func (f *frame) span(s *treeSpan, depth int) {
 			left := max(0, s.fields.Timeout-f.now.Sub(s.ran))
 			text += seconds(left+time.Second-1) + " left"
 		} else {
-			text += seconds(f.now.Sub(s.ran))
+			text += runTime(f.now.Sub(s.ran))
 		}
 		if s.fields.Message != "" {
 			text += "  " + s.fields.Message
@@ -899,7 +901,7 @@ func (f *frame) header(s *treeSpan) string {
 		}
 	default:
 	}
-	return text + g.sep + elapsed(f.now.Sub(s.started))
+	return text + g.sep + clock(f.now.Sub(s.started))
 }
 
 // below draws what is below s at depth: the targets that ended otherwise
@@ -955,7 +957,7 @@ func (f *frame) below(s *treeSpan, depth int) {
 			},
 			render: func(keep int) []string {
 				rows := make([]string, 0, keep)
-				for _, target := range longest(running, keep, f.now) {
+				for _, target := range longest(running, keep, f.t.start) {
 					rows = append(rows, pad+f.target(target))
 				}
 				return rows
@@ -976,22 +978,26 @@ func more(rows, targets, of int, what string) string {
 }
 
 // longest returns the k targets of running that have run longest, in that
-// order, by the seconds a row shows: those that started in the same second
-// in the order they were queued, rather than in the order a pool happened
-// to start them. Only the targets that get a row are picked out, rather
-// than all of them sorted.
-func longest(running []*treeSpan, k int, now time.Time) []*treeSpan {
-	age := func(s *treeSpan) time.Duration { return now.Sub(s.ran) / time.Second }
+// order, by the tenth of a second each started in, counted from start:
+// those that started in the same tenth in the order they were queued,
+// rather than in the order a pool happened to start them. A target's place
+// depends on when it started alone, not on the time of the frame, so that
+// two rows never swap places from one frame to the next; and it is read on
+// the monotonic clock where the times have one, as the times on the rows
+// are, so that a step of the wall clock does not reorder them. Only the
+// targets that get a row are picked out, rather than all of them sorted.
+func longest(running []*treeSpan, k int, start time.Time) []*treeSpan {
+	started := func(s *treeSpan) time.Duration { return s.ran.Sub(start) / (time.Second / 10) }
 	if k >= len(running) {
-		slices.SortStableFunc(running, func(a, b *treeSpan) int { return cmp.Compare(age(b), age(a)) })
+		slices.SortStableFunc(running, func(a, b *treeSpan) int { return cmp.Compare(started(a), started(b)) })
 		return running
 	}
 	top := make([]*treeSpan, 0, k+1)
 	for _, s := range running {
-		// After every one picked that has run as long, which was queued
-		// before it.
+		// After every one picked that started in the same tenth, which
+		// was queued before it.
 		i := len(top)
-		for i > 0 && age(top[i-1]) < age(s) {
+		for i > 0 && started(top[i-1]) > started(s) {
 			i--
 		}
 		if i < k {
@@ -1051,12 +1057,12 @@ func (f *frame) call(s *treeSpan) *treeSpan {
 }
 
 // took says how long s has run, or, when the request it waits for has a
-// bound, how long that has run against it: "3m12s/10m".
+// bound, how long that has run against it: "3m12.4s/10m".
 func (f *frame) took(s, inner *treeSpan) string {
 	if inner != nil && inner.fields.Timeout > 0 {
-		return seconds(f.now.Sub(inner.ran)) + "/" + bound(inner.fields.Timeout)
+		return runTime(f.now.Sub(inner.ran)) + "/" + bound(inner.fields.Timeout)
 	}
-	return seconds(f.now.Sub(s.ran))
+	return runTime(f.now.Sub(s.ran))
 }
 
 // describe says what a span is doing, in few words: the method and path of
@@ -1099,8 +1105,23 @@ func standingOf(c progress.Count, g glyphs) string {
 	return strings.Join(parts, g.sep)
 }
 
-// seconds reads d in whole seconds, so that a row changes once a second,
-// not at every frame: "4s", "3m12s", "1h02m".
+// runTime reads how long a span has run, in tenths of a second, so that a
+// row ticks with the frames: "4.2s", "3m12.4s", and in hours and minutes,
+// "1h02m", from an hour on. The tenths are cut, not rounded, as clock's are.
+func runTime(d time.Duration) string {
+	t := int(max(0, d) / (time.Second / 10))
+	s := t / 10
+	switch {
+	case s < 60:
+		return fmt.Sprintf("%d.%ds", s, t%10)
+	case s < 3600:
+		return fmt.Sprintf("%dm%02d.%ds", s/60, s%60, t%10)
+	}
+	return fmt.Sprintf("%dh%02dm", s/3600, s/60%60)
+}
+
+// seconds reads d in whole seconds, as a countdown and the bound of a
+// request are written: "4s", "3m12s", "1h02m".
 func seconds(d time.Duration) string {
 	s := int(max(0, d) / time.Second)
 	switch {

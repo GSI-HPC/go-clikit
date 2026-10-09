@@ -140,7 +140,7 @@ func TestTheTreeWaitsASecond(t *testing.T) {
 	step.End(nil)
 	checkScreen(t, f.draw(500*time.Millisecond), `
 ✓ configuring the network boot  0.5s
-provision reinstall · 0:01
+provision reinstall · 0:01.0
 `)
 
 	quick := newTreeFixture(t, "provision reinstall", treeSetup{})
@@ -183,12 +183,12 @@ func TestTheTreeOfAFanOutWithManyQueued(t *testing.T) {
 	progress.Start(ctxs[312], progress.KindCall, "redfish", progress.HTTP("PATCH", "/redfish/v1/Systems/1"), progress.Host("exe313.mgmt"))
 	progress.Start(ctxs[314], progress.KindCall, "ssh", progress.Node("exe315"), progress.Timeout(10*time.Minute))
 	checkScreen(t, f.draw(4*time.Minute), `
-provision reinstall · 4:04
+provision reinstall · 4:04.0
   setting the machines to boot from the network once  312/480 · 1 failed · 8 running · 160 queued
     ✗ exe41  transport: {}: dial tcp: i/o timeout
-    ▸ exe313  4m03s  PATCH /redfish/v1/Systems/1
-    ▸ exe314  4m03s
-    ▸ exe315  4m00s/10m  ssh
+    ▸ exe313  4m03.5s  PATCH /redfish/v1/Systems/1
+    ▸ exe314  4m03.0s
+    ▸ exe315  4m00.0s/10m  ssh
     … 5 more running
     ✓ exe[1-40,42-312]
 `)
@@ -200,7 +200,7 @@ provision reinstall · 4:04
 	checkScreen(t, f.draw(time.Second), `
 ✗ setting the machines to boot from the network once  4m04s  479 ok, 1 failed
   ✗ exe41  transport: {}: dial tcp: i/o timeout
-provision reinstall · 4:05
+provision reinstall · 4:05.0
 `)
 }
 
@@ -227,11 +227,11 @@ func TestTheTreeGroupsFailures(t *testing.T) {
 		}
 	}
 	checkScreen(t, f.draw(2*time.Second), `
-bmc power off · 0:02
+bmc power off · 0:02.0
   power off  6/7 · 4 failed · 1 running
     ✗ exe[1,4]  transport: {}: dial tcp: i/o timeout
     ✗ exe[2,5]  target: {}: 400 Bad Request: refused
-    ▸ exe7  2s
+    ▸ exe7  2.0s
     ✓ exe[3,6]
 `)
 	spans[6].End(nil)
@@ -388,11 +388,11 @@ func TestTheTreeRevealsASlowHiddenSpan(t *testing.T) {
 	ctx, slow := progress.Start(f.ctx, progress.KindStep, "check the boot paths", progress.WithFlags(progress.Hidden))
 	_, call := progress.Start(ctx, progress.KindCall, "ssh", progress.Node("install"), progress.Timeout(10*time.Minute))
 	checkScreen(t, f.draw(500*time.Millisecond), `
-provision reinstall · 0:01
+provision reinstall · 0:01.0
 `)
 	checkScreen(t, f.draw(time.Second), `
-provision reinstall · 0:02
-  check the boot paths  1s/10m  ssh install
+provision reinstall · 0:02.0
+  check the boot paths  1.5s/10m  ssh install
 `)
 	call.End(nil)
 	slow.End(nil)
@@ -402,7 +402,7 @@ provision reinstall · 0:02
 	checkScreen(t, f.draw(time.Second), `
 ✓ check the boot paths  1.5s
 ✗ check Slurm jobs  0.0s
-provision reinstall · 0:03
+provision reinstall · 0:03.0
 `)
 }
 
@@ -429,7 +429,7 @@ func TestAFastFailureKeepsItsLine(t *testing.T) {
 ✗ configuring the network boot  0.0s
 ✓ disarming › clearing the boot overrides  0.0s  1 ok
 ✓ disarming  0.0s
-provision reinstall · 0:02
+provision reinstall · 0:02.1
 `)
 }
 
@@ -456,8 +456,10 @@ func testTheTreeOfAPowerOnInBatches(t *testing.T) {
 		Size:  2,
 		Pause: 30 * time.Second,
 	}, func(d time.Duration) {
-		frames = append(frames, f.draw(10*time.Second))
-		f.clock.Add(d - 10*time.Second)
+		// Between two of the pause's seconds, which it counts down whole,
+		// rounded up, while the command's time shows the tenth.
+		frames = append(frames, f.draw(10500*time.Millisecond))
+		f.clock.Add(d - 10500*time.Millisecond)
 	})
 	fanout.Batches(f.ctx, set, o, func(ctx context.Context, batch *nodeset.NodeSet) error {
 		_, spans := targets(ctx, batch.Expand()...)
@@ -475,23 +477,23 @@ func testTheTreeOfAPowerOnInBatches(t *testing.T) {
 		return failed
 	})
 	checkScreen(t, frames[0], `
-bmc power on · 0:02
+bmc power on · 0:02.0
   power on  0/6 · 1 running · 5 queued
     batch 1/3  0/2 · 1 running · 1 queued
-      ▸ exe1  1s
+      ▸ exe1  1.0s
 `)
 	checkScreen(t, frames[2], `
-bmc power on · 0:13
+bmc power on · 0:13.5
   power on  2/6 · 4 queued
     stagger  20s left
     ✓ exe[1-2]
 `)
 	checkScreen(t, frames[4], `
-bmc power on · 0:35
+bmc power on · 0:35.0
   power on  3/6 · 1 failed · 1 running · 2 queued
     batch 2/3  1/2 · 1 failed · 1 running
       ✗ exe3  target: {}: connection timeout
-      ▸ exe4  1s
+      ▸ exe4  1.0s
     ✓ exe[1-2]
 `)
 	checkScreen(t, f.end(errors.New("1 of 2 service processors failed")), `
@@ -522,15 +524,69 @@ func TestTheTreeShowsTwoRootsSideBySide(t *testing.T) {
 		progress.Start(ctx, progress.KindCall, "ssh", progress.Timeout(20*time.Second))
 	})
 	checkScreen(t, f.draw(time.Second), `
-provision status · 0:02
+provision status · 0:02.0
   read the power state  0/5 · 5 running
-    ▸ exe1  1s  GET /redfish/v1/Systems/1
-    ▸ exe2  1s  GET /redfish/v1/Systems/1
+    ▸ exe1  1.9s  GET /redfish/v1/Systems/1
+    ▸ exe2  1.8s  GET /redfish/v1/Systems/1
     … 3 more running
   read the uptime  0/5 · 5 running
-    ▸ exe1  1s/20s  ssh
+    ▸ exe1  1.4s/20s  ssh
     … 4 more running
 `)
+}
+
+// The running targets are listed by the tenths of a second their rows
+// show, the longest running first, though queued last; those that started
+// in the same tenth keep the order they were queued in, rather than the
+// order a pool happened to start them.
+func TestTheTreeListsTheRunningByTenths(t *testing.T) {
+	t.Parallel()
+	f := newTreeFixture(t, "exec", treeSetup{})
+	ctx, _ := progress.Start(f.ctx, progress.KindStep, "run", progress.WithFlags(progress.Fold), progress.Total(4))
+	_, spans := targets(ctx, nodes(4)...)
+	for _, start := range []struct {
+		target int
+		after  time.Duration
+	}{
+		{3, 200 * time.Millisecond}, // exe4 at 0.20s
+		{1, 210 * time.Millisecond}, // exe2 at 0.41s
+		{0, 40 * time.Millisecond},  // exe1 at 0.45s, in the same tenth
+		{2, 100 * time.Millisecond}, // exe3 at 0.55s
+	} {
+		f.clock.Add(start.after)
+		spans[start.target].Run()
+	}
+	checkScreen(t, f.draw(1450*time.Millisecond), `
+exec · 0:02.0
+  run  0/4 · 4 running
+    ▸ exe4  1.8s
+    ▸ exe1  1.5s
+    ▸ exe2  1.5s
+    ▸ exe3  1.4s
+`)
+}
+
+// Two targets that started in the same tenth of a second keep the order
+// they were queued in at every frame, though the tenths their rows show
+// may part: a row's place depends on when its target started, not on the
+// time of the frame, so that rows never swap places as the frames go by.
+func TestTheRunningKeepTheirPlacesFromFrameToFrame(t *testing.T) {
+	t.Parallel()
+	f := newTreeFixture(t, "exec", treeSetup{})
+	ctx, _ := progress.Start(f.ctx, progress.KindStep, "run", progress.WithFlags(progress.Fold), progress.Total(2))
+	_, spans := targets(ctx, nodes(2)...)
+	f.clock.Add(410 * time.Millisecond)
+	spans[1].Run() // exe2 at 0.41s
+	f.clock.Add(70 * time.Millisecond)
+	spans[0].Run() // exe1 at 0.48s, in the same tenth, queued before exe2
+	f.clock.Add(520 * time.Millisecond)
+	for frame := range 20 {
+		screen := f.draw(10 * time.Millisecond)
+		first, second := strings.Index(screen, "exe1"), strings.Index(screen, "exe2")
+		if first < 0 || second < 0 || first > second {
+			t.Fatalf("frame %d lists exe2 before exe1, or misses one:\n%s", frame, screen)
+		}
+	}
 }
 
 // On a terminal too small for the tree the counter's line is drawn
@@ -542,13 +598,13 @@ func TestTheTreeFallsBackToTheCounter(t *testing.T) {
 	_, spans := targets(ctx, nodes(3)...)
 	spans[0].Run()
 	checkScreen(t, f.draw(time.Second), `
-run · 0/3 · 1 running · 2 queued · 0:01
+run · 0/3 · 1 running · 2 queued · 0:01.0
 `)
 	f.resize(100, 8)
 	checkScreen(t, f.draw(time.Second), `
-exec · 0:02
+exec · 0:02.0
   run  0/3 · 1 running · 2 queued
-    ▸ exe1  2s
+    ▸ exe1  2.0s
 `)
 	f.resize(39, 40)
 	checkScreen(t, f.draw(time.Second), `
@@ -579,12 +635,12 @@ func TestTheTreeInASCII(t *testing.T) {
 	spans[4].Run()
 	tree := f.draw(time.Second)
 	checkScreen(t, tree, `
-exec - 0:01
+exec - 0:01.0
   run  4/5 - 1 failed - 1 canceled - 1 skipped - 1 running
     x exe2  target: {}: command exited 1
     ~ exe3  canceled
     - exe4  skipped: the node could not be reached
-    > exe5  1s
+    > exe5  1.0s
     + exe1
 `)
 	f.resize(30, 24)
@@ -635,7 +691,7 @@ exe7 runs no jobs
 ✓ check Slurm jobs  1.0s
 About to drain 1 host: exe7
 Continue? [y/N] y
-slurm node drain · 0:04
+slurm node drain · 0:04.0
 `)
 }
 
@@ -656,7 +712,7 @@ func TestAStepThatEndedBeforeAWriteInTheFirstSecondLeavesNoLine(t *testing.T) {
 	checkScreen(t, f.draw(100*time.Millisecond), `
 exe7 runs no jobs
 ✓ check Slurm jobs  1.0s
-slurm node drain · 0:01
+slurm node drain · 0:01.4
 `)
 }
 
@@ -676,9 +732,9 @@ powering on exe[1-2] (1 of 1)
 `)
 	checkScreen(t, f.draw(time.Second), `
 powering on exe[1-2] (1 of 1)
-bmc power cycle · 0:02
+bmc power cycle · 0:02.0
   power cycle  0/2 · 1 running · 1 queued
-    ▸ exe1  2s
+    ▸ exe1  2.0s
 `)
 	// A line the command has not ended yet is not drawn over.
 	_, _ = io.WriteString(errOut, "Password: ")
@@ -701,16 +757,16 @@ func TestTheTreeSaysItIsInterrupting(t *testing.T) {
 	f.draw(time.Second)
 	close(interrupt)
 	checkScreen(t, f.draw(time.Second), `
-exec · interrupting · 2 running will stop · 3 queued will not start · 0:02
+exec · interrupting · 2 running will stop · 3 queued will not start · 0:02.0
   run  0/5 · 2 running · 3 queued
-    ▸ exe1  2s
-    ▸ exe2  2s
+    ▸ exe1  2.0s
+    ▸ exe2  2.0s
 `)
 	for _, span := range spans {
 		span.End(context.Canceled)
 	}
 	checkScreen(t, f.draw(time.Second), `
-exec · interrupting · 0:03
+exec · interrupting · 0:03.0
   run  5/5 · 5 canceled
     ⊘ exe[1-5]  canceled
 `)
@@ -733,10 +789,10 @@ func TestTheTreeShowsTheLastLineOfOutput(t *testing.T) {
 		}
 	}
 	checkScreen(t, f.draw(90*time.Second), `
-cinc run · 1:30
+cinc run · 1:30.0
   run  0/2 · 2 running
-    ▸ exe1  1m30s/30m  Converging 12 resources
-    ▸ exe2  1m30s/30m  ssh
+    ▸ exe1  1m30.0s/30m  Converging 12 resources
+    ▸ exe2  1m30.0s/30m  ssh
 `)
 }
 
@@ -752,7 +808,7 @@ func TestTheRowsFitTheTerminal(t *testing.T) {
 	spans[0].End(errors.New("exe1: " + strings.Repeat("ü", 60)))
 	f.draw(time.Second)
 	checkScreen(t, f.draw(time.Second), `
-exec · 0:02
+exec · 0:02.0
   run the command on every node of the 
     ✗ exe1  target: {}: üüüüüüüüüüüüüüü
 `)
@@ -769,7 +825,7 @@ func TestARowOfWideCharactersFitsTheTerminal(t *testing.T) {
 	spans[0].End(errors.New("exe1: " + strings.Repeat("失败", 40)))
 	f.draw(time.Second)
 	checkScreen(t, f.draw(time.Second), `
-exec · 0:02
+exec · 0:02.0
   run  1/1 · 1 failed
     ✗ exe1  target: {}: 失败失败失败失
 `)
@@ -788,9 +844,9 @@ func TestAStepOfATargetIsPartOfItsRow(t *testing.T) {
 				_, call := progress.Start(ctx, progress.KindCall, "ssh", progress.Node(node), progress.Timeout(30*time.Second))
 				if node == "exe2" && file == "/etc/munge/munge.key" {
 					checkScreen(t, f.draw(time.Second), `
-secrets push · 0:03
+secrets push · 0:03.0
   write the secrets  1/2 · 1 running
-    ▸ exe2  1s/30s  ssh
+    ▸ exe2  1.0s/30s  ssh
     ✓ exe1
 `)
 				}
@@ -802,7 +858,7 @@ secrets push · 0:03
 		})
 	checkScreen(t, f.draw(time.Second), `
 ✓ write the secrets  5.0s  2 ok
-secrets push · 0:06
+secrets push · 0:06.0
 `)
 }
 
@@ -816,10 +872,10 @@ func TestAStepWithNoNamePassesItsChildrenUp(t *testing.T) {
 	_, spans := targets(askCtx, "exe1")
 	spans[0].Run()
 	checkScreen(t, f.draw(time.Second), `
-node hw · 0:01
-  read the inventory  1s
+node hw · 0:01.0
+  read the inventory  1.0s
   ask the nodes  0/1 · 1 running
-    ▸ exe1  1s
+    ▸ exe1  1.0s
 `)
 	step.End(nil)
 	spans[0].End(nil)
@@ -828,7 +884,7 @@ node hw · 0:01
 	checkScreen(t, f.draw(time.Second), `
 ✓ read the inventory  1.0s
 ✓ ask the nodes  1.0s  1 ok
-node hw · 0:02
+node hw · 0:02.0
 `)
 }
 
@@ -871,13 +927,65 @@ func TestTheTreeReadsTheRealClock(t *testing.T) {
 		time.Sleep(time.Millisecond)
 		synctest.Wait()
 		checkScreen(t, s.String(), `
-exec · 0:01
+exec · 0:01.0
 `)
 		command.End(nil)
 		bus.Close()
 		tree.Close()
 		progresstest.Check(t, capture.Events())
 	})
+}
+
+// A frame that reads as the one before writes nothing: one drawn again at
+// the same instant, or later within the same tenth of a second, to which
+// the command's time and how long a target has run are both cut. The next
+// tenth is drawn.
+func TestTheTreeDoesNotDrawTheSameFrameTwice(t *testing.T) {
+	t.Parallel()
+	raw, shown := &screen{}, &progresstest.Screen{}
+	c := &clock{now: time.Date(2026, 9, 26, 12, 0, 0, 0, time.UTC)}
+	term := display.NewTerminal(io.MultiWriter(raw, shown), display.TerminalOptions{Size: func() (int, int, error) { return 100, 24, nil }})
+	tree := display.NewTree(term, display.TreeOptions{Now: c.Now})
+	capture := &progresstest.Capture{}
+	bus := progress.NewBus(progress.BusOptions{Sinks: []progress.Sink{capture, tree}, Now: c.Now})
+	ctx, command := progress.Start(progress.WithBus(context.Background(), bus), progress.KindCommand, "exec")
+	ctx, step := progress.Start(ctx, progress.KindStep, "run", progress.WithFlags(progress.Fold), progress.Total(1))
+	_, spans := targets(ctx, "exe1")
+	spans[0].Run()
+	c.Add(time.Second)
+	tree.Draw()
+	checkScreen(t, shown.String(), `
+exec · 0:01.0
+  run  0/1 · 1 running
+    ▸ exe1  1.0s
+`)
+	written := raw.String()
+	for _, again := range []struct {
+		what  string
+		after time.Duration
+	}{
+		{"at the same instant", 0},
+		{"within the same tenth", 99 * time.Millisecond},
+	} {
+		c.Add(again.after)
+		tree.Draw()
+		if got := raw.String(); got != written {
+			t.Errorf("a frame drawn again %s wrote %q", again.what, strings.TrimPrefix(got, written))
+		}
+	}
+	c.Add(time.Millisecond)
+	tree.Draw()
+	checkScreen(t, shown.String(), `
+exec · 0:01.1
+  run  0/1 · 1 running
+    ▸ exe1  1.1s
+`)
+	spans[0].End(nil)
+	step.End(nil)
+	command.End(nil)
+	bus.Close()
+	tree.Close()
+	progresstest.Check(t, capture.Events())
 }
 
 // Two steps side by side share the rows there are: a short list of running
@@ -896,13 +1004,13 @@ func TestTheTreeDrawsAShortListWhole(t *testing.T) {
 	start("read the power state", 2)
 	start("read the uptime", 10)
 	checkScreen(t, f.draw(time.Second), `
-provision status · 0:01
+provision status · 0:01.0
   read the power state  0/2 · 2 running
-    ▸ exe1  1s
-    ▸ exe2  1s
+    ▸ exe1  1.0s
+    ▸ exe2  1.0s
   read the uptime  0/10 · 10 running
-    ▸ exe1  1s
-    ▸ exe2  1s
+    ▸ exe1  1.0s
+    ▸ exe2  1.0s
     … 8 more running
 `)
 }
@@ -923,7 +1031,7 @@ func TestTheTreeCutsTheFailures(t *testing.T) {
 		span.End(fmt.Errorf("command exited %d", min(i+1, 11)))
 	}
 	checkScreen(t, f.draw(time.Second), `
-exec · 0:01
+exec · 0:01.0
   run  13/14 · 13 failed · 1 running
     ✗ exe1  target: command exited 1
     ✗ exe2  target: command exited 2
@@ -944,13 +1052,13 @@ func TestTheTreeCutsOffWhatNeverFits(t *testing.T) {
 		progress.Start(f.ctx, progress.KindStep, fmt.Sprintf("step %d", i+1))
 	}
 	checkScreen(t, f.draw(time.Second), `
-provision status · 0:01
-  step 1  1s
-  step 2  1s
-  step 3  1s
-  step 4  1s
-  step 5  1s
-  step 6  1s
+provision status · 0:01.0
+  step 1  1.0s
+  step 2  1.0s
+  step 3  1.0s
+  step 4  1.0s
+  step 5  1.0s
+  step 6  1.0s
 …
 `)
 }
@@ -967,13 +1075,13 @@ func TestTheTreeDrawsSpansUnderTheCommand(t *testing.T) {
 	progress.Start(f.ctx, progress.KindCall, "ssh", progress.Node("install"), progress.Message("reading the inventory"))
 	_, wait := progress.Start(f.ctx, progress.KindWait, "settle")
 	checkScreen(t, f.draw(50*time.Millisecond), `
-provision reinstall · 0:01
+provision reinstall · 0:01.0
 `)
 	wait.Update(progress.Message("for exe3 to boot"))
 	checkScreen(t, f.draw(2*time.Second), `
-provision reinstall · 0:03
-  ssh install reading the inventory  2s
-  settle  2s  for exe3 to boot
+provision reinstall · 0:03.0
+  ssh install reading the inventory  2.0s
+  settle  2.0s  for exe3 to boot
 `)
 }
 
@@ -986,8 +1094,8 @@ func TestTheTreeDrawsTheCallOfACountedStep(t *testing.T) {
 	targets(ctx, "exe1")
 	progress.Start(ctx, progress.KindCall, "ssh", progress.Node("install"), progress.Timeout(30*time.Second))
 	checkScreen(t, f.draw(3*time.Second), `
-provision reinstall · 0:03
-  boot  0/1 · 1 queued  3s/30s  ssh install
+provision reinstall · 0:03.0
+  boot  0/1 · 1 queued  3.0s/30s  ssh install
 `)
 }
 
@@ -1006,10 +1114,10 @@ func TestTheTreeReadsTheBoundOfARequest(t *testing.T) {
 	f.clock.Add(time.Hour + 2*time.Minute)
 	progress.Start(ctxs[1], progress.KindCall, "redfish", progress.Timeout(1500*time.Millisecond))
 	checkScreen(t, f.draw(time.Second), `
-cinc run · 1:02:01
+cinc run · 1:02:01.0
   run  0/2 · 2 running
     ▸ exe1  1h02m/2h  ssh
-    ▸ exe2  1s/1.5s  redfish
+    ▸ exe2  1.0s/1.5s  redfish
 `)
 }
 
@@ -1027,7 +1135,7 @@ func TestTheLinesOfStepsLeftOutAndInterrupted(t *testing.T) {
 	checkScreen(t, f.draw(0), `
 – disarming  skipped: nothing was armed
 ⊘ configuring the network boot  1.0s
-provision reinstall · 0:02
+provision reinstall · 0:02.0
 `)
 }
 
@@ -1062,7 +1170,7 @@ func TestTheTreeFoldsWhatBatchesLeftOut(t *testing.T) {
 	run(secondCtx, second, map[string]string{"exe3": "powered on already", "exe4": "in maintenance"}, "exe3", "exe4")
 	third.End(context.Canceled)
 	checkScreen(t, f.draw(time.Second), `
-bmc power on · 0:01
+bmc power on · 0:01.0
   power on  6/6 · 2 canceled · 3 skipped
     ⊘ exe[5-6]  canceled
     – exe[1,3-4]  skipped
@@ -1088,7 +1196,7 @@ func TestTheTreeFoldsTargetsThatAreNoNodeSet(t *testing.T) {
 	spans[3].Skip("unplugged")
 	spans[4].Skip("disabled")
 	checkScreen(t, f.draw(time.Second), `
-switch status · 0:01
+switch status · 0:01.0
   read the ports  5/5 · 2 skipped
     – exe[3-4]  skipped
     ✓ exe[1-2],port 10
@@ -1100,7 +1208,7 @@ func TestTheRegionComesOffOnceTheCommandHasEnded(t *testing.T) {
 	t.Parallel()
 	f := newTreeFixture(t, "exec", treeSetup{})
 	checkScreen(t, f.draw(time.Second), `
-exec · 0:01
+exec · 0:01.0
 `)
 	f.command.End(nil)
 	if got := f.draw(time.Second); got != "" {
@@ -1138,7 +1246,7 @@ func TestTheTreeTakesEventsNoBusSends(t *testing.T) {
 	c.Add(time.Second)
 	tree.Draw()
 	checkScreen(t, s.String(), `
-exec · 0:01
+exec · 0:01.0
   run  1/1 · 1 failed
     ✗ exe1  failed
 `)
@@ -1174,18 +1282,18 @@ func TestTheTreeFoldsALargeSetOnceASecond(t *testing.T) {
 	}
 	fail(0, 300)
 	checkScreen(t, f.draw(time.Second), `
-exec · 0:01
+exec · 0:01.0
   run  300/400 · 300 failed · 100 queued
     ✗ exe[1-300]  target: exit 1
 `)
 	fail(300, 301)
 	checkScreen(t, f.draw(500*time.Millisecond), `
-exec · 0:01
+exec · 0:01.5
   run  301/400 · 301 failed · 99 queued
     ✗ exe[1-300]  target: exit 1
 `)
 	checkScreen(t, f.draw(500*time.Millisecond), `
-exec · 0:02
+exec · 0:02.0
   run  301/400 · 301 failed · 99 queued
     ✗ exe[1-301]  target: exit 1
 `)
@@ -1194,6 +1302,6 @@ exec · 0:02
 	checkScreen(t, f.draw(100*time.Millisecond), `
 ✗ run  2.0s  0 ok, 302 failed, 98 canceled
   ✗ exe[1-302]  target: exit 1
-exec · 0:02
+exec · 0:02.1
 `)
 }

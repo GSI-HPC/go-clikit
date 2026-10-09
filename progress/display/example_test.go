@@ -124,9 +124,9 @@ func ExampleNewTree() {
 	tree.Close()
 	fmt.Print(screen.String())
 	// Output:
-	// power on · 0:02
+	// power on · 0:02.0
 	//   powering on  2/4 · 1 running · 1 queued
-	//     ▸ exe03  2s/30s  POST /redfish/v1/Systems/1
+	//     ▸ exe03  2.0s/30s  POST /redfish/v1/Systems/1
 	//     ✓ exe[01-02]
 	// ---
 	// ✓ powering on  2.0s  4 ok
@@ -150,7 +150,7 @@ func ExampleNewCounter() {
 	targets[1].Run()
 	targets[1].End(errors.New("no answer"))
 	targets[2].Run()
-	clock.Add(41 * time.Second)
+	clock.Add(41300 * time.Millisecond)
 	counter.Draw()
 	fmt.Println(screen.String())
 
@@ -160,5 +160,5 @@ func ExampleNewCounter() {
 	bus.Close()
 	counter.Close()
 	// Output:
-	// uptime · 2/3 · 1 failed · 1 running · 0:41
+	// uptime · 2/3 · 1 failed · 1 running · 0:41.3
 }

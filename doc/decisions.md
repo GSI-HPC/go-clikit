@@ -27,6 +27,7 @@ names it.
 | [15](#15-a-new-or-stricter-check-rule-is-a-breaking-change) | A new or stricter Check rule is a breaking change | accepted |
 | [16](#16-a-large-set-of-targets-is-folded-again-once-a-second) | A large set of targets is folded again once a second | accepted |
 | [17](#17-the-cost-tests-run-in-ci-alone) | The cost tests run in CI, alone | accepted |
+| [18](#18-the-live-clocks-tick-in-tenths-of-a-second) | The live clocks tick in tenths of a second | accepted |
 
 ## 1. Apache-2.0, and GSI holds the copyright
 
@@ -850,3 +851,50 @@ time and trust.
 - Every CI run takes one more runner, for about half a minute.
 - A check that times code on a shared machine can still fail by chance.
   Its log then says which part, by how much, and how long each size took.
+
+## 18. The live clocks tick in tenths of a second
+
+Status: accepted
+
+### Context
+
+The counter's time and the tree's command row read whole seconds, `0:41`,
+and so did how long each running target, step, call and wait had run, `4s`,
+so that a row changed once a second rather than at every frame. A display
+draws up to ten frames a second, and the terminal writes nothing for a
+frame that reads as the one before. A display that changes once a second
+looks stalled between changes: a request that has run for a while cannot be
+told at a glance from a display that has stopped drawing.
+
+### Decision
+
+- The Counter's time and the Tree's command row read minutes, seconds and
+  tenths, `0:41.3`, or hours, minutes, seconds and tenths, `1:02:03.4`.
+- How long a running target, step, call or wait has run reads seconds and
+  tenths, `4.2s`, or minutes, seconds and tenths, `3m12.4s`, and hours and
+  minutes from an hour on, `1h02m`, as before; against the bound of the
+  request it waits for, `3m12.4s/10m`.
+- The tenths are cut, not rounded, so that a clock never runs ahead.
+- The tree lists running targets by the tenth of a second each started
+  in, counted from when the tree was made, those that started in the same
+  tenth in the order they were queued. A row's place depends on when its
+  target started, not on the time of the frame, so that two rows never swap
+  places from one frame to the next, though the tenths two such rows show
+  may differ by one. The tenths are read on the monotonic clock, as the
+  times on the rows are, where the times have one, so that a step of the
+  wall clock does not reorder the rows.
+- What is no live clock stays as it was: the time in front of a plain
+  line, `[0:03]`, which a log keeps; how long a span that has ended took,
+  in the lines the tree leaves, the end lines of `Plain` and the summary;
+  a pause's countdown, `12s left`, rounded up to the whole second; and the
+  bound of a request.
+
+### Costs
+
+- While anything runs, every frame differs from the one before, so the
+  terminal is written up to ten times a second rather than about once: a
+  region of twelve rows a hundred columns wide is about 12 KB a second,
+  which a slow link carries but notices.
+- The text the displays draw changes: a consumer's test that compares
+  frames sees `0:41.0` and `4.0s` where it saw `0:41` and `4s`. Decision 5
+  makes that a breaking change, named in the release notes.
