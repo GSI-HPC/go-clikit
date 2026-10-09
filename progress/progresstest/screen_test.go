@@ -87,3 +87,94 @@ func TestScreenCompletesWhatItShowedUnfinished(t *testing.T) {
 		t.Errorf("screen after it ends: %q, want %q", got, want)
 	}
 }
+
+// With Styles, the sequences that set the attributes of text take no
+// column and String shows the text alone, while Styled shows which
+// attributes each run was written in, however they were set.
+func TestScreenAppliesStylesWhenAsked(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name   string
+		width  int
+		writes []string
+		text   string
+		styled string
+	}{
+		{"a colour and its reset", 0, []string{"\x1b[31m✗\x1b[0m exe0007\n"}, "✗ exe0007\n", "«31»✗«» exe0007\n"},
+		{"ESC [ m sets everything back", 0, []string{"\x1b[1mok\x1b[m done\n"}, "ok done\n", "«1»ok«» done\n"},
+		{"each attribute in one order", 0, []string{"\x1b[7;4;2;1;94mx\x1b[0m\n"}, "x\n", "«1;2;4;7;94»x«»\n"},
+		{"attributes set by several sequences", 0, []string{"\x1b[94m\x1b[1mx\x1b[0m\n"}, "x\n", "«1;94»x«»\n"},
+		{"a colour of 256 colours", 0, []string{"\x1b[1;38;5;30m✓\x1b[0m\n"}, "✓\n", "«1;38;5;30»✓«»\n"},
+		{"a colour of 256 colours written with colons", 0, []string{"\x1b[38:5:208mx\x1b[0m\n"}, "x\n", "«38;5;208»x«»\n"},
+		{"the resets of each attribute", 0,
+			[]string{"\x1b[1;2;4;7;31ma\x1b[22mb\x1b[24mc\x1b[27md\x1b[39me\n"}, "abcde\n",
+			"«1;2;4;7;31»a«4;7;31»b«7;31»c«31»d«»e\n"},
+		{"an empty parameter sets everything back", 0, []string{"\x1b[1;;32mx\n"}, "x\n", "«32»x«»\n"},
+		{"a row that ends in a colour closes it", 0, []string{"\x1b[33mone\ntwo\x1b[0m\n"}, "one\ntwo\n", "«33»one«»\n«33»two«»\n"},
+		// Styled shows the attributes of the cells, not the sequences: a row
+		// whose colour is set back after it reads as one whose colour is
+		// left on, which shows only in the text written after it.
+		{"a row whose colour is set back", 0, []string{"\x1b[33mtwo\x1b[0m\n"}, "two\n", "«33»two«»\n"},
+		{"a row whose colour is left on", 0, []string{"\x1b[33mtwo\n"}, "two\n", "«33»two«»\n"},
+		{"a colour left on shows in the text after it", 0, []string{"\x1b[33mtwo\n", "after\n"}, "two\nafter\n", "«33»two«»\n«33»after«»\n"},
+		{"colours take no column where a row wraps", 4, []string{"\x1b[32mabcd\x1b[0m", "\x1b[31me\x1b[0m"}, "abcd\ne\n", "«32»abcd«»\n«31»e«»\n"},
+		{"writing over a cell takes the new attributes", 0, []string{"\x1b[31mabc\x1b[0m\rx\n"}, "xbc\n", "x«31»bc«»\n"},
+		{"an erase takes the attributes off", 0, []string{"\x1b[31mabc\r\x1b[2K", "\x1b[0mx\n"}, "x\n", "x\n"},
+		{"an erase to the end of the row", 0, []string{"\x1b[31mabc\x1b[0m\rx\x1b[K\n"}, "x\n", "x\n"},
+		{"an erase below", 0, []string{"\x1b[31ma\nb\x1b[0m\x1b[1A\r\x1b[J\n"}, "", ""},
+		{"a wide rune keeps one style for both columns", 0, []string{"\x1b[35m失\x1b[0m败\n"}, "失败\n", "«35»失«»败\n"},
+		{"a wide rune half written over leaves a blank of none", 0, []string{"\x1b[35m失\x1b[0m\rx\n"}, "x \n", "x \n"},
+		{"the gap a cursor left has none", 0, []string{"a\x1b[31m\n", "\x1b[1Axyz\x1b[0m\n"}, "xyz\n", "«31»xyz«»\n"},
+		{"a sequence split across writes", 0, []string{"\x1b[3", "1mx\x1b[0m\n"}, "x\n", "«31»x«»\n"},
+		{"italic is shown as text", 0, []string{"\x1b[3mx\n"}, "^[[3mx\n", "^[[3mx\n"},
+		{"a background is shown as text", 0, []string{"\x1b[41mx\n"}, "^[[41mx\n", "^[[41mx\n"},
+		{"a colour of 24 bits is shown as text", 0, []string{"\x1b[38;2;1;2;3mx\n"}, "^[[38;2;1;2;3mx\n", "^[[38;2;1;2;3mx\n"},
+		{"a colour of 256 colours with no index", 0, []string{"\x1b[38;5mx\n"}, "^[[38;5mx\n", "^[[38;5mx\n"},
+		{"a colour of 256 colours past the last", 0, []string{"\x1b[38;5;256mx\n"}, "^[[38;5;256mx\n", "^[[38;5;256mx\n"},
+		{"a colour index that is no number", 0, []string{"\x1b[38;5;xmx\n"}, "^[[38;5;xmx\n", "^[[38;5;xmx\n"},
+		{"a code that is no number", 0, []string{"\x1b[1:2mx\n"}, "^[[1:2mx\n", "^[[1:2mx\n"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			s := &Screen{Width: tc.width, Styles: true}
+			for _, w := range tc.writes {
+				io.WriteString(s, w)
+			}
+			if got := s.String(); got != tc.text {
+				t.Errorf("String:\n%q\nwant:\n%q", got, tc.text)
+			}
+			if got := s.Styled(); got != tc.styled {
+				t.Errorf("Styled:\n%q\nwant:\n%q", got, tc.styled)
+			}
+		})
+	}
+}
+
+// Without Styles, a sequence that sets attributes is shown as text, as any
+// sequence the Screen does not know is, and Styled shows what String does.
+func TestScreenShowsStylesAsTextUnlessAsked(t *testing.T) {
+	t.Parallel()
+	s := &Screen{}
+	io.WriteString(s, "\x1b[31m✗\x1b[0m exe0007\n")
+	want := "^[[31m✗^[[0m exe0007\n"
+	if got := s.String(); got != want {
+		t.Errorf("String: %q, want %q", got, want)
+	}
+	if got := s.Styled(); got != want {
+		t.Errorf("Styled: %q, want %q", got, want)
+	}
+}
+
+// Styled, like String, shows a sequence the output ends in the middle of as
+// text, in the attributes then on, and the next write completes it.
+func TestScreenStylesWhatItShowedUnfinished(t *testing.T) {
+	t.Parallel()
+	s := &Screen{Styles: true}
+	io.WriteString(s, "\x1b[32mok\x1b[")
+	if got, want := s.Styled(), "«32»ok^[[«»\n"; got != want {
+		t.Errorf("Styled before the sequence ends: %q, want %q", got, want)
+	}
+	io.WriteString(s, "0m done\n")
+	if got, want := s.Styled(), "«32»ok«» done\n"; got != want {
+		t.Errorf("Styled after it ends: %q, want %q", got, want)
+	}
+}

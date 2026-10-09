@@ -84,7 +84,16 @@ the two it would be: a row written to its last column leaves the cursor on
 that column until the next rune, where an erase to the end of the row takes
 the last rune. A wide rune takes two columns, and writing over half of one
 blanks the other, as a terminal does. A test compares what a person would
-see, frame by frame.
+see, frame by frame. With `Styles` set, a Screen applies the colours a theme
+draws, which take no column, and `Styled` shows each run of text in the
+attributes it was written in, `«1;31»✗«»`, so that a test sees which part
+is in which colour; any other attribute, a background or italic, is still
+shown as text. `Styled` shows the attributes of what is on the screen, not
+the sequences that set them, so a row that leaves its colour on reads as
+one that sets it back: a colour left on shows only in the text written
+after it. The tests that check that none is left on write text after the
+output, or a mark after every row and every write, and look at its
+colour.
 
 The tests of each display cover a wide fan-out, failures that group, a hidden
 span that turns slow, a step that fails at once, a power-on in batches, two
