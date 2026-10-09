@@ -84,3 +84,16 @@ func ExampleScreen() {
 	// uptime · 3/3 · 0:02
 	// ^[[?25l
 }
+
+// With Styles, a Screen applies the colours a display drawn in a theme sets,
+// which take no column, and Styled shows which colours each run of text was
+// written in, here a failure in bold red and a separator in grey.
+func ExampleScreen_Styled() {
+	screen := &progresstest.Screen{Styles: true}
+	fmt.Fprint(screen, "\x1b[1;31m✗\x1b[0m exe0007\x1b[38;5;244m · \x1b[0mtransport\n")
+	fmt.Print(screen.String())
+	fmt.Print(screen.Styled())
+	// Output:
+	// ✗ exe0007 · transport
+	// «1;31»✗«» exe0007«38;5;244» · «»transport
+}
