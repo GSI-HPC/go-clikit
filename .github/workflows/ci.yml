@@ -89,6 +89,7 @@ jobs:
           - {package: termtext, target: FuzzEscape}
           - {package: termtext, target: FuzzTruncate}
           - {package: progress, target: FuzzSanitize}
+          - {package: progress/display, target: FuzzCut}
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-go
