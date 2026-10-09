@@ -46,7 +46,7 @@ description: Drive a go-clikit pull request to a mergeable state. Covers the loc
 | Test (Go floor, ubuntu-latest), Test (Go current, ubuntu-latest), Test (Go current, macos-latest) | `go vet` and `go test -race` with the newest patch of the release line in `go.mod`, and in `mise.toml` |
 | Costs | `make costs`: the cost tests of the live tree, without the race detector, alone on their runner; each logs how many times as long its larger size took, and its limit |
 | Coverage | go-test-coverage against `.testcoverage.yml` |
-| Fuzz (FuzzEscape), Fuzz (FuzzTruncate), Fuzz (FuzzSanitize) | `make fuzz` with one target for 60 s; a failing input is uploaded as the `fuzz-corpus-<target>` artifact, to be committed under the package's `testdata/fuzz/` |
+| Fuzz (FuzzEscape), Fuzz (FuzzTruncate), Fuzz (FuzzSanitize), Fuzz (FuzzCut) | `make fuzz` with one target for 60 s; a failing input is uploaded as the `fuzz-corpus-<target>` artifact, to be committed under the package's `testdata/fuzz/` |
 | Lint | `make tidy` leaves `go.mod` and `go.sum` unchanged, golangci-lint (depguard enforces decision 3) |
 | Markdown | `make lint-docs` |
 | REUSE | `reuse lint` |

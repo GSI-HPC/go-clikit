@@ -6,7 +6,7 @@ COVER    ?= coverage.out
 FUZZTIME ?= 60s
 # The fuzz targets, as package:target, which make fuzz runs one after the
 # other; FUZZ=progress:FuzzSanitize runs one of them.
-FUZZ     ?= termtext:FuzzEscape termtext:FuzzTruncate progress:FuzzSanitize
+FUZZ     ?= termtext:FuzzEscape termtext:FuzzTruncate progress:FuzzSanitize progress/display:FuzzCut
 
 .PHONY: all
 all: lint test

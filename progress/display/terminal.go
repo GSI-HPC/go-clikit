@@ -50,8 +50,6 @@ import (
 	"strings"
 	"sync"
 	"time"
-
-	"github.com/GSI-HPC/go-clikit/termtext"
 )
 
 // maxWaiting is the most the lines of the Lines writers may hold, in
@@ -435,9 +433,10 @@ func (t *Terminal) writeWaiting() {
 }
 
 // draw puts rows on the terminal in place of the display's region, each cut
-// to the width, once the lines of the Lines writers and those a display
-// holds are written above it, unless the terminal is lent out, closed or
-// waiting for a line to end. No rows take the region off.
+// to the width, its colours taking no column, once the lines of the Lines
+// writers and those a display holds are written above it, unless the
+// terminal is lent out, closed or waiting for a line to end. No rows take
+// the region off.
 func (t *Terminal) draw(rows []string) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
@@ -456,7 +455,7 @@ func (t *Terminal) draw(rows []string) {
 	width, _ := t.dims()
 	cutRows := make([]string, 0, len(rows))
 	for _, row := range rows {
-		cutRows = append(cutRows, termtext.Truncate(row, width-1))
+		cutRows = append(cutRows, cut(row, width-1))
 	}
 	var held string
 	if t.held != nil {

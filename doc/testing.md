@@ -112,7 +112,8 @@ interrupt too, keeps the contract above.
 
 ## Fuzzing
 
-Three fuzz targets check what must hold for any text a remote host sends:
+Four fuzz targets check what must hold for any text a remote host sends,
+and for the rows a display draws in colour:
 
 - `termtext.FuzzEscape`: neither escaper leaves a rune its policy names, and
   escaping twice changes nothing;
@@ -121,7 +122,11 @@ Three fuzz targets check what must hold for any text a remote host sends:
   already is left as it is, and `Width` keeps to the bounds the widths of
   the runes set;
 - `progress.FuzzSanitize`: what comes out is UTF-8, holds nothing a terminal
-  would act on, keeps to its bound and is the same when sanitised again.
+  would act on, keeps to its bound and is the same when sanitised again;
+- `display.FuzzCut`: a row cut to its columns shows what `termtext.Truncate`
+  keeps of its text, with every colour sequence whole and none after the
+  cut, and a row holding an escape that was shortened ends by setting the
+  colours back.
 
 `make fuzz` runs each for `FUZZTIME`, 60 s unless told otherwise, and
 `FUZZ=progress:FuzzSanitize` runs one. CI runs each for a minute on every
