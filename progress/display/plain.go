@@ -21,8 +21,8 @@ const (
 )
 
 // Plain is a display of plain lines, one for each thing worth a line, with
-// the time since the command started in front and no escape codes, for a
-// log as much as for a terminal:
+// the time since the command started in front and no escape codes unless
+// its Theme draws in colour, for a log as much as for a terminal:
 //
 //	[0:00] bmc power › power off: start, 480 targets, 8 at a time
 //	[0:03] bmc power › power off › exe0007 failed (transport): exe0007.mgmt: dial tcp: i/o timeout
@@ -46,6 +46,16 @@ const (
 //
 //	[0:00] start, 2 targets
 //
+// In a theme, PlainOptions.Theme, a line takes the theme's colours and one
+// mark after the time: that of what runs for the start of a step, a batch
+// or a pause and for how far a step has got, and that of how it ended for
+// a target that failed and for the end of a span. Its words, punctuation
+// and path are those of no theme, which draws no mark, so that the line
+// without its colours and its mark is the line a log of no theme shows. In
+// Classic:
+//
+//	[0:03] ✗ bmc power › power off › exe0007 failed (transport): exe0007.mgmt: dial tcp: i/o timeout
+//
 // The lines go out through the Terminal: ahead of whatever the command
 // writes after the events they tell of, never into a line the command has
 // not ended, and not while a question is asked. A Plain is a progress.Sink
@@ -54,8 +64,13 @@ type Plain struct {
 	term  *Terminal
 	now   func() time.Time
 	start time.Time
-	// between is what the parts of a span's path are written with between.
+	// between is what the parts of a span's path are written with between,
+	// in the colour of a separator.
 	between string
+	// look is what the lines are drawn with, and themed says each starts
+	// with a mark after the time.
+	look   look
+	themed bool
 	// noun says how many targets n are.
 	noun func(n int) string
 
@@ -103,8 +118,14 @@ type PlainOptions struct {
 	// the same.
 	Now func() time.Time
 	// ASCII writes the path to a span with ">" between its parts, for a
-	// locale that is not UTF-8, rather than "›".
+	// locale that is not UTF-8, rather than "›", and the marks of Theme in
+	// ASCII, "*" for what runs.
 	ASCII bool
+	// Theme draws the lines in its colours, each with a mark after the
+	// time in front, and with the words, punctuation and paths of no
+	// theme. The zero Theme draws them as they have always been drawn,
+	// with no mark and no escape code.
+	Theme Theme
 	// Noun says how many targets a step or a batch expects, n of them,
 	// in the line that starts it, in the program's own word for them, such
 	// as "480 hosts"; nil is "1 target" and "%d targets".
@@ -115,10 +136,13 @@ type PlainOptions struct {
 // in front of its lines from now. It panics if term has carried a display
 // before.
 func NewPlain(term *Terminal, o PlainOptions) *Plain {
-	p := &Plain{term: term, now: o.Now, spans: map[progress.SpanID]*plainSpan{}, between: " › ", noun: o.Noun, wake: make(chan struct{}, 1)}
+	l := lookOf(o.Theme, o.ASCII)
+	between := " › "
 	if o.ASCII {
-		p.between = " > "
+		between = " > "
 	}
+	p := &Plain{term: term, now: o.Now, spans: map[progress.SpanID]*plainSpan{}, between: l.paint(roleMuted, between),
+		look: l, themed: o.Theme.art != nil, noun: o.Noun, wake: make(chan struct{}, 1)}
 	if p.now == nil {
 		p.now = time.Now
 	}
@@ -246,13 +270,13 @@ func (p *Plain) run(e progress.Event, s *plainSpan) {
 	}
 	switch e.Kind {
 	case progress.KindStep, progress.KindBatch:
-		p.say(e.Time, s.path, "start"+p.sizes(e.Fields))
+		p.say(e.Time, p.runMark(), s.path, p.look.paint(roleRunning, "start")+p.sizes(e.Fields))
 		if s.counts && !s.below {
 			p.beats = append(p.beats, beat{span: e.Span, due: e.Time.Add(plainBeat)})
 		}
 	case progress.KindWait:
 		if e.Timeout > 0 {
-			p.say(e.Time, s.path, fmt.Sprintf("waiting %s", e.Timeout))
+			p.say(e.Time, p.runMark(), s.path, p.look.paint(roleMuted, fmt.Sprintf("waiting %s", e.Timeout)))
 		}
 	}
 }
@@ -271,27 +295,27 @@ func (p *Plain) end(e progress.Event, s *plainSpan, count progress.Count, counte
 	switch e.Kind {
 	case progress.KindTarget:
 		if e.Status == progress.StatusFailed {
-			text := fmt.Sprintf("%s failed (%s)", s.path, e.Class)
+			text := s.path + " " + outcome(p.look, e)
 			if e.Err != "" {
 				text += ": " + e.Err
 			}
-			p.line(e.Time, text)
+			p.line(e.Time, p.endMark(e.Status), text)
 		}
 	case progress.KindStep, progress.KindBatch:
 		if s.ran.IsZero() {
 			// Left out before it ran, as the batches after one that
 			// failed are.
-			p.say(e.Time, s.path, outcome(e))
+			p.say(e.Time, p.endMark(e.Status), s.path, outcome(p.look, e))
 			return
 		}
-		text := fmt.Sprintf("%s in %s", word(e.Status), took(e.Time.Sub(s.ran)))
+		text := fmt.Sprintf("%s in %s", wordIn(p.look, e.Status), p.look.paint(roleMuted, took(e.Time.Sub(s.ran))))
 		if counted {
-			text += ": " + ended(count)
+			text += ": " + ended(p.look, count)
 		}
-		p.say(e.Time, s.path, text)
+		p.say(e.Time, p.endMark(e.Status), s.path, text)
 	case progress.KindWait:
 		if e.Status == progress.StatusFailed || e.Status == progress.StatusCanceled {
-			p.say(e.Time, s.path, outcome(e))
+			p.say(e.Time, p.endMark(e.Status), s.path, outcome(p.look, e))
 		}
 	}
 }
@@ -312,28 +336,45 @@ func (p *Plain) heartbeats(now time.Time) {
 		if s == nil || !ok {
 			continue
 		}
-		p.say(now, s.path, standing(count))
+		p.say(now, p.runMark(), s.path, standing(p.look, count))
 	}
 }
 
-// line adds a line at t to those not yet written, and has them written. p.mu
-// is held.
-func (p *Plain) line(t time.Time, text string) {
-	fmt.Fprintf(&p.lines, "[%s] %s\n", elapsed(max(0, t.Sub(p.start))), text)
+// line adds a line at t to those not yet written, mark and text after the
+// time, and has them written. p.mu is held.
+func (p *Plain) line(t time.Time, mark, text string) {
+	stamp := p.look.paint(roleClock, "["+elapsed(max(0, t.Sub(p.start)))+"]")
+	fmt.Fprintf(&p.lines, "%s %s%s\n", stamp, mark, text)
 	select {
 	case p.wake <- struct{}{}:
 	default:
 	}
 }
 
-// say writes the line that says text of the span path names, after its
-// path when there is one. p.mu is held.
-func (p *Plain) say(t time.Time, path, text string) {
+// say writes the line that says text of the span path names, after mark
+// and its path when there is one. p.mu is held.
+func (p *Plain) say(t time.Time, mark, path, text string) {
 	if path != "" {
 		text = path + ": " + text
 	}
-	p.line(t, text)
+	p.line(t, mark, text)
 }
+
+// mark returns what a line starts with after the time in a theme: mark
+// and a space; "" with no theme, whose lines have no mark.
+func (p *Plain) mark(mark string) string {
+	if !p.themed {
+		return ""
+	}
+	return mark + " "
+}
+
+// runMark returns the mark of a line that tells of what runs: a start,
+// and how far a step has got.
+func (p *Plain) runMark() string { return p.mark(p.look.mark(roleRunning, p.look.running)) }
+
+// endMark returns the mark of a line that tells of what ended with status.
+func (p *Plain) endMark(status progress.Status) string { return p.mark(p.look.endMark(status)) }
 
 // sizes says how many targets a step or a batch expects, and how many of
 // them it works on at once when that is fewer.
@@ -356,66 +397,57 @@ func targets(n int) string {
 	return fmt.Sprintf("%d targets", n)
 }
 
-// standing says how far a counted step has got while it is under way.
-func standing(c progress.Count) string {
+// standing says how far a counted step has got while it is under way, each
+// count of targets in the colour l gives what they are doing.
+func standing(l look, c progress.Count) string {
 	var parts []string
 	if c.Batch != "" {
 		parts = append(parts, "batch "+c.Batch)
 	}
 	parts = append(parts, fmt.Sprintf("%d/%d done", c.Done, c.Total))
-	for _, n := range []struct {
-		n    int
-		what string
-	}{
-		{c.Failed, "failed"},
-		{c.Canceled, "canceled"},
-		{c.Skipped, "skipped"},
-		{c.Running, "running"},
-		{c.Queued, "queued"},
-	} {
-		if n.n > 0 {
-			parts = append(parts, fmt.Sprintf("%d %s", n.n, n.what))
-		}
-	}
+	parts = append(parts, l.counts(c)...)
 	if c.Waits > 0 {
-		parts = append(parts, "waiting")
+		parts = append(parts, l.paint(roleMuted, "waiting"))
 	}
 	return strings.Join(parts, ", ")
 }
 
-// ended says how the targets of a counted step or batch ended.
-func ended(c progress.Count) string {
-	return tallied(c.Done-c.Failed-c.Canceled-c.Skipped, c.Failed, c.Canceled, c.Skipped)
+// ended says how the targets of a counted step or batch ended, each count
+// in the colour l gives how its targets ended.
+func ended(l look, c progress.Count) string {
+	return tallied(l, c.Done-c.Failed-c.Canceled-c.Skipped, c.Failed, c.Canceled, c.Skipped)
 }
 
-// tallied says how many ended how: "478 ok, 2 failed", leaving out none but
-// ok.
-func tallied(ok, failed, canceled, skipped int) string {
-	parts := []string{fmt.Sprintf("%d ok", ok)}
-	for _, n := range []struct {
-		n    int
-		what string
-	}{{failed, "failed"}, {canceled, "canceled"}, {skipped, "skipped"}} {
-		if n.n > 0 {
-			parts = append(parts, fmt.Sprintf("%d %s", n.n, n.what))
-		}
+// tallied says how many ended how: "478 ok, 2 failed", leaving out none
+// but ok, each count in the colour l gives how its targets ended, but for
+// "0 ok", which is uncoloured: nothing ended well.
+func tallied(l look, ok, failed, canceled, skipped int) string {
+	okWord := fmt.Sprintf("%d ok", ok)
+	if ok > 0 {
+		okWord = l.paint(roleOK, okWord)
 	}
+	parts := append([]string{okWord}, l.counts(progress.Count{Failed: failed, Canceled: canceled, Skipped: skipped})...)
 	return strings.Join(parts, ", ")
 }
 
 // outcome says in a word how a span ended that has no count to say, with
 // the reason when it was left out: that is no failure, which report prints.
-func outcome(e progress.Event) string {
+// The word, and the class of a failure, are in the colour l gives how the
+// span ended; a reason stays uncoloured.
+func outcome(l look, e progress.Event) string {
 	switch e.Status {
 	case progress.StatusFailed:
-		return fmt.Sprintf("failed (%s)", e.Class)
+		return l.paint(roleFailed, fmt.Sprintf("failed (%s)", e.Class))
 	case progress.StatusSkipped:
 		if e.Err != "" {
-			return "skipped: " + e.Err
+			return l.paint(roleSkipped, "skipped") + ": " + e.Err
 		}
 	}
-	return word(e.Status)
+	return wordIn(l, e.Status)
 }
+
+// wordIn is word in the colour l gives how the span ended.
+func wordIn(l look, s progress.Status) string { return l.paint(statusRole(s), word(s)) }
 
 // word says in a word how a span ended.
 func word(s progress.Status) string {

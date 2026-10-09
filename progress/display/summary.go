@@ -32,8 +32,23 @@ import (
 // line says nothing of why a target failed: the command's error says that,
 // once, after it.
 //
+// In a Theme, the line takes the theme's colours and, in front, the mark of
+// how the command ended, and keeps its words and punctuation. In Classic:
+//
+//	✗ provision reinstall: failed in 18m03s: 478 ok, 2 failed
+//
 // A Summary is a progress.Sink; its methods are safe for concurrent use.
 type Summary struct {
+	// Theme draws the line in its colours, with the mark of how the
+	// command ended in front; the zero Theme draws it as it has always
+	// been drawn, with no mark and no escape code. Line reads it: set it
+	// before the Summary is put on a Bus.
+	Theme Theme
+	// ASCII draws the mark of Theme in ASCII, for a locale that is not
+	// UTF-8; with the zero Theme it changes nothing. Line reads it: set it
+	// before the Summary is put on a Bus.
+	ASCII bool
+
 	mu    sync.Mutex
 	tally progress.Tally
 	// command is the span of the command, the root of the tree.
@@ -190,11 +205,15 @@ func (s *Summary) Line() string {
 	if d < time.Second {
 		return ""
 	}
-	line := fmt.Sprintf("%s: %s in %s", s.name, word(s.status), took(d))
+	l := lookOf(s.Theme, s.ASCII)
+	line := fmt.Sprintf("%s: %s in %s", l.paint(roleTitle, s.name), wordIn(l, s.status), l.paint(roleMuted, took(d)))
+	if s.Theme.art != nil {
+		line = l.endMark(s.status) + " " + line
+	}
 	if ok+all.failed+all.canceled+all.skipped == 0 {
 		return line
 	}
-	return line + ": " + tallied(ok, all.failed, all.canceled, all.skipped)
+	return line + ": " + tallied(l, ok, all.failed, all.canceled, all.skipped)
 }
 
 // took reads a length of time the way a person says it: tenths of a second,

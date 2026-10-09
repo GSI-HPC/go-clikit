@@ -42,14 +42,14 @@ func newPlainFixture(t *testing.T, command string) *plainFixture {
 }
 
 // newPlainFixtureWith is newPlainFixture with the options o, on the
-// fixture's clock.
+// fixture's clock, and a summary in o's Theme and ASCII.
 func newPlainFixtureWith(t *testing.T, command string, o display.PlainOptions) *plainFixture {
 	t.Helper()
 	f := &plainFixture{screen: &screen{}, clock: &clock{now: time.Date(2026, 9, 26, 12, 0, 0, 0, time.UTC)}}
 	f.term = display.NewTerminal(f.screen, display.TerminalOptions{})
 	o.Now = f.clock.Now
 	f.plain = display.NewPlain(f.term, o)
-	f.summary = &display.Summary{}
+	f.summary = &display.Summary{Theme: o.Theme, ASCII: o.ASCII}
 	f.capture = &progresstest.Capture{}
 	f.bus = progress.NewBus(progress.BusOptions{Sinks: []progress.Sink{f.capture, f.plain, f.summary}, Now: f.clock.Now})
 	t.Cleanup(func() {
