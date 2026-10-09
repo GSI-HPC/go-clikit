@@ -25,10 +25,11 @@ const (
 // are counted, the roots of a progress.Tally, how far it has got, and how
 // long the command has run:
 //
-//	power on · batch 3/60 · 17/480 · 1 failed · 8 running · 0:41
+//	power on · batch 3/60 · 17/480 · 1 failed · 8 running · 0:41.3
 //
 // Steps under way side by side each get a segment of their own, split by
-// " | ". While no counted step is under way the line names the innermost
+// " | ". The time runs in tenths of a second, so the line changes at every
+// frame. While no counted step is under way the line names the innermost
 // step that is, or the command. Hidden steps are not shown. A step with no
 // name, as a pool given none reports its targets under, goes by the name
 // of the nearest step above it that has one, or of the command.
@@ -175,7 +176,7 @@ func (c *counting) line(now, start time.Time, g glyphs) string {
 	if line != "" {
 		line += g.sep
 	}
-	return line + elapsed(now.Sub(start))
+	return line + clock(now.Sub(start))
 }
 
 // segment says how far one counted step has got, its parts split by sep,
@@ -209,11 +210,25 @@ func segment(n progress.Count, sep string) string {
 	return strings.Join(parts, sep)
 }
 
-// elapsed reads d as minutes and seconds, or hours, minutes and seconds.
+// elapsed reads d as minutes and seconds, or hours, minutes and seconds,
+// as the time in front of a plain line: "0:03", "1:02:03".
 func elapsed(d time.Duration) string {
 	s := int(d / time.Second)
 	if s >= 3600 {
 		return fmt.Sprintf("%d:%02d:%02d", s/3600, s/60%60, s%60)
 	}
 	return fmt.Sprintf("%d:%02d", s/60, s%60)
+}
+
+// clock reads d as the clock of a live display, which a frame redraws
+// every tenth of a second: minutes, seconds and tenths, or hours, minutes,
+// seconds and tenths, "0:41.3", "1:02:03.4". The tenths are cut, not
+// rounded, so that the clock never runs ahead of the time.
+func clock(d time.Duration) string {
+	t := int(max(0, d) / (time.Second / 10))
+	s := t / 10
+	if s >= 3600 {
+		return fmt.Sprintf("%d:%02d:%02d.%d", s/3600, s/60%60, s%60, t%10)
+	}
+	return fmt.Sprintf("%d:%02d.%d", s/60, s%60, t%10)
 }

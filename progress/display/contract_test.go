@@ -193,11 +193,11 @@ func TestTheCounterIsTakenOffBeforeEveryWrite(t *testing.T) {
 	s := newSession(t, "exec", counterDisplay)
 	err := uptime(s, false)
 	s.checkFrames(t, `
-run · 0/3 · 1 running · 2 queued · 0:01
+run · 0/3 · 1 running · 2 queued · 0:01.0
 `, `
-run · 1/3 · 1 running · 1 queued · 0:02
+run · 1/3 · 1 running · 1 queued · 0:02.0
 `, `
-run · 2/3 · 1 failed · 1 running · 0:03
+run · 2/3 · 1 failed · 1 running · 0:03.0
 `)
 	checkEnd(t, s.end(t, err), `
 exe0001: up 3 days
@@ -251,24 +251,24 @@ func testTheCounterOfAPowerOnInBatches(t *testing.T) {
 	err := batches[1].Err
 	s.checkFrames(t, `
 powering on exe[1-2] (1 of 2)
-power on · batch 1/2 · 0/4 · 1 running · 3 queued · 0:01
+power on · batch 1/2 · 0/4 · 1 running · 3 queued · 0:01.0
 `, `
 powering on exe[1-2] (1 of 2)
-power on · batch 1/2 · 1/4 · 1 running · 2 queued · 0:02
-`, `
-powering on exe[1-2] (1 of 2)
-waiting 5s before the next batch
-power on · batch 1/2 · 2/4 · 2 queued · waiting · 0:03
+power on · batch 1/2 · 1/4 · 1 running · 2 queued · 0:02.0
 `, `
 powering on exe[1-2] (1 of 2)
 waiting 5s before the next batch
-powering on exe[3-4] (2 of 2)
-power on · batch 2/2 · 2/4 · 1 running · 1 queued · 0:04
+power on · batch 1/2 · 2/4 · 2 queued · waiting · 0:03.0
 `, `
 powering on exe[1-2] (1 of 2)
 waiting 5s before the next batch
 powering on exe[3-4] (2 of 2)
-power on · batch 2/2 · 3/4 · 1 running · 0:05
+power on · batch 2/2 · 2/4 · 1 running · 1 queued · 0:04.0
+`, `
+powering on exe[1-2] (1 of 2)
+waiting 5s before the next batch
+powering on exe[3-4] (2 of 2)
+power on · batch 2/2 · 3/4 · 1 running · 0:05.0
 `)
 	checkEnd(t, s.end(t, err), `
 powering on exe[1-2] (1 of 2)
@@ -304,7 +304,7 @@ func TestTheCounterLeavesTheQuestionAlone(t *testing.T) {
 	call.End(nil)
 	_, _ = io.WriteString(s.out, "drained exe0007\n")
 	s.checkFrames(t, `
-slurm node drain · 0:01
+slurm node drain · 0:01.0
 `, `
 About to drain 1 host: exe0007
   reason: "failing DIMM"
@@ -313,7 +313,7 @@ Continue? [y/N]
 About to drain 1 host: exe0007
   reason: "failing DIMM"
 Continue? [y/N] y
-slurm node drain · 0:03
+slurm node drain · 0:03.0
 `)
 	checkEnd(t, s.end(t, nil), `
 About to drain 1 host: exe0007
@@ -334,19 +334,19 @@ func TestTheTreeKeepsTheCommandsOutputAboveIt(t *testing.T) {
 	s := newSession(t, "exec", treeDisplay)
 	err := uptime(s, true)
 	s.checkFrames(t, `
-exec · 0:01
+exec · 0:01.0
   run  0/3 · 1 running · 2 queued
-    ▸ exe0001  1s/10m  ssh
+    ▸ exe0001  1.0s/10m  ssh
 `, `
-exec · 0:02
+exec · 0:02.0
   run  1/3 · 1 running · 1 queued
-    ▸ exe0002  1s/10m  ssh
+    ▸ exe0002  1.0s/10m  ssh
     ✓ exe0001
 `, `
-exec · 0:03
+exec · 0:03.0
   run  2/3 · 1 failed · 1 running
     ✗ exe0002  target: {}: command exited 1
-    ▸ exe0003  1s/10m  ssh
+    ▸ exe0003  1.0s/10m  ssh
     ✓ exe0001
 `)
 	checkEnd(t, s.end(t, err), `
@@ -374,8 +374,8 @@ func TestTheTreeLeavesTheQuestionAlone(t *testing.T) {
 	call.End(nil)
 	_, _ = io.WriteString(s.out, "drained exe0007\n")
 	s.checkFrames(t, `
-slurm node drain · 0:01
-  ssh login  1s/10m
+slurm node drain · 0:01.0
+  ssh login  1.0s/10m
 `, `
 About to drain 1 host: exe0007
   reason: "failing DIMM"
@@ -384,8 +384,8 @@ Continue? [y/N]
 About to drain 1 host: exe0007
   reason: "failing DIMM"
 Continue? [y/N] y
-slurm node drain · 0:03
-  ssh login  3s/10m
+slurm node drain · 0:03.0
+  ssh login  3.0s/10m
 `)
 	checkEnd(t, s.end(t, nil), `
 About to drain 1 host: exe0007

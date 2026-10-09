@@ -158,12 +158,12 @@ func TestTheCounterWaitsASecond(t *testing.T) {
 		t.Fatalf("the counter was drawn within its first second: %q", got)
 	}
 	f.draw(time.Millisecond)
-	check(t, f.frames(), "node hw · 0:01")
+	check(t, f.frames(), "node hw · 0:01.0")
 }
 
 // A counter given no clock reads the real one, and draws from its own
-// ticker: nothing in its first second, and then a line each time it reads
-// otherwise than the one before.
+// ticker: nothing in its first second, and then a line at each tick, whose
+// time, in tenths of a second, reads otherwise than the one before.
 func TestTheCounterReadsTheRealClock(t *testing.T) {
 	t.Parallel()
 	synctest.Test(t, func(t *testing.T) {
@@ -175,23 +175,38 @@ func TestTheCounterReadsTheRealClock(t *testing.T) {
 		if got := s.String(); got != "" {
 			t.Fatalf("the counter was drawn within its first second: %q", got)
 		}
-		// Two ticks, at 1.0s and 1.1s, of the same line.
+		// Two ticks, at 1.0s and 1.1s, a line each.
 		time.Sleep(200 * time.Millisecond)
 		synctest.Wait()
 		counter.Close()
-		if got, want := s.String(), "\n<erase>0:01\n<erase>"; got != want {
+		if got, want := s.String(), "\n<erase>0:01.0\n<erase>0:01.1\n<erase>"; got != want {
 			t.Errorf("screen:\n%q\nwant:\n%q", got, want)
 		}
 	})
 }
 
-// A line that reads as the one drawn before is not written again.
+// A line that reads as the one drawn before is not written again: one
+// drawn at the same instant, or later within the same tenth of a second,
+// which the time is cut to, writes nothing. The next tenth is drawn.
 func TestTheCounterDoesNotDrawTheSameLineTwice(t *testing.T) {
 	t.Parallel()
 	f := newFixture(t, "node hw", nil)
 	f.draw(time.Second)
-	f.draw(500 * time.Millisecond)
-	check(t, f.frames(), "node hw · 0:01")
+	written := f.screen.String()
+	for _, again := range []struct {
+		what  string
+		after time.Duration
+	}{
+		{"at the same instant", 0},
+		{"within the same tenth", 99 * time.Millisecond},
+	} {
+		f.draw(again.after)
+		if got := f.screen.String(); got != written {
+			t.Errorf("a line drawn again %s wrote %q", again.what, strings.TrimPrefix(got, written))
+		}
+	}
+	f.draw(time.Millisecond)
+	check(t, f.frames(), "node hw · 0:01.0", "node hw · 0:01.1")
 }
 
 // A fan-out is counted as its targets end, however they end, with those
@@ -210,12 +225,12 @@ func TestTheCounterCountsAFanOut(t *testing.T) {
 	})
 	f.draw(time.Second)
 	check(t, f.frames(),
-		"exec · 0:01",
-		"run · 0/4 · 1 running · 3 queued · 0:02",
-		"run · 1/4 · 1 running · 2 queued · 0:03",
-		"run · 2/4 · 1 failed · 1 running · 1 queued · 0:04",
-		"run · 3/4 · 1 failed · 1 running · 0:05",
-		"exec · 0:06",
+		"exec · 0:01.0",
+		"run · 0/4 · 1 running · 3 queued · 0:02.0",
+		"run · 1/4 · 1 running · 2 queued · 0:03.0",
+		"run · 2/4 · 1 failed · 1 running · 1 queued · 0:04.0",
+		"run · 3/4 · 1 failed · 1 running · 0:05.0",
+		"exec · 0:06.0",
 	)
 }
 
@@ -254,7 +269,7 @@ func TestTheCounterOfAWideFanOut(t *testing.T) {
 		end(i)
 	}
 	step.End(errors.New("1 of 480 failed"))
-	check(t, f.frames(), "reset the machines · 312/480 · 1 failed · 8 running · 160 queued · 4:12")
+	check(t, f.frames(), "reset the machines · 312/480 · 1 failed · 8 running · 160 queued · 4:12.0")
 }
 
 // A power-on in batches is counted as a whole, with the batch under way,
@@ -301,14 +316,14 @@ func testTheCounterCountsAPowerOnInBatches(t *testing.T) {
 	})
 	f.draw(time.Second)
 	check(t, f.frames(),
-		"power on · batch 1/3 · 0/6 · 4 queued · 0:02",
-		"power on · batch 1/3 · 0/6 · 1 running · 5 queued · 0:03",
-		"power on · batch 1/3 · 1/6 · 1 running · 4 queued · 0:04",
-		"power on · batch 1/3 · 2/6 · 4 queued · waiting · 0:05",
-		"power on · batch 2/3 · 2/6 · 2 queued · 0:36",
-		"power on · batch 2/3 · 2/6 · 1 running · 3 queued · 0:37",
-		"power on · batch 2/3 · 3/6 · 1 running · 2 queued · 0:38",
-		"bmc power on · 0:39",
+		"power on · batch 1/3 · 0/6 · 4 queued · 0:02.0",
+		"power on · batch 1/3 · 0/6 · 1 running · 5 queued · 0:03.0",
+		"power on · batch 1/3 · 1/6 · 1 running · 4 queued · 0:04.0",
+		"power on · batch 1/3 · 2/6 · 4 queued · waiting · 0:05.0",
+		"power on · batch 2/3 · 2/6 · 2 queued · 0:36.0",
+		"power on · batch 2/3 · 2/6 · 1 running · 3 queued · 0:37.0",
+		"power on · batch 2/3 · 3/6 · 1 running · 2 queued · 0:38.0",
+		"bmc power on · 0:39.0",
 	)
 }
 
@@ -348,9 +363,9 @@ func TestTheCounterShowsTwoStepsSideBySide(t *testing.T) {
 	}
 	ssh.End(nil)
 	check(t, f.frames(),
-		"read the power state · 0/3 · 1 running · 2 queued | run · 0/3 · 2 running · 1 queued · 0:02",
-		"read the power state · 1/3 · 1 running · 1 queued | run · 1/3 · 1 failed · 1 running · 1 queued · 0:03",
-		"run · 1/3 · 1 failed · 1 running · 1 queued · 0:04",
+		"read the power state · 0/3 · 1 running · 2 queued | run · 0/3 · 2 running · 1 queued · 0:02.0",
+		"read the power state · 1/3 · 1 running · 1 queued | run · 1/3 · 1 failed · 1 running · 1 queued · 0:03.0",
+		"run · 1/3 · 1 failed · 1 running · 1 queued · 0:04.0",
 	)
 }
 
@@ -364,7 +379,7 @@ func TestTheCounterNamesTheStepUnderWay(t *testing.T) {
 	_, step := progress.Start(f.ctx, progress.KindStep, "configuring the network boot")
 	f.draw(time.Second)
 	step.End(nil)
-	check(t, f.frames(), "provision reinstall · 0:01", "configuring the network boot · 0:02")
+	check(t, f.frames(), "provision reinstall · 0:01.0", "configuring the network boot · 0:02.0")
 }
 
 // A step with no name, as a pool given none reports its targets under, is
@@ -392,11 +407,11 @@ func TestTheCounterNamesAStepWithNoNameByTheSpanAboveIt(t *testing.T) {
 	call.End(nil)
 	disarming.End(nil)
 	check(t, f.frames(),
-		"exec · 0:01",
-		"exec · 0/2 · 1 running · 1 queued · 0:02",
-		"exec · 1/2 · 1 running · 0:03",
-		"disarming · 0:04",
-		"disarming · 0/1 · 1 running · 0:05",
+		"exec · 0:01.0",
+		"exec · 0/2 · 1 running · 1 queued · 0:02.0",
+		"exec · 1/2 · 1 running · 0:03.0",
+		"disarming · 0:04.0",
+		"disarming · 0/1 · 1 running · 0:05.0",
 	)
 }
 
@@ -416,7 +431,7 @@ func TestTheCounterOfAStepWithNothingToNameIt(t *testing.T) {
 		})
 	bus.Close()
 	counter.Close()
-	if got, want := s.String(), "\n<erase>0/1 · 1 running · 0:01\n<erase>"; got != want {
+	if got, want := s.String(), "\n<erase>0/1 · 1 running · 0:01.0\n<erase>"; got != want {
 		t.Errorf("screen %q, want %q", got, want)
 	}
 }
@@ -438,14 +453,14 @@ func TestWritesTakeTheCounterOff(t *testing.T) {
 	_, _ = io.WriteString(errOut, "y\n")
 	f.draw(time.Second)
 	want := `
-<erase>bmc power cycle · 0:01
+<erase>bmc power cycle · 0:01.0
 <erase>waiting 30s before the next batch
 
-<erase>bmc power cycle · 0:02
+<erase>bmc power cycle · 0:02.0
 <erase>About to power cycle 2 hosts
 Continue? [y/N] y
 
-<erase>bmc power cycle · 0:05`
+<erase>bmc power cycle · 0:05.0`
 	if got := f.screen.String(); got != want {
 		t.Errorf("screen:\n%s\nwant:\n%s", got, want)
 	}
@@ -459,7 +474,7 @@ func TestSuspendTakesTheCounterOffUntilResumed(t *testing.T) {
 	errOut := f.term.Writer(f.screen)
 	f.draw(time.Second)
 	resume := progress.Suspend(f.ctx)
-	if got := f.screen.String(); !strings.HasSuffix(got, "0:01\n<erase>") {
+	if got := f.screen.String(); !strings.HasSuffix(got, "0:01.0\n<erase>") {
 		t.Fatalf("Suspend returned with the line still drawn: %q", got)
 	}
 	_, _ = io.WriteString(errOut, "Password for admin@bmc: ")
@@ -469,10 +484,10 @@ func TestSuspendTakesTheCounterOffUntilResumed(t *testing.T) {
 	resume()
 	f.draw(time.Second)
 	want := `
-<erase>bmc status · 0:01
+<erase>bmc status · 0:01.0
 <erase>Password for admin@bmc: 
 
-<erase>bmc status · 0:04`
+<erase>bmc status · 0:04.0`
 	if got := f.screen.String(); got != want {
 		t.Errorf("screen:\n%s\nwant:\n%s", got, want)
 	}
@@ -513,7 +528,7 @@ func TestCloseTakesTheCounterOff(t *testing.T) {
 	f.counter.Close()
 	f.draw(time.Second)
 	_, _ = io.WriteString(errOut, "prog: interrupted\n")
-	if got, want := f.screen.String(), "\n<erase>exec · 0:01\n<erase>prog: interrupted\n"; got != want {
+	if got, want := f.screen.String(), "\n<erase>exec · 0:01.0\n<erase>prog: interrupted\n"; got != want {
 		t.Errorf("screen:\n%q\nwant:\n%q", got, want)
 	}
 }

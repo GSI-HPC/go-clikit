@@ -109,9 +109,9 @@ func TestLinesAreWrittenAboveTheNextFrame(t *testing.T) {
 	diag := f.term.Lines(f.screen)
 	f.counter.Draw()
 	_, _ = io.WriteString(diag, "first\n")
-	f.shows(t, "before the next frame", "0:02\n")
+	f.shows(t, "before the next frame", "0:02.0\n")
 	f.counter.Draw()
-	f.shows(t, "after it", "first\n0:02\n")
+	f.shows(t, "after it", "first\n0:02.0\n")
 
 	// Without a region, a line is written at once.
 	f.counter.Close()
@@ -402,7 +402,7 @@ func TestAColourNotSetBackLeavesTheLineOpen(t *testing.T) {
 	f.shows(t, "after a background colour", "line\n^[[41m\n")
 	_, _ = io.WriteString(out, "red\n\x1b[31m\x1b[0m")
 	f.counter.Draw()
-	f.shows(t, "once the colours are set back", "line\n^[[41mred\n^[[31m^[[0ma log line\n0:02\n")
+	f.shows(t, "once the colours are set back", "line\n^[[41mred\n^[[31m^[[0ma log line\n0:02.0\n")
 
 	_, _ = io.WriteString(out, "\x1b[7m")
 	_, _ = io.WriteString(diag, "another log line\n")
@@ -410,7 +410,7 @@ func TestAColourNotSetBackLeavesTheLineOpen(t *testing.T) {
 	f.shows(t, "after a colour written alone", "line\n^[[41mred\n^[[31m^[[0ma log line\n^[[7m\n")
 	_, _ = io.WriteString(out, "reverse\n")
 	f.counter.Draw()
-	f.shows(t, "once the line has ended", "line\n^[[41mred\n^[[31m^[[0ma log line\n^[[7mreverse\nanother log line\n0:02\n")
+	f.shows(t, "once the line has ended", "line\n^[[41mred\n^[[31m^[[0ma log line\n^[[7mreverse\nanother log line\n0:02.0\n")
 
 	// Text that ends in an m and holds no sequence is text all the same.
 	_, _ = io.WriteString(out, "Continue with the program")
@@ -520,7 +520,7 @@ func TestAColourAfterTheEndOfALineLeavesNoLineOpen(t *testing.T) {
 	_, _ = io.WriteString(diag, "a log line\n")
 	f.counter.Draw()
 	// The Screen shows a colour as text, where a terminal shows nothing.
-	f.shows(t, "after the colour is set back", "^[[31mred line\n^[[0ma log line\n0:02\n")
+	f.shows(t, "after the colour is set back", "^[[31mred line\n^[[0ma log line\n0:02.0\n")
 
 	// A colour alone leaves the line as it was: open, here.
 	_, _ = io.WriteString(out, "Continue? \x1b[1m")
