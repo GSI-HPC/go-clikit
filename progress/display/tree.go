@@ -15,6 +15,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/GSI-HPC/go-clikit/progress"
+	"github.com/GSI-HPC/go-clikit/termtext"
 	"github.com/GSI-HPC/go-nodeset"
 )
 
@@ -41,29 +42,10 @@ const (
 	// step counts the targets as they end anyway.
 	refoldAbove = 256
 	refoldEvery = time.Second
+	// treeBar is how many cells wide the bar of a step's count is, in a
+	// theme that draws one.
+	treeBar = 10
 )
-
-// glyphs are the marks a display draws with.
-type glyphs struct {
-	ok, failed, canceled, skipped, running, more string
-	// sep splits the parts of a row, and path the names of a step and
-	// the steps it is part of.
-	sep, path string
-}
-
-var (
-	unicodeGlyphs = glyphs{ok: "✓", failed: "✗", canceled: "⊘", skipped: "–", running: "▸", more: "…", sep: " · ", path: " › "}
-	// asciiGlyphs are for a terminal whose locale is not UTF-8, which
-	// would show the others as garbage.
-	asciiGlyphs = glyphs{ok: "+", failed: "x", canceled: "~", skipped: "-", running: ">", more: "...", sep: " - ", path: " > "}
-)
-
-func glyphsFor(ascii bool) glyphs {
-	if ascii {
-		return asciiGlyphs
-	}
-	return unicodeGlyphs
-}
 
 // Tree is the live display of a terminal: a few rows at its bottom, the
 // region, that show the work under way as a tree, redrawn as it goes on,
@@ -112,13 +94,27 @@ func glyphsFor(ascii bool) glyphs {
 // drawn instead. Once the command has been interrupted, its row says so,
 // with how many targets will stop and how many will not start.
 //
+// In a Theme the tree draws the theme's marks and separators, and adds what
+// no theme draws: a spinner in place of the mark of a running target, which
+// turns with the time since the tree was made, so that a frame drawn at the
+// same instant is drawn the same; on the row of a step or a batch whose
+// count it knows, a bar of how many of its targets are done, between its
+// name and its count, when the row fits the terminal with it; a guide at
+// the innermost level of each indent; and colours, on the marks, the counts
+// of how the targets stand and ended, the clock, the times, the separators
+// and the names of the command and its steps, while the names of targets,
+// errors, requests and lines of output stay in the terminal's own. A theme
+// draws as many rows as no theme, with the same words in the same order,
+// and sets the colours back after each piece it colours, so that none runs
+// on past a row or a line.
+//
 // A Tree is a progress.Sink, a progress.LineSink and a progress.Suspender.
 // Its methods are safe for concurrent use.
 type Tree struct {
 	term        *Terminal
 	now         func() time.Time
 	start       time.Time
-	g           glyphs
+	g           look
 	interrupted <-chan struct{}
 
 	mu sync.Mutex
@@ -145,8 +141,13 @@ type TreeOptions struct {
 	// time.Now. The Bus's clock should be the same.
 	Now func() time.Time
 	// ASCII draws with ASCII marks alone, for a terminal whose locale is
-	// not UTF-8.
+	// not UTF-8. In a Theme it draws the theme's colours with the ASCII
+	// marks, a bar of # and no spinner or guide.
 	ASCII bool
+	// Theme is how the tree looks: its marks, spinner, bar, guides and
+	// colours. The zero Theme draws the tree as it has always been drawn,
+	// in plain text.
+	Theme Theme
 	// Interrupted is closed once the command has been interrupted; nil is
 	// a command that never is.
 	Interrupted <-chan struct{}
@@ -184,9 +185,11 @@ type treeSpan struct {
 	// ended folds the targets below that have ended, nil for none.
 	ended *folded
 	// path names a step from the one under the command down, for its
-	// line; spans that are not steps, and those under a target, which get
-	// no line, pass their parent's on.
-	path string
+	// line, each name a part that the line sets in its colour as it is
+	// written; spans that are not steps, and those under a target, which
+	// get no line, pass their parent's on. A step's path is a slice of its
+	// own, which no other span's grows into.
+	path []string
 	// underTarget says the span is part of a target's work, which is
 	// drawn in the target's row.
 	underTarget bool
@@ -196,7 +199,7 @@ type treeSpan struct {
 // on its first row is counted from now. It panics if term has carried a
 // display before.
 func NewTree(term *Terminal, o TreeOptions) *Tree {
-	t := &Tree{term: term, now: o.Now, g: glyphsFor(o.ASCII), interrupted: o.Interrupted, spans: map[progress.SpanID]*treeSpan{}}
+	t := &Tree{term: term, now: o.Now, g: lookOf(o.Theme, o.ASCII), interrupted: o.Interrupted, spans: map[progress.SpanID]*treeSpan{}}
 	if t.now == nil {
 		t.now = time.Now
 	}
@@ -226,7 +229,7 @@ func (t *Tree) Draw() {
 		line := func() string {
 			t.mu.Lock()
 			defer t.mu.Unlock()
-			return t.counts.line(now, t.start, t.g)
+			return t.counts.line(now, t.start, t.g, width)
 		}()
 		t.term.draw([]string{line})
 		return
@@ -234,7 +237,7 @@ func (t *Tree) Draw() {
 	rows := func() []string {
 		t.mu.Lock()
 		defer t.mu.Unlock()
-		return t.frame(now, max(treeHeight, height/3))
+		return t.frame(now, width, max(treeHeight, height/3))
 	}()
 	t.term.draw(rows)
 }
@@ -330,10 +333,7 @@ func (t *Tree) begin(e progress.Event) {
 	}
 	s.path = p.path
 	if e.Kind == progress.KindStep && e.Name != "" && !s.underTarget {
-		if s.path != "" {
-			s.path += t.g.path
-		}
-		s.path += e.Name
+		s.path = append(slices.Clip(p.path), e.Name)
 	}
 }
 
@@ -394,34 +394,26 @@ func (t *Tree) finished(e progress.Event, s *treeSpan, count progress.Count, cou
 			return
 		}
 	}
-	text := t.mark(e.Status) + " " + s.path
+	g := t.g
+	names := make([]string, len(s.path))
+	for i, name := range s.path {
+		names[i] = g.paint(roleTitle, name)
+	}
+	text := g.endMark(e.Status) + " " + strings.Join(names, g.paint(roleMuted, g.path))
 	switch {
 	case !ran:
-		text += "  " + outcome(e)
+		text += "  " + outcome(g, e)
 	case counted:
-		text += "  " + took(d) + "  " + ended(count)
+		text += "  " + g.paint(roleMuted, took(d)) + "  " + ended(g, count)
 	default:
-		text += "  " + took(d)
+		text += "  " + g.paint(roleMuted, took(d))
 	}
 	t.lines.WriteString(text + "\n")
 	if s.ended != nil {
 		for _, f := range s.ended.failures {
-			fmt.Fprintf(&t.lines, "  %s %s  %s\n", t.g.failed, f.names.String(), f.text)
+			fmt.Fprintf(&t.lines, "%s%s %s  %s\n", g.indent(1), g.mark(roleFailed, g.failed), f.names.String(), f.text)
 		}
 	}
-}
-
-// mark is the mark of a span that ended with status.
-func (t *Tree) mark(status progress.Status) string {
-	switch status {
-	case progress.StatusFailed:
-		return t.g.failed
-	case progress.StatusCanceled:
-		return t.g.canceled
-	case progress.StatusSkipped:
-		return t.g.skipped
-	}
-	return t.g.ok
 }
 
 // folded are the targets below a span that have ended, folded by how they
@@ -720,15 +712,18 @@ func (p *part) cost() int {
 }
 
 type frame struct {
-	t     *Tree
-	now   time.Time
+	t   *Tree
+	now time.Time
+	// width is how many columns the terminal has, which a row is cut to
+	// one short of.
+	width int
 	parts []*part
 }
 
 // frame draws the region as the work stands at now, in at most height
-// rows. t.mu is held.
-func (t *Tree) frame(now time.Time, height int) []string {
-	f := &frame{t: t, now: now}
+// rows, for a terminal width columns wide. t.mu is held.
+func (t *Tree) frame(now time.Time, width, height int) []string {
+	f := &frame{t: t, now: now, width: width}
 	for _, root := range t.roots {
 		f.span(root, 0)
 	}
@@ -739,7 +734,7 @@ func (t *Tree) frame(now time.Time, height int) []string {
 // failures, until they fit in height rows, each list in turn giving up its
 // last row, and cuts the last rows off if the rows that are never cut do
 // not fit either.
-func fit(parts []*part, height int, g glyphs) []string {
+func fit(parts []*part, height int, g look) []string {
 	used := 0
 	for _, p := range parts {
 		p.keep = p.len()
@@ -796,16 +791,15 @@ func fit(parts []*part, height int, g glyphs) []string {
 		}
 	}
 	if len(rows) > height {
-		rows = append(rows[:height-1], g.more)
+		rows = append(rows[:height-1], g.paint(roleMuted, g.more))
 	}
 	return rows
 }
 
+// row adds a row of text at depth, after its indent.
 func (f *frame) row(depth int, text string) {
-	f.parts = append(f.parts, &part{rows: []string{indent(depth) + text}})
+	f.parts = append(f.parts, &part{rows: []string{f.t.g.indent(depth) + text}})
 }
-
-func indent(depth int) string { return strings.Repeat("  ", depth) }
 
 // drawn reports whether s gets a row of its own now: a span that has not
 // started running gets none; a hidden one gets one once it has run for a
@@ -836,18 +830,19 @@ func (f *frame) span(s *treeSpan, depth int) {
 			f.below(s, depth)
 			return
 		}
-		text := s.name
+		name := s.name
 		if s.kind == progress.KindBatch {
-			text = "batch " + text
+			name = "batch " + name
 		}
+		text := g.paint(roleTitle, name)
 		if count, ok := f.t.counts.tally.Count(s.id); ok {
-			text += "  " + standingOf(count, g)
+			text = f.counted(depth, text, count)
 			if c := f.call(s); c != nil {
-				text += "  " + f.took(s, c) + "  " + describe(c, nil)
+				text += "  " + g.paint(roleMuted, f.took(s, c)) + "  " + describe(c, nil)
 			}
 		} else {
 			c := f.call(s)
-			text += "  " + f.took(s, c)
+			text += "  " + g.paint(roleMuted, f.took(s, c))
 			if c != nil {
 				text += "  " + describe(c, nil)
 			}
@@ -858,13 +853,13 @@ func (f *frame) span(s *treeSpan, depth int) {
 		if !f.drawn(s) {
 			return
 		}
-		text := s.name + "  "
+		var left string
 		if s.fields.Timeout > 0 {
-			left := max(0, s.fields.Timeout-f.now.Sub(s.ran))
-			text += seconds(left+time.Second-1) + " left"
+			left = seconds(max(0, s.fields.Timeout-f.now.Sub(s.ran))+time.Second-1) + " left"
 		} else {
-			text += runTime(f.now.Sub(s.ran))
+			left = runTime(f.now.Sub(s.ran))
 		}
+		text := g.paint(roleTitle, s.name) + "  " + g.paint(roleMuted, left)
 		if s.fields.Message != "" {
 			text += "  " + s.fields.Message
 		}
@@ -875,8 +870,24 @@ func (f *frame) span(s *treeSpan, depth int) {
 		if s.parent != nil && s.parent.kind != progress.KindCommand || !f.drawn(s) {
 			return
 		}
-		f.row(depth, describe(s, nil)+"  "+f.took(s, s))
+		f.row(depth, describe(s, nil)+"  "+g.paint(roleMuted, f.took(s, s)))
 	}
+}
+
+// counted is the row of a step or a batch whose count is known, after its
+// indent at depth, up to the end of its count: head, its name, the bar of
+// the count, where the row fits the terminal with it, and how its targets
+// stand.
+func (f *frame) counted(depth int, head string, c progress.Count) string {
+	g := f.t.g
+	standing := standingOf(c, g)
+	if bar := g.bar(c, treeBar); bar != "" {
+		row := head + "  " + bar + " " + standing
+		if termtext.Width(visible(g.indent(depth)+row)) <= f.width-1 {
+			return row
+		}
+	}
+	return head + "  " + standing
 }
 
 // header is the command's row: its name and how long it has run, and,
@@ -884,7 +895,8 @@ func (f *frame) span(s *treeSpan, depth int) {
 // will not start.
 func (f *frame) header(s *treeSpan) string {
 	g := f.t.g
-	text := s.name
+	sep := g.paint(roleMuted, g.sep)
+	text := g.paint(roleTitle, s.name)
 	select {
 	case <-f.t.interrupted:
 		var running, queued int
@@ -892,16 +904,16 @@ func (f *frame) header(s *treeSpan) string {
 			running += root.Running
 			queued += root.Queued
 		}
-		text += g.sep + "interrupting"
+		text += sep + g.paint(roleCanceled, "interrupting")
 		if running > 0 {
-			text += fmt.Sprintf("%s%d running will stop", g.sep, running)
+			text += fmt.Sprintf("%s%d running will stop", sep, running)
 		}
 		if queued > 0 {
-			text += fmt.Sprintf("%s%d queued will not start", g.sep, queued)
+			text += fmt.Sprintf("%s%d queued will not start", sep, queued)
 		}
 	default:
 	}
-	return text + g.sep + clock(f.now.Sub(s.started))
+	return text + sep + g.paint(roleClock, clock(f.now.Sub(s.started)))
 }
 
 // below draws what is below s at depth: the targets that ended otherwise
@@ -909,18 +921,19 @@ func (f *frame) header(s *treeSpan) string {
 // that ended well.
 func (f *frame) below(s *treeSpan, depth int) {
 	g := f.t.g
-	pad := indent(depth)
+	pad := g.indent(depth)
 	folded := s.ended
 	if folded != nil && len(folded.failures) > 0 {
 		failures := folded.failures
+		failed := g.mark(roleFailed, g.failed)
 		list := &part{rank: 1, size: len(failures), weights: make([]int, len(failures)),
 			cut: func(rows, targets int) string {
-				return pad + g.failed + " " + g.more + " " + more(rows, targets, len(failures), "failed")
+				return pad + failed + " " + g.paint(roleMuted, g.more+" "+more(rows, targets, len(failures), "failed"))
 			},
 			render: func(keep int) []string {
 				rows := make([]string, keep)
 				for i, fl := range failures[:keep] {
-					rows[i] = fmt.Sprintf("%s%s %s  %s", pad, g.failed, fl.names.drawn(f.now), fl.text)
+					rows[i] = fmt.Sprintf("%s%s %s  %s", pad, failed, fl.names.drawn(f.now), fl.text)
 				}
 				return rows
 			}}
@@ -930,10 +943,10 @@ func (f *frame) below(s *treeSpan, depth int) {
 		f.parts = append(f.parts, list)
 	}
 	if folded != nil && folded.canceled.len() > 0 {
-		f.row(depth, g.canceled+" "+folded.canceled.drawn(f.now)+"  canceled")
+		f.row(depth, g.mark(roleCanceled, g.canceled)+" "+folded.canceled.drawn(f.now)+"  "+g.paint(roleCanceled, "canceled"))
 	}
 	if folded != nil && folded.skipped.len() > 0 {
-		text := g.skipped + " " + folded.skipped.drawn(f.now) + "  skipped"
+		text := g.mark(roleSkipped, g.skipped) + " " + folded.skipped.drawn(f.now) + "  " + g.paint(roleSkipped, "skipped")
 		if folded.reason != "" {
 			text += ": " + folded.reason
 		}
@@ -953,7 +966,7 @@ func (f *frame) below(s *treeSpan, depth int) {
 	if len(running) > 0 {
 		f.parts = append(f.parts, &part{size: len(running),
 			cut: func(rows, targets int) string {
-				return pad + g.more + " " + more(rows, targets, len(running), "running")
+				return pad + g.paint(roleMuted, g.more+" "+more(rows, targets, len(running), "running"))
 			},
 			render: func(keep int) []string {
 				rows := make([]string, 0, keep)
@@ -964,7 +977,7 @@ func (f *frame) below(s *treeSpan, depth int) {
 			}})
 	}
 	if folded != nil && folded.ok.len() > 0 {
-		f.row(depth, g.ok+" "+folded.ok.drawn(f.now))
+		f.row(depth, g.mark(roleOK, g.ok)+" "+folded.ok.drawn(f.now))
 	}
 }
 
@@ -1010,12 +1023,14 @@ func longest(running []*treeSpan, k int, start time.Time) []*treeSpan {
 	return top
 }
 
-// target is the row of a running target: its name, how long it has run,
-// and what it waits for now, or the last line of its output.
+// target is the row of a running target: the running mark, a spinner's
+// frame in a theme that has one, its name, how long it has run, and what
+// it waits for now, or the last line of its output.
 func (f *frame) target(s *treeSpan) string {
-	text := f.t.g.running + " " + s.name
+	g := f.t.g
+	text := g.spinner(f.now.Sub(f.t.start)) + " " + s.name
 	inner := f.innermost(s)
-	text += "  " + f.took(s, inner)
+	text += "  " + g.paint(roleMuted, f.took(s, inner))
 	switch {
 	case s.flags&progress.ShowLines != 0 && s.line != "":
 		text += "  " + s.line
@@ -1085,24 +1100,10 @@ func describe(s, of *treeSpan) string {
 
 // standingOf says how the targets of a step or a batch stand: how many are
 // done, of how many, and how many of them failed, were interrupted or left
-// out, run and wait.
-func standingOf(c progress.Count, g glyphs) string {
-	parts := []string{fmt.Sprintf("%d/%d", c.Done, c.Total)}
-	for _, n := range []struct {
-		n    int
-		what string
-	}{
-		{c.Failed, "failed"},
-		{c.Canceled, "canceled"},
-		{c.Skipped, "skipped"},
-		{c.Running, "running"},
-		{c.Queued, "queued"},
-	} {
-		if n.n > 0 {
-			parts = append(parts, fmt.Sprintf("%d %s", n.n, n.what))
-		}
-	}
-	return strings.Join(parts, g.sep)
+// out, run and wait, each of those in its colour.
+func standingOf(c progress.Count, g look) string {
+	parts := append([]string{fmt.Sprintf("%d/%d", c.Done, c.Total)}, g.counts(c)...)
+	return strings.Join(parts, g.paint(roleMuted, g.sep))
 }
 
 // runTime reads how long a span has run, in tenths of a second, so that a

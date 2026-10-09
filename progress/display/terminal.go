@@ -39,6 +39,11 @@
 // the drawing Start begins. The Summary is a sink alone, with nothing to
 // start or close, whose Line the program writes once the display is
 // closed.
+//
+// A display draws in no colour unless the program gives it a Theme, one of
+// Themes, drawn in 256 colours, in the terminal's own 16, or in none, its
+// art alone. Whether to draw in colour is the program's to decide: the
+// package reads no environment, NO_COLOR and TERM included.
 package display
 
 import (
@@ -475,6 +480,12 @@ func (t *Terminal) draw(rows []string) {
 	b.WriteString(eraseLine)
 	for range len(t.rows) - 1 {
 		b.WriteString(eraseLineAbove)
+	}
+	if strings.IndexByte(held, 0x1b) >= 0 || slices.ContainsFunc(cutRows, func(row string) bool { return strings.IndexByte(row, 0x1b) >= 0 }) {
+		// A frame drawn in a theme starts from no colour, so that a
+		// colour the command left on does not tint what the theme leaves
+		// in the terminal's own.
+		b.WriteString(reset)
 	}
 	b.WriteString(held)
 	b.WriteString(strings.Join(cutRows, "\n"))

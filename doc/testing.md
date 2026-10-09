@@ -98,8 +98,20 @@ colour.
 The tests of each display cover a wide fan-out, failures that group, a hidden
 span that turns slow, a step that fails at once, a power-on in batches, two
 steps side by side, a terminal too small for the tree, the ASCII marks, an
-interrupt, a question and a write in the middle of a frame. The contract
-tests of `progress/display` put them together, as a program sees them: a
+interrupt, a question and a write in the middle of a frame. Every display is
+also drawn in themes, in each number of colours and in ASCII, on a Screen
+with `Styles`: a themed row never wraps at any width from 40 columns to 120,
+no row or line ends in a colour, and plain lines and the summary say the
+same words with the colours and their mark taken out. With the zero `Theme`
+every display writes what it wrote before, byte for byte, which the tests
+written before themes hold it to. Every glyph of every theme is held to one
+column, to an East Asian Width that is not ambiguous, and to no emoji, nor
+any rune Unicode keeps for emoji to come. The palettes are held to decision
+19: those of 256 colours to a middle lightness, an L* of 45 to 60, with the
+failed end of a bar a ΔE of 20 or more from the rest of it, as readers with
+deuteranopia or protanopia see it too; those of 16 to the terminal's own
+colours, never bright and never bold with a colour. The contract tests of
+`progress/display` put them together, as a program sees them: a
 pool, the command's output and questions, and a Screen, on which the counter
 and the tree are taken off before every write and never drawn over a
 question, and leave the command's output and their summary behind. The

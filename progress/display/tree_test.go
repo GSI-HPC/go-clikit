@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -42,10 +43,13 @@ type treeFixture struct {
 }
 
 // treeSetup is the terminal a tree is drawn on: 100 columns and 24 rows
-// unless it says otherwise.
+// unless it says otherwise. styles has the screen apply the colours of the
+// theme the tree is drawn in, which its Styled shows.
 type treeSetup struct {
 	width, height int
 	ascii         bool
+	theme         display.Theme
+	styles        bool
 	interrupted   <-chan struct{}
 }
 
@@ -58,9 +62,9 @@ func newTreeFixture(t *testing.T, command string, o treeSetup) *treeFixture {
 	}
 	// A row drawn wider than the terminal wraps on the screen, as it
 	// would on a terminal, so a test sees it.
-	f.screen = &progresstest.Screen{Width: f.width}
+	f.screen = &progresstest.Screen{Width: f.width, Styles: o.styles}
 	f.term = display.NewTerminal(f.screen, display.TerminalOptions{Size: f.size})
-	f.tree = display.NewTree(f.term, display.TreeOptions{Now: f.clock.Now, ASCII: o.ascii, Interrupted: o.interrupted})
+	f.tree = display.NewTree(f.term, display.TreeOptions{Now: f.clock.Now, ASCII: o.ascii, Theme: o.theme, Interrupted: o.interrupted})
 	f.summary = &display.Summary{}
 	f.capture = &progresstest.Capture{}
 	f.bus = progress.NewBus(progress.BusOptions{Sinks: []progress.Sink{f.capture, f.tree, f.summary}, Now: f.clock.Now})
@@ -610,6 +614,21 @@ exec · 0:02.0
 	checkScreen(t, f.draw(time.Second), `
 run · 0/3 · 1 running · 2 queued · 0:0
 `)
+	// In a theme the counter's line is drawn in it, as a Counter in that
+	// theme draws it, and cut to the width with its colours set back.
+	themed := newTreeFixture(t, "exec", treeSetup{width: 100, height: 7, theme: display.Neon, styles: true})
+	ctx, _ = progress.Start(themed.ctx, progress.KindStep, "run", progress.WithFlags(progress.Fold), progress.Total(3))
+	_, spans = targets(ctx, nodes(3)...)
+	spans[0].Run()
+	themed.draw(time.Second)
+	checkScreen(t, themed.screen.Styled(), `
+«38;5;135»◷«» «1»run«38;5;103» ⋄ ▱▱▱▱▱▱▱▱«» 0/3«38;5;103» ⋄ «38;5;135»1 running«38;5;103» ⋄ 2 queued ⋄ «1;38;5;134»0:01.0«»
+`)
+	themed.resize(39, 40)
+	themed.draw(time.Second)
+	checkScreen(t, themed.screen.Styled(), `
+«38;5;135»◶«» «1»run«38;5;103» ⋄ «»0/3«38;5;103» ⋄ «38;5;135»1 running«38;5;103» ⋄ 2 queued ⋄ «1;38;5;134»0«»
+`)
 }
 
 // Outside a UTF-8 locale the tree is drawn in ASCII alone, and so is the
@@ -1136,6 +1155,38 @@ func TestTheLinesOfStepsLeftOutAndInterrupted(t *testing.T) {
 – disarming  skipped: nothing was armed
 ⊘ configuring the network boot  1.0s
 provision reinstall · 0:02.0
+`)
+}
+
+// Steps that run side by side under the same step each name their own path
+// in the line they leave, however deep they are: neither takes the other's
+// name, though their paths share the steps above them.
+func TestStepsSideBySideNameTheirOwnPaths(t *testing.T) {
+	t.Parallel()
+	f := newTreeFixture(t, "deploy", treeSetup{})
+	ctx := f.ctx
+	var above []*progress.Span
+	for _, name := range []string{"cluster", "rack", "chassis"} {
+		var step *progress.Span
+		ctx, step = progress.Start(ctx, progress.KindStep, name)
+		above = append(above, step)
+	}
+	_, first := progress.Start(ctx, progress.KindStep, "blade 1")
+	_, second := progress.Start(ctx, progress.KindStep, "blade 2")
+	f.draw(time.Second)
+	f.clock.Add(100 * time.Millisecond)
+	first.End(nil)
+	second.End(nil)
+	for _, step := range slices.Backward(above) {
+		step.End(nil)
+	}
+	checkScreen(t, f.draw(0), `
+✓ cluster › rack › chassis › blade 1  1.1s
+✓ cluster › rack › chassis › blade 2  1.1s
+✓ cluster › rack › chassis  1.1s
+✓ cluster › rack  1.1s
+✓ cluster  1.1s
+deploy · 0:01.1
 `)
 }
 

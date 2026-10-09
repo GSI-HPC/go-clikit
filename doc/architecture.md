@@ -174,6 +174,7 @@ The kit knows no program. What depends on one is a parameter or a hook:
 | The terminal's size, whether the process is in its foreground, whether its locale shows UTF-8, and the interrupt | `display.TerminalOptions`, the `ASCII` options, `display.TreeOptions.Interrupted` |
 | The trace another program handed on | `progress.BusOptions.Trace`, as `progress.ParseTraceContext` reads it from the values the program read from `TRACEPARENT` and `TRACESTATE` |
 | Where a panic's stack goes | the `PanicLog` options |
+| How the displays look: a theme, in how many colours, or none | `display.TreeOptions.Theme`, `display.CounterOptions.Theme`, `display.PlainOptions.Theme` and `display.Summary.Theme`, one of `display.Themes`, which `display.ParseTheme` reads, drawn in 256 colours, `Colours16` or `NoColours` by `Theme.In`; the zero `Theme` draws in no colour, as before (decisions 19 and 20) |
 
 A Bus hands on what it was told: `Bus.Program`, `Bus.PanicLog` and
 `Bus.Classify` answer for the Bus that `progress.BusFrom` finds in a
@@ -188,9 +189,11 @@ rule that tells an item canceled is the one that classes its target, so
 the step and its targets agree (decision 12).
 
 What stays in the program: its flags and environment variables, which display
-to draw and whether the terminal can show one, its exit codes, and reading
-the environment. The kit reads no variable and sets nothing process-wide, so
-two Buses in one process, one per call of a server, share no state.
+to draw and whether the terminal can show one, whether to draw in colour and
+in how many colours (from NO_COLOR, TERM, COLORTERM and whether standard
+error is a terminal), its exit codes, and reading the environment. The kit
+reads no variable and sets nothing process-wide, so two Buses in one
+process, one per call of a server, share no state.
 
 ## Standard error
 

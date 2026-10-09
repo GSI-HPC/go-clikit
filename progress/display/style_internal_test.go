@@ -59,31 +59,17 @@ func TestCutOfPlainTextIsTruncate(t *testing.T) {
 
 // The Terminal cuts a row by the columns it shows, so that a row drawn in
 // colour fills the width without wrapping, and sets the colour back where
-// it cut one short.
+// it cut one short. A frame drawn in colour starts from none, so that a
+// colour the command left on does not tint it.
 func TestTheTerminalCutsAColouredRowByWhatItShows(t *testing.T) {
 	var b strings.Builder
 	term := NewTerminal(&b, TerminalOptions{Size: func() (int, int, error) { return 6, 10, nil }})
 	term.attach(nil)
 	term.draw([]string{"\x1b[32m✓\x1b[0m exe0001", "\x1b[31m✗ exe0002\x1b[0m"})
-	want := eraseLine + "\x1b[32m✓\x1b[0m exe\x1b[0m\n\x1b[31m✗ exe\x1b[0m"
+	want := eraseLine + reset + "\x1b[32m✓\x1b[0m exe\x1b[0m\n\x1b[31m✗ exe\x1b[0m"
 	if got := b.String(); got != want {
 		t.Errorf("the terminal wrote %q, want %q", got, want)
 	}
-}
-
-// visible returns row without its sequences of attributes, as cut finds
-// them: the text a terminal shows.
-func visible(row string) string {
-	var b strings.Builder
-	for i := 0; i < len(row); {
-		if seq := sgr(row[i:]); seq != "" {
-			i += len(seq)
-			continue
-		}
-		b.WriteByte(row[i])
-		i++
-	}
-	return b.String()
 }
 
 // FuzzCut checks that cut keeps of a row's text what termtext.Truncate

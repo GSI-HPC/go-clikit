@@ -28,6 +28,8 @@ names it.
 | [16](#16-a-large-set-of-targets-is-folded-again-once-a-second) | A large set of targets is folded again once a second | accepted |
 | [17](#17-the-cost-tests-run-in-ci-alone) | The cost tests run in CI, alone | accepted |
 | [18](#18-the-live-clocks-tick-in-tenths-of-a-second) | The live clocks tick in tenths of a second | accepted |
+| [19](#19-the-displays-draw-in-themes-the-program-picks) | The displays draw in themes the program picks | accepted |
+| [20](#20-a-themes-look-may-change-in-a-minor-release) | A theme's look may change in a minor release | accepted |
 
 ## 1. Apache-2.0, and GSI holds the copyright
 
@@ -898,3 +900,107 @@ told at a glance from a display that has stopped drawing.
 - The text the displays draw changes: a consumer's test that compares
   frames sees `0:41.0` and `4.0s` where it saw `0:41` and `4s`. Decision 5
   makes that a breaking change, named in the release notes.
+
+## 19. The displays draw in themes the program picks
+
+Status: accepted
+
+### Context
+
+The displays drew in no colour, with one set of marks, or in ASCII outside
+a UTF-8 locale. People who watch them all day asked for colour, and for
+marks, spinners and bars that tell a failure, a run and the share done at
+a glance. A terminal draws colour through sequences (SGR, ESC [ … m) that
+`termtext` counts as columns and `progresstest.Screen` showed as text, so a
+row drawn in colour was cut short or wrapped. Which colours read well
+depends on the terminal: how many it shows, its background, and whether
+its user set NO_COLOR, none of which the kit reads (it reads no
+environment). Glyphs have their own traps: a character of ambiguous East
+Asian Width is drawn two columns wide in a CJK locale, some are drawn as
+emoji pictures, and fonts lack some, DejaVu Sans Mono all of braille.
+
+### Decision
+
+- `display.Theme` is a comparable value whose zero value is no theme, which
+  draws byte for byte what the displays drew. There are five themes,
+  `Classic`, `Aurora`, `Ember`, `Neon` and `Tide`; `Themes`, `ParseTheme`
+  and the text methods serve a flag such as `--theme`.
+- `Theme.In` draws a theme in the 256 colours it is designed in, the zero
+  `Colours`, in the terminal's own 16, or in none, its art alone, for
+  NO_COLOR. The program decides from its flags, NO_COLOR, TERM, COLORTERM
+  and whether standard error is a terminal; the kit reads none of them.
+- `TreeOptions`, `CounterOptions` and `PlainOptions` take a `Theme`, and
+  `Summary` a `Theme` and `ASCII`. `ASCII` stays the switch for the
+  character set: with a theme it keeps the theme's colours and draws ASCII
+  marks, a bar of `[###...]`, no spinner and no guide.
+- The tree and the counter draw a theme's art: its marks and separators, a
+  spinner on each running target and in front of the counter's line, a bar
+  on each counted step that gives way when the counts would not fit, and a
+  guide at the innermost indent. Plain lines and the summary take its
+  colours and one mark in front, and keep their words, punctuation and
+  paths, so that what a log holds does not change.
+- Colour goes on marks, count words, the clock, bars, titles and
+  separators. Names, errors, requests and output lines stay in the
+  terminal's own colour, and colour is never the only signal: every status
+  has a mark and a word of its own.
+- Every glyph of a theme takes one column, is of East Asian Width neutral
+  or narrow, never ambiguous, and is no emoji, nor a rune Unicode keeps for
+  emoji to come. No theme sets a background, reverse video, italic or
+  blink. The palettes of 256 colours
+  keep to a middle lightness, an L* of 45 to 60, which reads on light and
+  dark backgrounds, though some of their colours are as vivid as any; and
+  the cells of a bar that stand for the targets that failed, which only
+  their colour sets apart, differ from the rest of the bar by a ΔE of 20 or
+  more as readers with deuteranopia or protanopia see them too. Those of 16
+  use red, green, yellow, cyan and magenta, bold and faint, never bold with
+  a colour and never the bright colours, which some palettes make grey.
+  Tests hold every theme to all of this.
+- Every painted piece sets its colour back, so that no row and no line ends
+  in a colour; the Terminal cuts a row by the columns it shows, and starts a
+  frame drawn in colour by setting colours back. `progresstest.Screen`
+  applies colours when its `Styles` is set, and `Styled` shows them.
+
+### Costs
+
+- A theme in 256 colours on a terminal that shows 16 draws other colours,
+  or none; the program steps it down with `In(Colours16)` from what TERM
+  says.
+- Aurora's braille is drawn from a fallback font where the terminal's font
+  lacks it, as DejaVu Sans Mono does; FreeMono and DejaVu Sans have it.
+- A theme's colours cost bytes: over a run of 48 targets the tree wrote
+  1.5 to 1.9 times as many in a theme of 256 colours as in none, and the
+  counter's line, which is short, up to 3 times.
+- The API grows by `Theme`, `Colours`, five variables a program could
+  assign to and should not, as `io.EOF`, and two fields of `Summary`.
+- The look of no theme keeps `·`, `…` and `–`, which are of ambiguous
+  width: changing them would change every consumer's frames.
+
+## 20. A theme's look may change in a minor release
+
+Status: accepted
+
+### Context
+
+Decision 5 makes a change to the text consumers compare in their tests a
+breaking change. A theme is art: its glyphs and colours will be tuned as
+people use it, on terminals, fonts and palettes the first release did not
+try, and holding them to the rule for text would freeze them.
+
+### Decision
+
+- What the displays draw with the zero Theme stays the text consumers
+  compare: changing it is a breaking change, as decision 5 has it.
+- A theme's colours, marks, separators, spinner, bar and guides may change
+  in a minor release, which names the change in its release notes. Its
+  name, and the words and numbers a display draws in it, may not: removing
+  or renaming a theme is a breaking change, and adding one is not.
+- A consumer that tests a display drawn in a theme checks the words and
+  numbers it draws, such as a count or a target's name in what
+  `progresstest.Screen` shows, rather than comparing its frames byte for
+  byte, or pins the release. The kit exports nothing that takes a theme's
+  art out of a frame, since the art is what may change.
+
+### Costs
+
+- A consumer's test that compares the frames of a theme byte for byte can
+  break in a minor release.

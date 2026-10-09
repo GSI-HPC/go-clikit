@@ -30,17 +30,9 @@ func cut(row string, cols int) string {
 	if strings.IndexByte(row, 0x1b) < 0 {
 		return termtext.Truncate(row, cols)
 	}
-	var text strings.Builder
-	for i := 0; i < len(row); {
-		if seq := sgr(row[i:]); seq != "" {
-			i += len(seq)
-			continue
-		}
-		text.WriteByte(row[i])
-		i++
-	}
-	keep := len(termtext.Truncate(text.String(), cols))
-	if keep == text.Len() {
+	text := visible(row)
+	keep := len(termtext.Truncate(text, cols))
+	if keep == len(text) {
 		return row
 	}
 	var b strings.Builder
@@ -73,4 +65,22 @@ func sgr(s string) string {
 		}
 	}
 	return ""
+}
+
+// visible returns row without its sequences of attributes, as cut finds
+// them: the text a terminal shows of it.
+func visible(row string) string {
+	if strings.IndexByte(row, 0x1b) < 0 {
+		return row
+	}
+	var b strings.Builder
+	for i := 0; i < len(row); {
+		if seq := sgr(row[i:]); seq != "" {
+			i += len(seq)
+			continue
+		}
+		b.WriteByte(row[i])
+		i++
+	}
+	return b.String()
 }
