@@ -71,6 +71,7 @@ mise install          # Go and golangci-lint at the versions CI uses
 make lint             # golangci-lint v2 (.golangci.yml, gofmt + goimports)
 make test             # go test -race ./...
 make floor            # vet and test with the go line of go.mod
+make vet-other        # go vet for Windows and Plan 9, whose files no test runs
 make costs            # the live tree's cost tests, without the race detector, as CI runs them
 make cover            # go-test-coverage: every file at 100% (.testcoverage.yml)
 make fuzz             # every fuzz target for 60 s, as CI runs them (FUZZTIME, FUZZ)
