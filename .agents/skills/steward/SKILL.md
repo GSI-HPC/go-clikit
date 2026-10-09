@@ -15,7 +15,7 @@ description: Drive a go-clikit pull request to a mergeable state. Covers the loc
 
 ## Before every push
 
-1. `make lint` reports 0 issues.
+1. `make lint` reports 0 issues, and `make vet-other` passes.
 2. `make test` and `make floor` pass: the tests under the race detector, and
    vet and tests with the Go release `go.mod` names. A change to a display
    also passes on macOS in CI.
@@ -47,7 +47,7 @@ description: Drive a go-clikit pull request to a mergeable state. Covers the loc
 | Costs | `make costs`: the cost tests of the live tree, without the race detector, alone on their runner; each logs how many times as long its larger size took, and its limit |
 | Coverage | go-test-coverage against `.testcoverage.yml` |
 | Fuzz (FuzzEscape), Fuzz (FuzzTruncate), Fuzz (FuzzSanitize), Fuzz (FuzzCut) | `make fuzz` with one target for 60 s; a failing input is uploaded as the `fuzz-corpus-<target>` artifact, to be committed under the package's `testdata/fuzz/` |
-| Lint | `make tidy` leaves `go.mod` and `go.sum` unchanged, golangci-lint (depguard enforces decision 3) |
+| Lint | `make tidy` leaves `go.mod` and `go.sum` unchanged, `make vet-other`, golangci-lint (depguard enforces decision 3) |
 | Markdown | `make lint-docs` |
 | REUSE | `reuse lint` |
 | Vulnerabilities | govulncheck on the current line |
