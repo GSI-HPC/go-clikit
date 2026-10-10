@@ -32,6 +32,15 @@ import (
 // line says nothing of why a target failed: the command's error says that,
 // once, after it.
 //
+// When the work the command's spans reported, rolled up by a
+// progress.Meter, is all in one unit, the line ends with the total amount
+// and the average rate, which the targets' counts need not have:
+//
+//	deploy: failed in 20m33s: 479 ok, 1 failed, 958 GiB at 796 MiB/s
+//
+// Work in two units says nothing, as amounts in different units are never
+// added, and work in progress.Percent has no amount to say.
+//
 // In a Theme, the line takes the theme's colours and, in front, the mark of
 // how the command ended, and keeps its words and punctuation. In Classic:
 //
@@ -64,6 +73,13 @@ type Summary struct {
 	// Totals of what was left out.
 	nodes map[string]progress.Status
 	left  outcomes
+	// meter rolls up the work of the spans; worked is what the command's
+	// came to, when it had any, and units the units of work the spans
+	// reported.
+	meter   progress.Meter
+	worked  progress.Reading
+	hasWork bool
+	units   map[progress.Unit]struct{}
 }
 
 // outcomes counts targets by how they ended.
@@ -77,12 +93,20 @@ func (s *Summary) Handle(e progress.Event) {
 		s.roots = map[progress.SpanID]*outcomes{}
 		s.under = map[progress.SpanID]progress.SpanID{}
 		s.nodes = map[string]progress.Status{}
+		s.units = map[progress.Unit]struct{}{}
 	}
 	count, counted := s.tally.Add(e)
+	worked, hasWork := s.meter.Add(e)
+	if e.Unit != 0 {
+		s.units[e.Unit] = struct{}{}
+	}
 	switch e.Type {
 	case progress.TypeStart:
 		s.begin(e)
 	case progress.TypeEnd:
+		if e.Span == s.command {
+			s.worked, s.hasWork = worked, hasWork
+		}
 		s.finish(e, count, counted)
 	}
 }
@@ -210,10 +234,19 @@ func (s *Summary) Line() string {
 	if s.Theme.art != nil {
 		line = l.endMark(s.status) + " " + line
 	}
-	if ok+all.failed+all.canceled+all.skipped == 0 {
-		return line
+	sep := ": "
+	if ok+all.failed+all.canceled+all.skipped > 0 {
+		line += sep + tallied(l, ok, all.failed, all.canceled, all.skipped)
+		sep = ", "
 	}
-	return line + ": " + tallied(l, ok, all.failed, all.canceled, all.skipped)
+	// The work of the command is its amount and its mean rate, when all of
+	// it is in one unit: amounts in different units are never added.
+	if s.hasWork && len(s.units) == 1 {
+		if done := endedText(l, s.worked); done != "" {
+			line += sep + done
+		}
+	}
+	return line
 }
 
 // took reads a length of time the way a person says it: tenths of a second,

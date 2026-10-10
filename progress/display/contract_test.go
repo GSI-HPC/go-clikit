@@ -401,10 +401,11 @@ prog: slurm node drain: done in 3.0s
 	}
 }
 
-// The work a span reports, which the counter does not draw yet, changes
-// nothing it draws: a session whose calls advance their work draws the
-// frames and leaves the lines of one whose calls report none.
-func TestWorkChangesNoFrameOfTheCounter(t *testing.T) {
+// The work a span reports adds to what the counter draws and the lines it
+// leaves, and takes nothing from them: a session whose calls advance their
+// work draws the frames of one whose calls report none, with the work of
+// the step after its counts, and the summary leaves what it moved.
+func TestWorkAddsToTheFramesOfTheCounter(t *testing.T) {
 	t.Parallel()
 	var frames [2][]string
 	var ends [2]string
@@ -428,9 +429,27 @@ func TestWorkChangesNoFrameOfTheCounter(t *testing.T) {
 		ends[i] = s.end(t, nil)
 		frames[i] = s.frames
 	}
-	if !slices.Equal(frames[0], frames[1]) || ends[0] != ends[1] {
-		t.Errorf("with work:\n%s\n%s\nwithout:\n%s\n%s",
-			strings.Join(frames[1], "\n"), ends[1], strings.Join(frames[0], "\n"), ends[0])
+	if want := []string{
+		"copy · 0/2 · 1 running · 1 queued · 0:01.0\n",
+		"copy · 0/2 · 1 running · 1 queued · 0:02.0\n",
+		"copy · 1/2 · 1 running · 0:03.0\n",
+		"copy · 1/2 · 1 running · 0:04.0\n",
+	}; !slices.Equal(frames[0], want) {
+		t.Errorf("without work:\n%s", strings.Join(frames[0], "\n"))
+	}
+	if want := []string{
+		"copy · 0/2 · 1 running · 1 queued · 1.0 GiB · 25% · 0.0 B/s · 0:01.0\n",
+		"copy · 0/2 · 1 running · 1 queued · 2.0 GiB · 50% · 512 MiB/s · ~4s left · 0:02.0\n",
+		"copy · 1/2 · 1 running · 3.0 GiB · 75% · 683 MiB/s · ~2s left · 0:03.0\n",
+		"copy · 1/2 · 1 running · 4.0 GiB · 99% · 768 MiB/s · ~1s left · 0:04.0\n",
+	}; !slices.Equal(frames[1], want) {
+		t.Errorf("with work:\n%s", strings.Join(frames[1], "\n"))
+	}
+	if want := "prog: fetch: done in 4.0s: 2 ok, 4.0 GiB at 1.0 GiB/s\n"; !strings.HasSuffix(ends[1], want) {
+		t.Errorf("the summary is not the last line of\n%s", ends[1])
+	}
+	if want := "prog: fetch: done in 4.0s: 2 ok\n"; !strings.HasSuffix(ends[0], want) {
+		t.Errorf("the summary is not the last line of\n%s", ends[0])
 	}
 }
 
@@ -439,7 +458,39 @@ func TestWorkChangesNoFrameOfTheCounter(t *testing.T) {
 // into it, and draws a frame: six copies have ended, one failed, four run,
 // each at its own rate, and one is queued.
 func copyImage(f *treeFixture) {
-	ctx, _ := progress.Start(f.ctx, progress.KindStep, "copying the image",
+	copyImageOn(f.ctx, f.clock)
+	f.draw(0)
+}
+
+// pool is the step copyImageOn runs and what runs in it.
+type pool struct {
+	step *progress.Span
+	// targets and calls are the four copies under way, with the targets
+	// they are made for, and queued is the target still waiting.
+	targets, calls []*progress.Span
+	queued         *progress.Span
+}
+
+// finish ends the copies under way a second after the clock c, well, each
+// having moved another GiB, and then the target that waited, which ends at
+// once, and the step.
+func (p pool) finish(c *clock) {
+	c.Add(time.Second)
+	for i, call := range p.calls {
+		call.Advance(1 << 30)
+		call.End(nil)
+		p.targets[i].End(nil)
+	}
+	p.queued.Run()
+	p.queued.End(nil)
+	p.step.End(nil)
+}
+
+// copyImageOn runs the pool of copyImage under ctx, on the clock c that the
+// Bus reads, and returns it with the step still open: six copies have
+// ended, one failed, four run, each at its own rate, and one is queued.
+func copyImageOn(ctx context.Context, c *clock) pool {
+	ctx, step := progress.Start(ctx, progress.KindStep, "copying the image",
 		progress.WithFlags(progress.Fold), progress.Total(12), progress.Limit(4))
 	ctxs, spans := targets(ctx, nodes(12)...)
 	copying := func(i int) *progress.Span {
@@ -450,7 +501,7 @@ func copyImage(f *treeFixture) {
 	for i := range 7 {
 		call := copying(i)
 		if i == 3 {
-			f.clock.Add(time.Second)
+			c.Add(time.Second)
 			call.Advance(1 << 29)
 			err := unreachable("transport: dial tcp: i/o timeout")
 			call.End(err)
@@ -458,7 +509,7 @@ func copyImage(f *treeFixture) {
 			continue
 		}
 		for range 4 {
-			f.clock.Add(time.Second)
+			c.Add(time.Second)
 			call.Advance(1 << 29)
 		}
 		call.End(nil)
@@ -469,12 +520,12 @@ func copyImage(f *treeFixture) {
 		calls = append(calls, copying(i))
 	}
 	for range 10 {
-		f.clock.Add(time.Second)
+		c.Add(time.Second)
 		for j, call := range calls {
 			call.Advance(int64(j+1) << 26)
 		}
 	}
-	f.draw(0)
+	return pool{step: step, targets: spans[7:11], calls: calls, queued: spans[11]}
 }
 
 // The rows of the tree draw the work of their spans: the step's after how
