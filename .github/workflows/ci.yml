@@ -121,8 +121,9 @@ jobs:
             exit 1
           fi
 
-      # The files built for systems that are not Unix are compiled here and
-      # run nowhere, since every test job runs on Linux or macOS.
+      # The files built for systems that are not Unix, such as
+      # progress/cliprogress's *_other.go, are compiled here and run nowhere
+      # (doc/decisions.md, decision 22).
       - name: Vet for systems that are not Unix
         run: make vet-other
 

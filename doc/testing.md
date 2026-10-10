@@ -121,6 +121,31 @@ display's end, and against its bound; a stress test has four goroutines write
 questions and the counter draws, and checks that every line arrived whole, on
 a row of its own, in its writer's order, and none inside a question.
 
+## The command line
+
+`progress/cliprogress` is tested from outside the package, as a program uses
+it. `Choose` has a table of what the flag and the variable ask for on a
+terminal, on a dumb one and in a pipe, with every error and note it returns.
+`Start` runs with `Options.Manual` on a `progresstest.Screen` that the
+Options call a terminal of 80 columns, on a clock the test moves, and
+`Run.Draw` draws each frame; one test starts the tree's own goroutine in a
+`testing/synctest` bubble, and sees it say the command was interrupted.
+
+The private file of the event log is tested inside the package, through
+`appendPrivate(path, me)`, whose `me` is the user the file has to be. A test
+run as another user than root passes its own uid plus one to stand for
+someone else; one run as root gives the file, the link or the pipe to nobody,
+uid 65534, with `Chown`, or `Lchown` for a link. So every refusal runs on a
+CI runner, as root or not, and a test can run in parallel with the others.
+A link or a named pipe that another user would put at the log's name after
+the walk of its path is put there between `trustedLinks` and `openPrivate`,
+the walk and the open `appendPrivate` makes.
+
+A pseudo-terminal opened through `/dev/ptmx`, with the standard library's
+`syscall`, holds `TerminalSize` and `InForeground` to a real terminal on
+Linux. A terminal that is not the process's controlling terminal cannot say
+who its foreground is, and is taken to be the process's.
+
 ## The pools
 
 A fake that answers at once rarely has two calls under way together, so a
@@ -213,4 +238,6 @@ is compiled but not run.
 
 Every file stays at 100% of its statements, which `.testcoverage.yml` holds
 it to in CI. A branch no test can reach is deleted, not excluded: it is code
-nobody can show works.
+nobody can show works. The files built for systems that are not Unix,
+`*_other.go`, are not in the profile, which is Linux's: `make vet-other`
+compiles them, and nothing runs them.
