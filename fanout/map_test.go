@@ -226,6 +226,101 @@ func TestMapReportsItsWork(t *testing.T) {
 	}
 }
 
+// targetStart returns the start event of the target named name.
+func targetStart(t *testing.T, events []progress.Event, name string) progress.Event {
+	t.Helper()
+	for _, e := range events {
+		if e.Type == progress.TypeStart && e.Kind == progress.KindTarget && e.Name == name {
+			return e
+		}
+	}
+	t.Fatalf("no start of target %s among %d events", name, len(events))
+	return progress.Event{}
+}
+
+// An item's Unit and Size are the work its target starts with: a zero Unit
+// is none, a size below zero is one not known, and percent is out of 100.
+func TestMapStartsATargetWithTheWorkOfItsItem(t *testing.T) {
+	t.Parallel()
+
+	for _, tc := range []struct {
+		name string
+		item fanout.Item
+		unit progress.Unit
+		size int64
+	}{
+		{"unsized", fanout.Item{Node: "exe1"}, 0, 0},
+		{"sized", fanout.Item{Node: "exe1", Unit: progress.Bytes, Size: 2 << 30}, progress.Bytes, 2 << 30},
+		{"size not known", fanout.Item{Node: "exe1", Unit: progress.Bytes, Size: -1}, progress.Bytes, 0},
+		{"unit without a size", fanout.Item{Node: "exe1", Unit: progress.Items}, progress.Items, 0},
+		{"percent", fanout.Item{Node: "exe1", Unit: progress.Percent}, progress.Percent, 100},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			ctx, w := progresstest.Watch(context.Background(), t)
+			fanout.Map(ctx, []fanout.Item{tc.item}, fanout.MapOptions[fanout.Item]{Step: "copy",
+				Describe: func(i fanout.Item) fanout.Item { return i }},
+				func(context.Context, fanout.Item) (struct{}, error) { return struct{}{}, nil })
+			start := targetStart(t, w.Events(), "exe1")
+			if start.Unit != tc.unit || start.Size != tc.size {
+				t.Errorf("target starts with unit %v and size %d, want unit %v and size %d",
+					start.Unit, start.Size, tc.unit, tc.size)
+			}
+		})
+	}
+}
+
+// mapAllocsPerItem is what Map allocates for each item when no Bus watches,
+// its own bookkeeping alone: the spans an item reports must cost nothing.
+const mapAllocsPerItem = 3
+
+// TestMapWithoutABusAllocatesOnlyItsBookkeeping holds Map to the promise
+// that spans nobody watches cost nothing: the allocations an item adds,
+// sized or not, are those of Map's own bookkeeping.
+func TestMapWithoutABusAllocatesOnlyItsBookkeeping(t *testing.T) {
+	for _, unit := range []progress.Unit{0, progress.Bytes} {
+		allocs := func(n int) float64 {
+			items := make([]fanout.Item, n)
+			for i := range items {
+				items[i] = fanout.Item{Node: "exe1", Unit: unit, Size: 4096}
+			}
+			opts := fanout.MapOptions[fanout.Item]{Describe: func(i fanout.Item) fanout.Item { return i }}
+			return testing.AllocsPerRun(10, func() {
+				fanout.Map(context.Background(), items, opts,
+					func(context.Context, fanout.Item) (struct{}, error) { return struct{}{}, nil })
+			})
+		}
+		if more := allocs(200) - allocs(100); more > 100*mapAllocsPerItem {
+			t.Errorf("unit %v: 100 more items without a Bus allocate %v more times, want at most %d",
+				unit, more, 100*mapAllocsPerItem)
+		}
+	}
+}
+
+// A queued target is bounded before its place is taken: with a limit of one,
+// the second item's target is announced with its work while the first item's
+// target is still to run, and the step's total is the same either way.
+func TestMapBoundsATargetBeforeItRuns(t *testing.T) {
+	t.Parallel()
+
+	ctx, w := progresstest.Watch(context.Background(), t)
+	items := []fanout.Item{
+		{Node: "exe1"},
+		{Node: "exe2", Unit: progress.Bytes, Size: 4096},
+	}
+	fanout.Map(ctx, items, fanout.MapOptions[fanout.Item]{Step: "copy", Limit: 1,
+		Describe: func(i fanout.Item) fanout.Item { return i }},
+		func(context.Context, fanout.Item) (struct{}, error) { return struct{}{}, nil })
+	start := targetStart(t, w.Events(), "exe2")
+	if start.State != progress.StateQueued {
+		t.Errorf("target exe2 starts %v, want queued", start.State)
+	}
+	if start.Unit != progress.Bytes || start.Size != 4096 {
+		t.Errorf("queued target exe2 starts with unit %v and size %d, want bytes and 4096", start.Unit, start.Size)
+	}
+}
+
 // An Item without a Node names its target as fmt.Sprint prints the item,
 // and keeps the rest of what Describe said.
 func TestMapNamesAnItemWithoutANodeAsItPrints(t *testing.T) {
