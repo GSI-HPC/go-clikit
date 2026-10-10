@@ -27,6 +27,13 @@
 //     its Total, however they ended, so a counter always reaches its total;
 //     no count passes its Total, and a Total never shrinks.
 //   - No more targets run at once below a span than its Limit.
+//
+// The work of a span is held to rules too: an advance names a span that is
+// running and changes its Amount, two advances of a span come at least
+// 100 ms apart by their times, Amount and Size are never negative, a span
+// in progress.Percent has a Size of 100, and the Unit of a span never
+// changes once given. Capture keeps every advance the Bus sends, and Tree
+// draws the work of a span after its other fields.
 package progresstest
 
 import (
@@ -37,6 +44,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 	"unicode"
 	"unicode/utf8"
 
@@ -175,7 +183,8 @@ func newBus(capture *Capture, opts []Option) *progress.Bus {
 //
 // Tests compare trees whole, so the format is kept: a field is drawn only
 // when it has a value, and a field added to progress.Fields is drawn after
-// those drawn before it. Changing how an existing field is drawn changes
+// those drawn before it. The work of a span comes after its message, as
+// amount=2147483648 size=2147483648 unit=bytes. Changing how an existing field is drawn changes
 // what every such test compares.
 func (c *Capture) Tree() string {
 	return tree(c.Events())
@@ -200,7 +209,7 @@ func tree(events []progress.Event) string {
 			} else {
 				roots = append(roots, n)
 			}
-		case progress.TypeRun, progress.TypeUpdate, progress.TypeEnd:
+		case progress.TypeRun, progress.TypeUpdate, progress.TypeAdvance, progress.TypeEnd:
 			if n := nodes[e.Span]; n != nil {
 				n.last = e
 				n.ended = n.ended || e.Type == progress.TypeEnd
@@ -310,6 +319,15 @@ func draw(n *node, repl func(string) string) string {
 		field(&b, "exit", fmt.Sprint(*e.Exit))
 	}
 	field(&b, "message", repl(e.Message))
+	if e.Amount != 0 {
+		field(&b, "amount", fmt.Sprint(e.Amount))
+	}
+	if e.Size != 0 {
+		field(&b, "size", fmt.Sprint(e.Size))
+	}
+	if e.Unit != 0 {
+		field(&b, "unit", e.Unit.String())
+	}
 	if e.Flags != 0 {
 		fmt.Fprintf(&b, " [%s]", e.Flags)
 	}
@@ -416,6 +434,11 @@ func digits(s string) int {
 //  5. Every Suspend is followed by one Resume.
 //  6. No text holds anything termtext.Escape would escape, and none is
 //     longer than its bound. Hidden and ShowLines are passed down.
+//  7. The work of a span is sound. An advance names a span that is
+//     running and changes its Amount; two advances of a span come at
+//     least 100 ms apart by their times; Amount and Size are never
+//     negative; a span in Percent has a Size of 100; and the Unit of a
+//     span never changes once given.
 //
 // Each rule is a promise the progress package makes to every sink. A new
 // or stricter rule is a breaking change, named in the release notes; a
@@ -442,6 +465,12 @@ type span struct {
 	running int
 	// ran is set once a span this span announces up front has run.
 	ran bool
+	// amount and unit are the work as the last event of the span carried
+	// it, and advanced is when its last advance happened, if it did.
+	amount   int64
+	unit     progress.Unit
+	advanced time.Time
+	advances int
 }
 
 func (s *span) String() string {
@@ -464,6 +493,44 @@ func (s *span) announces(k progress.Kind) bool {
 		return s.counts() || s.e.Kind == progress.KindStep
 	}
 	return false
+}
+
+// advanceGap is the least time between two advances of a span, as the Bus
+// keeps it.
+const advanceGap = 100 * time.Millisecond
+
+// checkWork holds the work an event carries to its rules, and keeps it as
+// the work of s.
+func (s *span) checkWork(e progress.Event, bad func(string, ...any)) {
+	if e.Amount < 0 {
+		bad("event %d gives %s an Amount of %d", e.Seq, s, e.Amount)
+	}
+	if e.Size < 0 {
+		bad("event %d gives %s a Size of %d", e.Seq, s, e.Size)
+	}
+	if e.Unit == progress.Percent && e.Size != 100 {
+		bad("event %d gives %s, in percent, a Size of %d, not 100", e.Seq, s, e.Size)
+	}
+	if s.unit != 0 && e.Unit != s.unit {
+		bad("event %d changes the Unit of %s from %s to %s", e.Seq, s, s.unit, e.Unit)
+	}
+	if e.Type == progress.TypeAdvance {
+		if s.state != progress.StateRunning {
+			bad("event %d advances %s, which is %s, not running", e.Seq, s, s.state)
+		}
+		if e.Amount == s.amount {
+			bad("event %d advances %s without changing its Amount of %d", e.Seq, s, e.Amount)
+		}
+		if gap := e.Time.Sub(s.advanced); s.advances > 0 && gap < advanceGap {
+			bad("event %d advances %s %s after its last advance, less than %s", e.Seq, s, gap, advanceGap)
+		}
+		s.advanced = e.Time
+		s.advances++
+	}
+	s.amount = e.Amount
+	if s.unit == 0 {
+		s.unit = e.Unit
+	}
 }
 
 func violations(events []progress.Event) []string {
@@ -525,6 +592,7 @@ func violations(events []progress.Event) []string {
 				continue
 			}
 			s := &span{e: e, state: e.State, total: e.Total}
+			s.checkWork(e, bad)
 			if e.Kind < progress.KindCommand || e.Kind > progress.KindWait {
 				bad("%s has no valid kind", s)
 			}
@@ -576,6 +644,7 @@ func violations(events []progress.Event) []string {
 			bad("event %d lowers the Total of %s from %d to %d", e.Seq, s, s.total, e.Total)
 		}
 		s.total = max(s.total, e.Total)
+		s.checkWork(e, bad)
 
 		switch e.Type {
 		case progress.TypeRun:

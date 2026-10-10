@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"math/rand/v2"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -165,6 +166,82 @@ var (
 	call  = progress.KindCall
 )
 
+// Short names for the tests of work.
+var (
+	advance = progress.TypeAdvance
+	epoch   = time.Unix(1_700_000_000, 0)
+)
+
+// worked sets the work of an event, and at the time it happened, in
+// milliseconds after the epoch.
+func worked(amount, size int64, u progress.Unit, ms int) func(*progress.Event) {
+	return func(e *progress.Event) {
+		e.Amount, e.Size, e.Unit = amount, size, u
+		e.Time = epoch.Add(time.Duration(ms) * time.Millisecond)
+	}
+}
+
+func TestCheckHoldsTheWorkOfASpan(t *testing.T) {
+	t.Parallel()
+
+	b := progress.Bytes
+	tests := []struct {
+		name   string
+		events events
+		want   string
+	}{
+		{"an advance of a span not running",
+			events{}.add(start, 1, 0, call, queued, worked(0, 10, b, 0)).add(advance, 1, 0, call, queued, worked(5, 10, b, 0)).
+				add(end, 1, 0, call, worked(5, 10, b, 0)),
+			"which is queued, not running"},
+		{"an advance that changes nothing",
+			events{}.add(start, 1, 0, call, worked(0, 10, b, 0)).add(advance, 1, 0, call, worked(0, 10, b, 100)).
+				add(end, 1, 0, call, worked(0, 10, b, 100)),
+			"without changing its Amount of 0"},
+		{"a second advance that changes nothing",
+			events{}.add(start, 1, 0, call, worked(0, 10, b, 0)).add(advance, 1, 0, call, worked(3, 10, b, 100)).
+				add(advance, 1, 0, call, worked(3, 10, b, 300)).add(end, 1, 0, call, worked(3, 10, b, 300)),
+			"without changing its Amount of 3"},
+		{"advances too close together",
+			events{}.add(start, 1, 0, call, worked(0, 10, b, 0)).add(advance, 1, 0, call, worked(3, 10, b, 100)).
+				add(advance, 1, 0, call, worked(4, 10, b, 199)).add(end, 1, 0, call, worked(4, 10, b, 199)),
+			"99ms after its last advance, less than 100ms"},
+		{"a negative Amount",
+			events{}.add(start, 1, 0, call, worked(-1, 10, b, 0)).add(end, 1, 0, call, worked(-1, 10, b, 0)),
+			"an Amount of -1"},
+		{"a negative Size",
+			events{}.add(start, 1, 0, call, worked(0, -2, b, 0)).add(end, 1, 0, call, worked(0, -2, b, 0)),
+			"a Size of -2"},
+		{"a percentage of a Size other than 100",
+			events{}.add(start, 1, 0, call, worked(0, 50, progress.Percent, 0)).add(end, 1, 0, call, worked(0, 50, progress.Percent, 0)),
+			"a Size of 50, not 100"},
+		{"a Unit that changes",
+			events{}.add(start, 1, 0, call, worked(0, 10, b, 0)).add(progress.TypeUpdate, 1, 0, call, worked(0, 10, progress.Items, 0)).
+				add(end, 1, 0, call, worked(0, 10, progress.Items, 0)),
+			"changes the Unit of call \"s1\" (event 1) from bytes to items"},
+		{"a Unit that is taken back",
+			events{}.add(start, 1, 0, call, worked(0, 10, b, 0)).add(end, 1, 0, call),
+			"from bytes to unit(0)"},
+	}
+	for _, tc := range tests {
+		problems := strings.Join(violations(tc.events), "\n")
+		if !strings.Contains(problems, tc.want) {
+			t.Errorf("%s: violations %q, want one saying %q", tc.name, problems, tc.want)
+		}
+	}
+
+	// A Unit given after the start stays, and advances a tenth of a second
+	// apart are as often as the Bus sends them.
+	ok := events{}.add(start, 1, 0, call).
+		add(progress.TypeUpdate, 1, 0, call, worked(0, 100, progress.Percent, 0)).
+		add(advance, 1, 0, call, worked(10, 100, progress.Percent, 50)).
+		add(advance, 1, 0, call, worked(20, 100, progress.Percent, 150)).
+		add(end, 1, 0, call, worked(100, 100, progress.Percent, 160))
+	if problems := violations(ok); len(problems) > 0 {
+		t.Errorf("violations of work that keeps its promises: %q", problems)
+	}
+}
+
 func TestCheckFindsBrokenPromises(t *testing.T) {
 	t.Parallel()
 
@@ -291,6 +368,43 @@ func TestTreeDrawsWhatIsNotFinished(t *testing.T) {
 	if got := c.Tree(); got != want {
 		t.Errorf("drew:\n%s\nwant:\n%s", got, want)
 	}
+	bus.Close()
+}
+
+// Capture keeps every advance the Bus sends, and Tree draws the work of a
+// span after its fields, leaving out what is zero.
+func TestCaptureKeepsEveryAdvanceAndTreeDrawsTheWork(t *testing.T) {
+	t.Parallel()
+
+	now := epoch
+	c := &Capture{}
+	bus := progress.NewBus(progress.BusOptions{Sinks: []progress.Sink{c}, Now: func() time.Time { return now }})
+	ctx := progress.WithBus(context.Background(), bus)
+	ctx, cmd := progress.Start(ctx, progress.KindCommand, "fetch")
+	_, call := progress.Start(ctx, progress.KindCall, "download", progress.Work(progress.Bytes, 2<<30))
+	var amounts []int64
+	for range 5 {
+		call.Advance(1 << 30)
+		now = now.Add(100 * time.Millisecond)
+		call.Advance(0)
+	}
+	for _, e := range c.Events() {
+		if e.Type == progress.TypeAdvance {
+			amounts = append(amounts, e.Amount)
+		}
+	}
+	if want := []int64{1 << 30, 2 << 30, 3 << 30, 4 << 30, 5 << 30}; !slices.Equal(amounts, want) {
+		t.Errorf("Capture kept the advances %v, want %v", amounts, want)
+	}
+	want := `command fetch: running
+  call download amount=5368709120 size=2147483648 unit=bytes: running
+`
+	if got := c.Tree(); got != want {
+		t.Errorf("drew:\n%s\nwant:\n%s", got, want)
+	}
+	call.End(nil)
+	cmd.End(nil)
+	Check(t, c.Events())
 	bus.Close()
 }
 

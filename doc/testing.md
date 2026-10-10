@@ -27,6 +27,10 @@ what it reports. `Capture` is a sink that keeps the events of a Bus, and
   Total however it ended, an interrupt included;
 - no more targets run at once below a span than its Limit;
 - every Suspend is followed by one Resume;
+- the work of a span is sound: an advance names a span that is running and
+  changes its Amount, two advances of a span come at least 100 ms apart by
+  their times, Amount and Size are never negative, a span in Percent has a
+  Size of 100, and the Unit of a span never changes once given;
 - and no text holds anything `termtext.Escape` would escape, or is
   longer than its bound.
 
@@ -46,7 +50,10 @@ A test that sets up its own Bus with a `Capture` calls `Check` before it
 closes the Bus. `Watch`'s options are opaque: `Classify` gives the Bus the
 program's rule for the class of an error, and `Sinks` puts more sinks on
 it, such as a display drawing on a `Screen`, ahead of the `Capture`, which
-no option can take off. `Capture.Tree` draws the spans as an indented tree
+no option can take off. `Capture` keeps every advance the Bus sends,
+unsampled, as a display sees them. `Capture.Tree` draws the work of a span
+after its other fields, as `amount=2147483648 size=2147483648 unit=bytes`,
+and draws the spans as an indented tree
 that does not depend on how concurrent work was scheduled: targets that
 read the same are
 folded into one line naming them as a node set, or listing them when one is
