@@ -227,3 +227,67 @@ func ExampleBus_Classify() {
 	// "sind" transport
 	// "" target
 }
+
+// worker is a sink that prints the work each event of a span carries.
+type worker struct{}
+
+func (worker) Handle(e progress.Event) {
+	if e.Kind == progress.KindCall {
+		fmt.Printf("%s %q %d/%d %s\n", e.Type, e.Name, e.Amount, e.Size, e.Unit)
+	}
+}
+
+// A span reports its work: Work gives its unit and its size, here once the
+// size is known, and Advance adds to the amount done. The Bus sends the
+// amount at most once each 100 ms by its clock, and the End carries the
+// newest, so the advance made 50 ms after the one before reaches the sinks
+// with the End.
+func ExampleSpan_Advance() {
+	now := time.Date(2026, 10, 10, 12, 0, 0, 0, time.UTC)
+	bus := progress.NewBus(progress.BusOptions{
+		Sinks: []progress.Sink{worker{}},
+		Now:   func() time.Time { return now },
+	})
+	ctx := progress.WithBus(context.Background(), bus)
+	_, call := progress.Start(ctx, progress.KindCall, "download", progress.HTTP("GET", "/images/rocky-9.4.qcow2"))
+	call.Update(progress.Work(progress.Bytes, 2<<30))
+	for range 3 {
+		now = now.Add(100 * time.Millisecond)
+		call.Advance(8 << 20)
+	}
+	now = now.Add(50 * time.Millisecond)
+	call.Advance(8 << 20)
+	call.End(nil)
+	bus.Close()
+	// Output:
+	// start "download" 0/0 unit(0)
+	// update "download" 0/2147483648 bytes
+	// advance "download" 8388608/2147483648 bytes
+	// advance "download" 16777216/2147483648 bytes
+	// advance "download" 25165824/2147483648 bytes
+	// end "download" 33554432/2147483648 bytes
+}
+
+// Work that says only how far it has got, such as a remote task, is in
+// Percent, out of 100, and SetAmount sets how far it is.
+func ExampleSpan_SetAmount() {
+	now := time.Date(2026, 10, 10, 12, 0, 0, 0, time.UTC)
+	bus := progress.NewBus(progress.BusOptions{
+		Sinks: []progress.Sink{worker{}},
+		Now:   func() time.Time { return now },
+	})
+	ctx := progress.WithBus(context.Background(), bus)
+	_, call := progress.Start(ctx, progress.KindCall, "firmware update", progress.Work(progress.Percent, 0))
+	for _, done := range []int64{40, 75, 100} {
+		now = now.Add(time.Second)
+		call.SetAmount(done)
+	}
+	call.End(nil)
+	bus.Close()
+	// Output:
+	// start "firmware update" 0/100 percent
+	// advance "firmware update" 40/100 percent
+	// advance "firmware update" 75/100 percent
+	// advance "firmware update" 100/100 percent
+	// end "firmware update" 100/100 percent
+}

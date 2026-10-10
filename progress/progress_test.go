@@ -24,6 +24,7 @@ func TestAValueWithoutAConstantHasAName(t *testing.T) {
 		{progress.Class(99), "class(99)"},
 		{progress.Type(99), "type(99)"},
 		{progress.Stream(99), "stream(99)"},
+		{progress.Unit(99), "unit(99)"},
 		{progress.ClassNone, "none"},
 	} {
 		if got := tc.value.String(); got != tc.want {

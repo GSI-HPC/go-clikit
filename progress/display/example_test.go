@@ -9,6 +9,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/GSI-HPC/go-clikit/progress"
@@ -16,16 +17,29 @@ import (
 	"github.com/GSI-HPC/go-clikit/progress/progresstest"
 )
 
-// exampleClock is a clock the example moves on by hand.
-type exampleClock struct{ now time.Time }
+// exampleClock is a clock the example moves on by hand. Its mutex makes it
+// safe for concurrent use, as BusOptions.Now must be.
+type exampleClock struct {
+	mu  sync.Mutex
+	now time.Time
+}
 
 // newExampleClock returns a clock at noon.
 func newExampleClock() *exampleClock {
 	return &exampleClock{now: time.Date(2026, 9, 26, 12, 0, 0, 0, time.UTC)}
 }
 
-func (c *exampleClock) Now() time.Time      { return c.now }
-func (c *exampleClock) Add(d time.Duration) { c.now = c.now.Add(d) }
+func (c *exampleClock) Now() time.Time {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.now
+}
+
+func (c *exampleClock) Add(d time.Duration) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.now = c.now.Add(d)
+}
 
 // startTargets announces a target for each node, queued, as a pool does
 // before it runs the first.

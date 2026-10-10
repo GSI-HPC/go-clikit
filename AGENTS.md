@@ -34,11 +34,13 @@ each carried (decision 21). v0: the API may still change in a minor release
 - `doc.go`: the package comment of `clikit`, which lists the packages.
 - `termtext/`: `escape.go`, the escaper and its policy (`doc.go`);
   `width.go`, display widths and `Truncate`.
-- `progress/`: `progress.go`, the vocabulary (kinds, states, classes,
+- `progress/`: `progress.go`, the vocabulary (kinds, states, classes, units,
   flags, `Fields`, `Event`, the sink interfaces and the options); `bus.go`,
   the `Bus`, spans and `Suspend`; `classify.go`, `Classify`, `ErrSkipped`
   and `Skip`; `lines.go`, `Tee` and the lines of output; `sanitize.go`;
-  `tally.go`; `log.go`, the event log; `trace.go`, the W3C trace context.
+  `tally.go`; `work.go`, `Advance`, `SetAmount` and how often the Bus
+  sends the amount; `log.go`, the event log; `trace.go`, the W3C trace
+  context.
   `testdata/log-v1.jsonl` is the golden event log.
 - `progress/display/`: `terminal.go`, the `Terminal` and its writers;
   `style.go`, cutting a row that sets colours by the columns it shows;

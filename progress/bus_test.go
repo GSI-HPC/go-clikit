@@ -343,7 +343,7 @@ func TestTotalNeverShrinks(t *testing.T) {
 	for _, e := range capture.Events() {
 		totals = append(totals, e.Total)
 		if e.Node != "" {
-			t.Errorf("Update set Node %q; it sets only Total and Message", e.Node)
+			t.Errorf("Update set Node %q; it sets only Total, Message and Work", e.Node)
 		}
 	}
 	if fmt.Sprint(totals) != "[5 5 8 8]" {

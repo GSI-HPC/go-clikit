@@ -95,6 +95,11 @@ func TestCheckAcceptsWorkThatKeepsThePromises(t *testing.T) {
 	resume := progress.Suspend(ctx)
 	resume()
 	cred.End(nil)
+	// A download that reports its work, advanced as it goes.
+	_, download := progress.Start(ctx, progress.KindCall, "download", progress.Work(progress.Bytes, 2<<30))
+	download.Advance(8 << 20)
+	download.Advance(8 << 20)
+	download.End(nil)
 	pool(ctx, "boot from the network once", 40, 8, map[int]bool{6: true, 30: true}, nil)
 
 	// A staggered step: a batch that ran, one that failed, and one left

@@ -254,7 +254,8 @@ const (
 	TypeStart Type = iota + 1
 	// TypeRun is a queued span whose work has started.
 	TypeRun
-	// TypeUpdate is a span whose Total or Message changed.
+	// TypeUpdate is a span whose Total, Message or Work (Unit and Size)
+	// changed.
 	TypeUpdate
 	// TypeLine is a line of output from the work of a call.
 	TypeLine
@@ -265,6 +266,9 @@ const (
 	TypeSuspend
 	// TypeResume ends a TypeSuspend.
 	TypeResume
+	// TypeAdvance is a span whose Amount changed. The Bus sends one at
+	// most every 100 ms a span, by its clock, with the newest Amount.
+	TypeAdvance
 )
 
 // String returns the name the event log writes for the type, such as
@@ -285,6 +289,8 @@ func (t Type) String() string {
 		return "suspend"
 	case TypeResume:
 		return "resume"
+	case TypeAdvance:
+		return "advance"
 	}
 	return fmt.Sprintf("type(%d)", uint8(t))
 }
@@ -309,6 +315,35 @@ func (s Stream) String() string {
 		return "stderr"
 	}
 	return fmt.Sprintf("stream(%d)", uint8(s))
+}
+
+// Unit is what the work of a span is counted in. Values may be added in a
+// minor release.
+type Unit uint8
+
+const (
+	// Items counts things, such as files, rows or packages.
+	Items Unit = iota + 1
+	// Bytes counts bytes, which a display draws in KiB, MiB, GiB and TiB.
+	Bytes
+	// Percent is how far work has got, from 0 to 100, for work that says
+	// nothing else, such as a remote task. Its size is always 100, and a
+	// display draws its share, never an amount or a rate.
+	Percent
+)
+
+// String returns the name the event log writes for the unit, such as
+// "bytes", or "unit(n)" for a value this package does not define.
+func (u Unit) String() string {
+	switch u {
+	case Items:
+		return "items"
+	case Bytes:
+		return "bytes"
+	case Percent:
+		return "percent"
+	}
+	return fmt.Sprintf("unit(%d)", uint8(u))
 }
 
 // The bounds of the text an event carries, in bytes. Sanitize cuts to them.
@@ -369,6 +404,12 @@ type Fields struct {
 	// when set, points to a value every sink of the event shares; a sink
 	// never writes through it.
 	Exit *int
+	// Amount is how much of the span's own work is done, and Size how much
+	// there is, in Unit; a Size of 0 is one not known. Neither counts the
+	// work of the spans below. Every event of a span carries the Amount
+	// the Bus last sent in a TypeAdvance, and its TypeEnd the final one.
+	Amount, Size int64
+	Unit         Unit
 }
 
 // Event is one change to a span, or a suspension of the displays. It is plain data:
@@ -472,7 +513,7 @@ type Classifier interface {
 // Option sets what a span says about itself when it starts, changes or
 // ends.
 //
-// Start takes every option. Update takes Total and Message only, and
+// Start takes every option. Update takes Total, Message and Work only, and
 // ignores the others. End takes every option that sets a field, but not
 // Queued or WithFlags, which only Start can give; it is where a field
 // learned late is set, such as an address known only once the work has
@@ -489,6 +530,11 @@ type options struct {
 	// watches.
 	exit    int
 	hasExit bool
+	// work, unit and size are Work's, merged into Fields by apply under
+	// the rule that a unit once given stays.
+	work bool
+	unit Unit
+	size int64
 }
 
 // apply applies opts to o.
@@ -499,6 +545,15 @@ func (o *options) apply(opts []Option) {
 	if o.hasExit {
 		exit := o.exit
 		o.Exit = &exit
+	}
+	if o.work {
+		if o.Unit == 0 {
+			o.Unit = o.unit
+		}
+		o.Size = max(o.size, 0)
+		if o.Unit == Percent {
+			o.Size = 100
+		}
 	}
 }
 
@@ -553,3 +608,15 @@ func Timeout(d time.Duration) Option { return func(o *options) { o.Timeout = d }
 
 // Exit sets Exit.
 func Exit(code int) Option { return func(o *options) { o.exit, o.hasExit = code, true } }
+
+// Work says that a span reports work in u, out of size; a size of 0 or
+// less is one not known, and a zero u is Items. Start and Update take it:
+// Update to give the size once it is known, or to change it. A unit given
+// before stays. The size of work in Percent is 100, whatever size is given.
+// Advance and SetAmount move the amount.
+func Work(u Unit, size int64) Option {
+	if u == 0 {
+		u = Items
+	}
+	return func(o *options) { o.work, o.unit, o.size = true, u, size }
+}

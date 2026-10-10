@@ -22,7 +22,10 @@ import (
 type BusOptions struct {
 	// Sinks receive every event, in the order given.
 	Sinks []Sink
-	// Now is the clock the events are stamped with; nil is time.Now.
+	// Now is the clock the events are stamped with; nil is time.Now. It
+	// must be safe for concurrent use: Advance and SetAmount read it on the
+	// goroutines that call them, without the Bus's lock, so a clock a test
+	// moves by hand guards its time with a mutex of its own.
 	Now func() time.Time
 	// Trace is the trace the spans belong to, as ParseTraceContext reads
 	// it from another program that handed it on. Its Parent, Flags and
@@ -236,6 +239,9 @@ type Span struct {
 	// prev and next link the Bus's open spans.
 	prev, next *Span
 	lines      *lineState
+	// work is the amount of the span's work, which Advance moves without
+	// the lock.
+	work work
 }
 
 type busKey struct{}
@@ -304,6 +310,7 @@ func Start(ctx context.Context, k Kind, name string, opts ...Option) (context.Co
 	if o.queued {
 		s.state = StateQueued
 	}
+	s.work.live.Store(!o.queued)
 
 	b.mu.Lock()
 	defer b.mu.Unlock()
@@ -342,11 +349,13 @@ func (s *Span) Run() {
 		return
 	}
 	s.state = StateRunning
+	s.work.live.Store(true)
 	b.emit(s.event(TypeRun))
 }
 
-// Update changes the Total and Message of a span that has not ended. A
-// Total smaller than the one before is ignored, and so are other options.
+// Update changes the Total, Message and Work of a span that has not ended.
+// A Total smaller than the one before is ignored, and so is a unit other
+// than the one Work gave before, and other options.
 func (s *Span) Update(opts ...Option) {
 	if s == nil {
 		return
@@ -363,6 +372,7 @@ func (s *Span) Update(opts ...Option) {
 	if o.Message != s.fields.Message {
 		s.fields.Message = Sanitize(o.Message, MaxField)
 	}
+	s.fields.Unit, s.fields.Size = o.Unit, o.Size
 	b.emit(s.event(TypeUpdate))
 }
 
@@ -439,6 +449,7 @@ func (s *Span) end(status Status, class Class, text string, opts []Option) {
 		}
 	}
 	dropped := s.flushLines()
+	s.endWork()
 	if len(opts) > 0 {
 		o := options{Fields: s.fields}
 		o.apply(opts)
@@ -644,8 +655,12 @@ func (b *Bus) drop(e *entry) []*entry {
 
 // emit numbers ev and hands it to every sink. The clock is read first, so
 // that one that panics leaves no number used. b.mu is held.
-func (b *Bus) emit(ev Event) {
-	ev.Time = b.now()
+func (b *Bus) emit(ev Event) { b.emitAt(ev, b.now()) }
+
+// emitAt numbers ev, stamped with t, and hands it to every sink. b.mu is
+// held.
+func (b *Bus) emitAt(ev Event, t time.Time) {
+	ev.Time = t
 	b.seq++
 	ev.Seq = b.seq
 	removed := false

@@ -161,6 +161,35 @@ func TestTheEventLogWritesEveryEventOnALineOfItsOwn(t *testing.T) {
 		_, _ = io.WriteString(progress.Tee(solCtx, io.Discard, progress.Stdout, nil), strings.Repeat("the secret console\n", 22))
 		sol.End(nil)
 		status.End(nil)
+
+		// A third command reports work in each unit: a download whose size
+		// is known once its headers are, advanced every 100 ms, with an
+		// amount not yet sent when it ends, which its end carries; a walk
+		// that counts what it indexed, with no size; and a remote task
+		// that says how far it has got.
+		ctx, fetch := progress.Start(busCtx, progress.KindCommand, "fetch")
+		stepCtx, image := progress.Start(ctx, progress.KindStep, "fetching the base image")
+		_, download := progress.Start(stepCtx, progress.KindCall, "download", progress.HTTP("GET", "/images/rocky-9.4.qcow2"))
+		download.Update(progress.Work(progress.Bytes, 2<<30))
+		for range 2 {
+			clock.Add(100 * time.Millisecond)
+			download.Advance(8 << 20)
+		}
+		download.Advance(8 << 20)
+		download.End(nil)
+		image.End(nil)
+		_, index := progress.Start(ctx, progress.KindStep, "indexing the archive", progress.Work(progress.Items, 0))
+		clock.Add(100 * time.Millisecond)
+		index.Advance(1200)
+		index.End(nil)
+		_, firmware := progress.Start(ctx, progress.KindCall, "firmware update",
+			progress.HTTP("GET", "/redfish/v1/TaskService/Tasks/7"), progress.Work(progress.Percent, 0))
+		clock.Add(100 * time.Millisecond)
+		firmware.SetAmount(40)
+		clock.Add(100 * time.Millisecond)
+		firmware.SetAmount(100)
+		firmware.End(nil)
+		fetch.End(nil)
 	})
 
 	if *update {
@@ -258,10 +287,13 @@ func TestEveryValueHasANameInTheLog(t *testing.T) {
 		"Status": {progress.StatusOK, progress.StatusFailed, progress.StatusCanceled, progress.StatusSkipped},
 		"Class":  {progress.ClassTarget, progress.ClassTransport, progress.ClassTimeout, progress.ClassAuth, progress.ClassPin, progress.ClassUsage, progress.ClassCanceled},
 		"Flags":  {progress.Hidden, progress.Fold, progress.ShowLines, progress.DryRun},
-		"Type":   {progress.TypeStart, progress.TypeRun, progress.TypeUpdate, progress.TypeLine, progress.TypeEnd, progress.TypeSuspend, progress.TypeResume},
+		"Type": {progress.TypeStart, progress.TypeRun, progress.TypeUpdate, progress.TypeLine, progress.TypeEnd,
+			progress.TypeSuspend, progress.TypeResume, progress.TypeAdvance},
 		"Stream": {progress.Stdout, progress.Stderr},
+		"Unit":   {progress.Items, progress.Bytes, progress.Percent},
 	}
-	keys := map[string]string{"Kind": "kind", "State": "state", "Status": "status", "Class": "class", "Flags": "flags", "Type": "type", "Stream": "stream"}
+	keys := map[string]string{"Kind": "kind", "State": "state", "Status": "status", "Class": "class", "Flags": "flags",
+		"Type": "type", "Stream": "stream", "Unit": "unit"}
 	// ClassNone is a span that did not fail, and has no class in the log.
 	declared := declaredConstants(t, "progress.go")
 	declared["Class"]--
@@ -309,6 +341,7 @@ var loggedAs = map[string]string{
 	"HTTPStatus": "httpStatus", "Cache": "cache", "Source": "source", "Timeout": "timeout",
 	"Exit": "exit", "Status": "status", "Class": "class", "Err": "err",
 	"Stream": "stream", "Dropped": "dropped",
+	"Amount": "amount", "Size": "size", "Unit": "unit",
 	// The text of a line of output never leaves the process.
 	"Text": "",
 }
