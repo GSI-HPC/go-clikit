@@ -32,6 +32,7 @@ names it.
 | [20](#20-a-themes-look-may-change-in-a-minor-release) | A theme's look may change in a minor release | accepted |
 | [21](#21-the-command-lines-glue-for-progress-is-the-kits) | The command line's glue for progress is the kit's | accepted |
 | [22](#22-the-kit-may-require-golangorgxsys-in-cliprogress-alone) | The kit may require golang.org/x/sys, in cliprogress alone | accepted |
+| [23](#23-a-span-reports-its-work-sampled-and-a-sink-rolls-it-up) | A span reports its work, sampled, and a sink rolls it up | accepted |
 
 ## 1. Apache-2.0, and GSI holds the copyright
 
@@ -1178,3 +1179,55 @@ requirement all the same. The calls cost 4,096 bytes on linux/amd64 and
 - On Windows and Plan 9 a display takes the terminal to be 80 columns
   wide, and the log's file is not checked for its owner, its mode or its
   links.
+
+## 23. A span reports its work, sampled, and a sink rolls it up
+
+Status: accepted
+
+### Context
+
+The displays said how many targets of a step were done, and nothing of how
+far one piece of work had got: a copy, an upload or a walk of many files
+looked the same at its first second and its last. A pool of targets that
+each copy something showed its share done only as targets ended.
+
+### Decision
+
+- A span reports its work: an amount, in a unit of a closed set, `Items`,
+  `Bytes` or `Percent`, out of a size when one is known; the size of work
+  in `Percent` is 100. `Work` gives the unit and size; `Advance`,
+  `SetAmount`, `CountWriter` and `CountReader` move the amount.
+- The Bus sends the amount as a `TypeAdvance` at most every 100 ms a span,
+  by its clock, the newest never lost, and with the span's `End`.
+- An event carries only what its span said. `progress.Meter` rolls the
+  work up the tree: amounts add within a unit; a span's share done comes
+  from its own size, else from the targets it counts once one of them is
+  bounded, short of done until their count is complete, else from the sizes
+  of the work below, for any span, where a span with a size of its own
+  counts for everything below it, and it is unbounded without any of them.
+- The displays draw a span's work after its counts, or after its name;
+  what they draw for a span without work does not change. Bytes are drawn
+  in IEC units, and work in `Percent` as its share alone. A row of the tree
+  or the counter's line too wide for the terminal gives up the time left,
+  the rate, the amount and the bar in turn.
+- The log gains `advance`, `amount`, `size`, `unit` and `leftOut` under
+  version 1. It writes an advance of a span at most once a second by
+  default, `LogOptions.AdvanceEvery`, and counts those it leaves out, which
+  leave the only gaps in `seq`.
+- `Check`'s new rules apply only to the new event and fields, which no
+  source before this one sends, and so are no breaking change in the sense
+  of decision 15.
+
+### Costs
+
+- A span with work keeps an atomic counter and a timer; an `Advance`
+  reads the clock, `BusOptions.Now`, outside the Bus's lock, so the clock
+  must be safe for concurrent use: one that was safe only under the lock,
+  such as a test clock moved by hand without a mutex, no longer is.
+- A pool of copies adds up to one log line a second a target running, and
+  the log shows the amount a span reached at its next line, up to a second
+  late, or at its `end`.
+- A reader of the log that checks `seq` for gaps must allow those of the
+  advances left out, which `leftOut` counts.
+- Rule 3 lets a share fall back when work below starts that was not known.
+- The time left is an estimate, and reads wrong while the rate changes.
