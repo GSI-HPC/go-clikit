@@ -13,9 +13,11 @@ gitignored).
 
 ## Status
 
-The packages, moved here with their history from the repository where they
-were written, which `README.md` names. v0: the API may still change in a
-minor release (see Compatibility).
+The packages, most of them moved here with their history from the
+repository where they were written, which `README.md` names;
+`progress/cliprogress` was written here, from the glue clusterctl and sind
+each carried (decision 21). v0: the API may still change in a minor release
+(see Compatibility).
 
 | Package | What it holds | Release |
 | --- | --- | --- |
@@ -24,7 +26,8 @@ minor release (see Compatibility).
 | `progress/display` | the live tree, the counter, plain lines, the summary | v0.1.0 |
 | `progress/progresstest` | capturing and checking the events a command reports | v0.1.0 |
 | `fanout` | bounded worker pools that report their targets as progress | v0.1.0 |
-| `progress/cliprogress`, `cobratree`, `progress/mcpprogress` | the command-line glue for progress, cobra helpers, progress over MCP | later, each once a second program needs it |
+| `progress/cliprogress` | the words of `--progress`, a command's display and event log, the private log file | unreleased |
+| `cobratree`, `progress/mcpprogress` | cobra helpers, progress over MCP | later, each once a second program needs it |
 
 ## Layout
 
@@ -47,6 +50,12 @@ minor release (see Compatibility).
 - `progress/progresstest/`: `progresstest.go`, `Capture`, `Check`,
   `Watch`, `Watcher` and `Tree`; `screen.go`, `Screen`, which applies the
   colours a theme draws when its `Styles` is set.
+- `progress/cliprogress/`: `cliprogress.go`, the package comment, `Mode`,
+  `Setting`, `Options`, `Choose` and `UTF8Locale`; `run.go`, `Start` and
+  `Run`; `probe.go` and `probe_unix.go`, `IsPipe`, `TerminalSize` and
+  `InForeground`; `appendprivate.go`, the private file of the event log.
+  `probe_other.go` and `appendprivate_other.go` are for systems that are
+  not Unix.
 - `fanout/`: `each.go`, `Each` and the package comment; `map.go`, `Map`,
   `MapOptions`, `Item`, `Outcome`, `Summary` and `Failure`; `batches.go`;
   `recover.go`, `Recovered` and `PanicError`.
@@ -90,7 +99,8 @@ go-test-coverage: `go install github.com/vladopajic/go-test-coverage/v2@latest`.
   holder and the licence, in its own comment style (decision 1); a `SKILL.md`
   carries them after its front matter. A file that cannot hold a comment,
   such as `go.sum`, is annotated in `REUSE.toml`.
-- Requirements follow decision 3: `go-nodeset` and `golang.org/x/text`, and
+- Requirements follow decision 3: `go-nodeset` and `golang.org/x/text`,
+  `golang.org/x/sys` in `progress/cliprogress` alone (decision 22), and
   anything else only with a record. Never the MCP Go SDK, charmbracelet,
   testify or OpenTelemetry. cobra only in `cobratree`; `termtext`,
   `progress` and `fanout`, which library packages import too, never import
@@ -110,11 +120,17 @@ go-test-coverage: `go install github.com/vladopajic/go-test-coverage/v2@latest`.
   (version 1: keys may be added, never renamed or removed), the text the
   displays draw with the zero `Theme`, which consumers compare in their
   tests (the runes `termtext` escapes may grow in a minor release, decision
-  14, and a theme's colours and art may change in one, decision 20), and the
-  rules `progresstest.Check` enforces (decision 15). Changing any of them is a
-  breaking change; a new or stricter `Check` rule is one too.
+  14, and a theme's colours and art may change in one, decision 20), the
+  rules `progresstest.Check` enforces (decision 15), and the words
+  `cliprogress.Modes` names, in their order, and the texts of the errors and
+  notes `cliprogress` returns and writes, the refusals of the log's file
+  included (decision 21). Changing any of them is a breaking change; a new
+  or stricter `Check` rule is one too.
 - The kit reads no environment: whether to draw in colour, NO_COLOR and
-  TERM included, is the program's to decide, and a theme is a parameter.
+  TERM included, is the program's to decide, and a theme is a parameter;
+  `cliprogress` is told what the program read. It sets nothing
+  process-wide and ends no process; forbidigo refuses the calls that read
+  or set the environment, handle signals or end the process (decision 21).
 - A library that reports spans costs nothing without a Bus: no allocation
   on that path, which a benchmark or `testing.AllocsPerRun` keeps honest.
 - Fuzz targets sit next to the code, and a failing input found by CI is

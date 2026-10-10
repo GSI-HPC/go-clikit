@@ -12,6 +12,7 @@ linters:
     - depguard
     - errcheck
     - errorlint
+    - forbidigo
     - govet
     - ineffassign
     - misspell
@@ -46,6 +47,27 @@ linters:
           deny:
             - pkg: github.com/spf13/cobra
               desc: only cobratree may import cobra (doc/decisions.md, decision 3)
+        # The ioctls and fcntls cliprogress makes; every other package
+        # leaves the system alone (doc/decisions.md, decision 22).
+        x-sys-only-in-cliprogress:
+          files:
+            - $all
+            - "!**/progress/cliprogress/**"
+          deny:
+            - pkg: golang.org/x/sys
+              desc: only progress/cliprogress asks the system about terminals and descriptors (doc/decisions.md, decision 22)
+    # The kit reads no environment, sets nothing process-wide and ends no
+    # process (doc/decisions.md, decision 21): not through os, syscall or
+    # golang.org/x/sys/unix, nor through log.Fatal.
+    forbidigo:
+      forbid:
+        - pattern: ^(os|syscall|unix)\.(Getenv|LookupEnv|Environ|Setenv|Unsetenv|Clearenv|ExpandEnv|Exit)$
+          msg: the kit reads no environment, sets nothing process-wide and ends no process (doc/decisions.md, decision 21)
+        - pattern: ^log\.(Logger\.)?(Fatal|Fatalf|Fatalln)$
+          msg: the kit ends no process; it returns an error (doc/decisions.md, decision 21)
+        - pattern: ^signal\.(Notify|NotifyContext|Ignore|Reset|Stop)$
+          msg: the end of the command's context is the interrupt; the program catches signals (doc/decisions.md, decision 21)
+      analyze-types: true
     errcheck:
       # A deliberate discard is written as _ = f(), which reads as a decision
       # rather than an oversight.
@@ -57,6 +79,10 @@ linters:
       # point of the test.
       - path: _test\.go
         linters: [errcheck]
+      # A test may set the environment, or exit, as the program it stands
+      # in for would.
+      - path: _test\.go
+        linters: [forbidigo]
 
 formatters:
   enable:

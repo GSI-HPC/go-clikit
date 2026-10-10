@@ -12,7 +12,7 @@ names it.
 | --- | --- | --- |
 | [1](#1-apache-20-and-gsi-holds-the-copyright) | Apache-2.0, and GSI holds the copyright | accepted |
 | [2](#2-the-go-line-is-the-oldest-go-release-still-supported) | The go line is the oldest Go release still supported | accepted |
-| [3](#3-what-the-kit-may-require) | What the kit may require | accepted |
+| [3](#3-what-the-kit-may-require) | What the kit may require | accepted, refined by [22](#22-the-kit-may-require-golangorgxsys-in-cliprogress-alone) |
 | [4](#4-a-release-is-a-signed-tag) | A release is a signed tag | accepted, superseded in part by [10](#10-a-daily-audit-holds-the-releases-to-their-record) |
 | [5](#5-progress-and-its-displays-are-the-kits-own) | Progress and its displays are the kit's own | accepted |
 | [6](#6-the-pools-are-the-kits-own) | The pools are the kit's own | accepted, refined by [12](#12-the-programs-identity-lives-on-the-bus) |
@@ -30,6 +30,8 @@ names it.
 | [18](#18-the-live-clocks-tick-in-tenths-of-a-second) | The live clocks tick in tenths of a second | accepted |
 | [19](#19-the-displays-draw-in-themes-the-program-picks) | The displays draw in themes the program picks | accepted |
 | [20](#20-a-themes-look-may-change-in-a-minor-release) | A theme's look may change in a minor release | accepted |
+| [21](#21-the-command-lines-glue-for-progress-is-the-kits) | The command line's glue for progress is the kit's | accepted |
+| [22](#22-the-kit-may-require-golangorgxsys-in-cliprogress-alone) | The kit may require golang.org/x/sys, in cliprogress alone | accepted |
 
 ## 1. Apache-2.0, and GSI holds the copyright
 
@@ -134,7 +136,8 @@ since v0.42.0 requires Go 1.26.
 
 ## 3. What the kit may require
 
-Status: accepted
+Status: accepted, refined by
+[decision 22](#22-the-kit-may-require-golangorgxsys-in-cliprogress-alone)
 
 ### Context
 
@@ -1004,3 +1007,174 @@ try, and holding them to the rule for text would freeze them.
 
 - A consumer's test that compares the frames of a theme byte for byte can
   break in a minor release.
+
+## 21. The command line's glue for progress is the kit's
+
+Status: accepted
+
+### Context
+
+clusterctl v0.4.0 (`internal/cli/progress.go`, `internal/fileutil`) and sind
+(`cmd/sind/progress.go` and `appendprivate.go`, ported from clusterctl's)
+carry the same glue between a command line and the progress packages, about
+560 lines in clusterctl and 760 in sind: the five words of `--progress` and
+the rule that picks a display from them, with their notes and errors, word
+for word; the reading of the locale, byte for byte; the making of the
+Terminal, the display, the summary and the event log, and their teardown, in
+one order; and the opening of the event log for its user alone. The copies
+had drifted already: sind refuses another user's symbolic link in a
+directory on the way to the log, which clusterctl follows, and writes a log
+on the display's own terminal through the Terminal's Lines, where clusterctl
+writes it into the region. They differ in how they find out about the
+terminal, go-isatty and golang.org/x/sys in sind, asked for each command,
+golang.org/x/term in clusterctl, asked once, and in policy: which commands
+run in a span, when TRACEPARENT leaves the environment, where notes go,
+whether standard output goes through the Terminal under plain lines, and
+whether a command that succeeded leaves a summary.
+
+The kit imports no cobra (decision 3) and reads no environment, NO_COLOR
+and TERM included (decision 19); which display to draw, and whether the
+terminal can show one, was the program's to decide (`architecture.md`).
+
+### Decision
+
+- `progress/cliprogress` holds the words (`Mode`, `Modes`), the rule
+  (`Choose`), a command's `Run` (`Start`, `Run.Finish`, and the writers in
+  between), the opening of the event log, and the probes `IsPipe`,
+  `TerminalSize` and `InForeground` (decision 22).
+- It finds out nothing for itself. The program passes in `Options` the
+  name and value of its flag and of its variable for each setting, a
+  `Setting` each; whether standard error is a terminal, and a dumb one;
+  whether standard output goes into a pipe; the terminal's size and
+  foreground; whether the locale shows UTF-8, which `UTF8Locale` tells from
+  a getenv the program passes; and the Theme. The kit reads no variable,
+  NO_COLOR, TERM and COLORTERM included, and decides no colour: decision 19
+  stands.
+- It sets nothing process-wide and ends no process. `Options.Trace` is
+  called only once a Bus is made, so that a program takes TRACEPARENT and
+  TRACESTATE out of its environment there; the end of the command's
+  context is the interrupt. forbidigo refuses `os.Getenv`, `os.LookupEnv`,
+  `os.Environ`, `os.Setenv`, `os.Unsetenv`, `os.Clearenv`, `os.ExpandEnv`
+  and `os.Exit`, their namesakes in `syscall` and `golang.org/x/sys/unix`,
+  `log.Fatal`, `log.Fatalf` and `log.Fatalln`, a `log.Logger`'s too, and
+  the handlers of `os/signal` in the kit's code, its tests aside.
+- It imports no package of flags. What the flag asks for and cannot have
+  is an error, which the program reports as its usage error; what the
+  variable asks for fails no command, and is said in a note where it names
+  no word or no log that can be used. The package exports no error.
+- Notes go to `Options.Notes`, escaped, behind "prog: " as
+  `TerminalOptions.Program` writes it. The summary goes to `Options.Stderr`
+  unescaped, since a Theme colours it and the Bus sanitised its names.
+  Without a display or a log nothing is made, so standard error holds what
+  it would without the kit.
+- Where the programs differed in what they share, the kit takes sind's
+  way: a symbolic link on the way to the log, a directory's as well as the
+  file's, has to be this user's or root's, and a log on the display's own
+  file goes through the Terminal's Lines.
+- Beyond both, it refuses a log's file with other names, hard links, which
+  another user may have made to a file of this user's where the system
+  lets them, as macOS and the BSDs do; it follows no link put at the log's
+  own name after its walk of the path, whatever links lead to the
+  directory; and it opens the file without blocking, so that a named pipe
+  another user put there holds up no command, while one of this user's or
+  root's is waited on as before.
+- What stays in the program: finding out whether a stream is a terminal,
+  reading its environment, the theme and its colours, taking variables
+  out of the environment, signals and exit codes, which commands run in a
+  span and the span itself, which of its writers go through the Terminal
+  and putting them back, and whether a command that succeeded leaves the
+  summary, the argument of `Run.Finish`.
+- Interfaces beyond the Go API: the five words, in their order, and the
+  texts of the errors `Choose` and `Start` return and of the notes `Start`
+  and `Finish` write, the refusals of the log's file among them, around
+  the names the program gives and the system's errors they wrap. Programs
+  quote them in their manuals. Changing one is a breaking change; adding a
+  word is not, though the list the texts give grows.
+
+### Costs
+
+- Each program keeps the lines that fill in `Options`, and the library it
+  asks whether a stream is a terminal. A program that words its notes
+  otherwise, or picks a display by another rule, writes its own glue on
+  `display`, as before.
+- `Options` has 19 fields, most of them passed on to `display` and
+  `progress`, for a program to leave out; `Options.Manual` and `Run.Draw`
+  are there for tests, as the displays' `Draw` is.
+- clusterctl's walk of the links on the way to its log becomes stricter,
+  and its log on the display's terminal moves above the display. On
+  `cliprogress`, both programs refuse a log's file with other names, which
+  they appended to.
+- A word or a text of cliprogress is frozen with the API: rewording one
+  waits for a breaking release.
+
+## 22. The kit may require golang.org/x/sys, in cliprogress alone
+
+Status: accepted
+
+### Context
+
+`cliprogress` (decision 21) asks the system about a command's streams: how
+many columns and rows the terminal has (TIOCGWINSZ); whether the process
+is the job in its foreground (TIOCGPGRP against its own process group);
+and, for an event log a path such as /dev/stderr or /dev/fd/3 names,
+whether that descriptor of the process's is open for writing (F_GETFL) and
+a duplicate of it closed on exec (F_DUPFD_CLOEXEC). sind and clusterctl
+make these calls through golang.org/x/sys/unix, which decision 3 lets the
+kit require only with a record.
+
+The standard library makes them only as raw system calls by number.
+Measured with Go 1.26 and 1.27: on macOS `syscall.Syscall` traps into the
+kernel itself rather than through libc, which Apple does not support; on
+OpenBSD 7.5 and later it reaches ioctl alone, through libc, and returns
+ENOSYS for every other number, fcntl's among them, so a descriptor open
+for reading alone could not be told from one open for writing; Solaris,
+illumos and AIX define no SYS_IOCTL; and `syscall` has no Winsize, so the
+kit would declare one and pass its address through `unsafe`. A write of
+no bytes, which needs no fcntl, sends an empty datagram on a Unix socket
+of SOCK_DGRAM or SOCK_SEQPACKET, and POSIX leaves what it does to anything
+but a regular file unspecified. golang.org/x/sys/unix makes every one of
+these calls on every Unix port, through libc where the system asks for it.
+Its IoctlGetInt reads TIOCGPGRP's four bytes into an int of eight, which
+on a big-endian system of 64 bits puts them in the upper half; the kit
+reads both halves.
+
+golang.org/x/sys requires no module, and the go line of v0.48.0, and of
+v0.49.0, the newest, is 1.26.0, the kit's floor. sind and clusterctl
+v0.4.0 require v0.48.0. A program that builds no package of `cliprogress`
+links none of it, but minimal version selection reads the kit's
+requirement all the same. The calls cost 4,096 bytes on linux/amd64 and
+128 on darwin/arm64 over the same calls through `syscall`, and sind on
+`cliprogress` is 12,288 bytes larger than with its own glue.
+
+### Decision
+
+- The kit may require golang.org/x/sys. Only `progress/cliprogress`
+  imports it, in its files built for Unix, `probe_unix.go` and
+  `appendprivate.go`; its files for other systems answer that a terminal's
+  size is not known and the process is in the foreground, and open the log
+  as any file. depguard refuses golang.org/x/sys in every other package.
+- The kit requires v0.48.0, which sind and clusterctl required when this
+  was recorded, so that the first release of `cliprogress` raises neither;
+  Dependabot then moves it as it moves golang.org/x/text, and with it the
+  golang.org/x/sys of the programs that take a release of the kit.
+- golang.org/x/term is not required: the program asks whether a stream is
+  a terminal, with the library it has.
+- Tests use the standard library still: a pseudo-terminal is opened
+  through `syscall`.
+- `make vet-other` compiles the module for Windows and Plan 9 in CI, since
+  no test runs their files.
+
+### Costs
+
+- Every program that requires the kit has golang.org/x/sys v0.48.0 or later
+  in its module graph, whether it builds `cliprogress` or not, and a
+  release of the kit after Dependabot has moved the requirement raises the
+  program's to it, as golang.org/x/text's is raised.
+- These are the kit's first files with build tags outside its tests.
+  Coverage runs on Linux, so the files for other systems are compiled and
+  never run.
+- On AIX, which has no F_DUPFD_CLOEXEC, the duplicate of a descriptor is
+  inherited by a child started while the log is open.
+- On Windows and Plan 9 a display takes the terminal to be 80 columns
+  wide, and the log's file is not checked for its owner, its mode or its
+  links.

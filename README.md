@@ -22,14 +22,17 @@ command-line tool for administering HPC clusters, and became a module of
 their own when [sind](https://github.com/GSI-HPC/sind), which runs Slurm
 clusters in Docker, set out to use them too. They moved here with their
 history, as clusterctl v0.4.0 shipped them, and their first release will be
-v0.1.0. [`doc/architecture.md`](doc/architecture.md) says how they fit
-together.
+v0.1.0. `progress/cliprogress` was written here, from the command-line glue
+clusterctl and sind each carried
+([decision 21](doc/decisions.md#21-the-command-lines-glue-for-progress-is-the-kits)).
+[`doc/architecture.md`](doc/architecture.md) says how they fit together.
 
 | Package | What it holds |
 | --- | --- |
 | `termtext` | escaping untrusted text for a terminal, and display width |
 | `progress` | spans in a `context.Context`, the JSONL event log, `TRACEPARENT` |
 | `progress/display` | the live tree, the counter, plain lines, the summary |
+| `progress/cliprogress` | the words of `--progress`, a command's display and event log, the private log file |
 | `progress/progresstest` | capturing and checking the events a command reports |
 | `fanout` | bounded worker pools that report their targets as progress |
 

@@ -13,6 +13,8 @@ the tests fail when the log writes anything else.
 
 How a program lets its users ask for a log, by a flag or a variable, and
 where it writes it, is the program's to say in its manual.
+`progress/cliprogress` opens it for a program that names its flag and its
+variable.
 
 ## Lines
 

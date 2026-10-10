@@ -3,7 +3,7 @@
 
 # Architecture
 
-The kit is five packages that a command-line program and the library
+The kit is six packages that a command-line program and the library
 packages it calls share: a library reports what it does, and the command
 decides how that is shown. This document says where the packages came from,
 how they fit together, what runs on which goroutine, what a program fills
@@ -28,7 +28,10 @@ programs import too. So clusterctl cut what tied the packages to it: its exit
 codes became a hook, its name and the noun for its targets parameters, and
 the escaper moved out of its output package. The packages then moved here
 with their history, as they shipped in clusterctl v0.4.0, under paths of
-their own.
+their own. `progress/cliprogress` was written here afterwards, from the glue
+between the command line and the progress packages that clusterctl and sind
+each carried
+([decision 21](decisions.md#21-the-command-lines-glue-for-progress-is-the-kits)).
 
 ## The packages
 
@@ -37,17 +40,22 @@ their own.
 | `termtext` | Escaping untrusted text for a terminal, and the columns text takes there | `golang.org/x/text/width` |
 | `progress` | Spans carried in a `context.Context`, the `Bus` that orders their events, `Tally`, `Sanitize`, the JSONL event log and the W3C trace context | `termtext` |
 | `progress/display` | The `Terminal` a display shares with the command, the live `Tree`, the `Counter`, `Plain` lines and the `Summary` | `progress`, `termtext`, `go-nodeset` |
+| `progress/cliprogress` | The words of `--progress` and the rule that picks a display from them, a command's `Run`, which makes and takes down its Bus, display, summary and event log, the private file the log is appended to, and the probes of a command's streams | `progress`, `progress/display`, `termtext`, `golang.org/x/sys` |
 | `progress/progresstest` | `Capture`, `Check`, `Watch` and its `Watcher`, and `Screen`, a terminal for tests | `progress`, `termtext`, `go-nodeset` |
 | `fanout` | `Each`, `Map` and `Batches`, the bounded pools that report their items as targets | `progress`, `go-nodeset` |
 
-Every arrow points down the table: nothing imports `display`, `progresstest`
-or `fanout`, `progress` imports only `termtext`, and `termtext` only
-`golang.org/x/text`. A library imports `progress`, and `fanout` when it works
-on many items; the command imports `display`; tests import `progresstest`.
-`go-nodeset` folds the names of targets into node sets, `exe[0001-0480]`, in
-the tree, the tests' trees and the summary of a pool that failed.
+Every arrow points down the table: nothing imports `cliprogress`,
+`progresstest` or `fanout`, only `cliprogress` imports `display`, `progress`
+imports only `termtext`, and `termtext` only `golang.org/x/text`. A library
+imports `progress`, and `fanout` when it works on many items; the command
+imports `cliprogress`, or `display` when it picks its displays by a rule of
+its own; tests import `progresstest`. `go-nodeset` folds the names of
+targets into node sets, `exe[0001-0480]`, in the tree, the tests' trees and
+the summary of a pool that failed.
 [Decision 3](decisions.md#3-what-the-kit-may-require) says what else the kit
-may require, which is nothing without a record.
+may require, which is nothing without a record;
+[decision 22](decisions.md#22-the-kit-may-require-golangorgxsys-in-cliprogress-alone)
+lets `cliprogress` alone require `golang.org/x/sys`.
 
 ## Spans and the Bus
 
@@ -165,16 +173,22 @@ The kit knows no program. What depends on one is a parameter or a hook:
 
 | What | Where |
 | --- | --- |
-| The program's name, in the line that says a sink, a display or a pool's work panicked, and in the error a panic becomes | `progress.BusOptions.Program`, `display.TerminalOptions.Program`, `fanout.MapOptions.Program` in place of the Bus's, `fanout.Recovered` |
-| The program's name and version on the event log's first line | `progress.BusOptions.Program`, which the Bus hands the log in `progress.Run`, or `progress.LogOptions.Program` in its place; `progress.LogOptions.Version` |
-| The class of an error that says none of its own, such as the program's rule for its exit codes | `progress.BusOptions.Classify`, `fanout.MapOptions.Classify` in place of the Bus's, `progresstest.Classify` |
+| The program's name, in the line that says a sink, a display or a pool's work panicked, and in the error a panic becomes | `progress.BusOptions.Program`, `display.TerminalOptions.Program`, `fanout.MapOptions.Program` in place of the Bus's, `fanout.Recovered`, `cliprogress.Options.Program` |
+| The program's name and version on the event log's first line | `progress.BusOptions.Program`, which the Bus hands the log in `progress.Run`, or `progress.LogOptions.Program` in its place; `progress.LogOptions.Version`; `cliprogress.Options.LogOptions` |
+| The class of an error that says none of its own, such as the program's rule for its exit codes | `progress.BusOptions.Classify`, `fanout.MapOptions.Classify` in place of the Bus's, `progresstest.Classify`, `cliprogress.Options.Classify` |
 | The error a pool's step ends with, such as the program's exit code on the kit's summary | `fanout.MapOptions.Summarize`, which is given a `fanout.Summary`, with `fanout.Failure` as the default |
-| The noun for the targets, such as "1 host" and "480 hosts"; Plain says "1 target" and "480 targets" without one | `display.PlainOptions.Noun`, `fanout.MapOptions.Noun`, `fanout.Failure` |
+| The noun for the targets, such as "1 host" and "480 hosts"; Plain says "1 target" and "480 targets" without one | `display.PlainOptions.Noun`, `fanout.MapOptions.Noun`, `fanout.Failure`, `cliprogress.Options.Noun` |
 | What a display names an item by, and what an item needs besides its place in the pool | `fanout.MapOptions.Describe`, which returns a `fanout.Item`, and `fanout.MapOptions.Acquire` |
-| The terminal's size, whether the process is in its foreground, whether its locale shows UTF-8, and the interrupt | `display.TerminalOptions`, the `ASCII` options, `display.TreeOptions.Interrupted` |
-| The trace another program handed on | `progress.BusOptions.Trace`, as `progress.ParseTraceContext` reads it from the values the program read from `TRACEPARENT` and `TRACESTATE` |
+| The terminal's size, whether the process is in its foreground, whether its locale shows UTF-8, and the interrupt | `display.TerminalOptions`, the `ASCII` options, `display.TreeOptions.Interrupted`; `cliprogress.Options.Size`, `.Foreground` and `.ASCII`, which `cliprogress.TerminalSize`, `cliprogress.InForeground` and `cliprogress.UTF8Locale` find out, and the end of the context `cliprogress.Start` is given |
+| The trace another program handed on | `progress.BusOptions.Trace`, as `progress.ParseTraceContext` reads it from the values the program read from `TRACEPARENT` and `TRACESTATE`; `cliprogress.Options.Trace`, which `cliprogress.Start` calls only once it makes a Bus |
 | Where a panic's stack goes | the `PanicLog` options |
-| How the displays look: a theme, in how many colours, or none | `display.TreeOptions.Theme`, `display.CounterOptions.Theme`, `display.PlainOptions.Theme` and `display.Summary.Theme`, one of `display.Themes`, which `display.ParseTheme` reads, drawn in 256 colours, `Colours16` or `NoColours` by `Theme.In`; the zero `Theme` draws in no colour, as before (decisions 19 and 20) |
+| How the command line and the environment ask for a display and an event log: the names of the flag and of the variable that stands in for it, and what each holds | `cliprogress.Options.Mode` and `cliprogress.Options.Log`, a `cliprogress.Setting` each |
+| Whether standard error is a terminal, and a dumb one, and whether standard output goes into a pipe | `cliprogress.Options.OnTerminal`, `.Dumb` and `.IntoPipe`; `cliprogress.IsPipe` tells the last |
+| Where the notes go, and the display and the summary | `cliprogress.Options.Notes`, `cliprogress.Options.Stderr` |
+| Which of the program's writers, and its logger's, go through the display's Terminal | the writers of `cliprogress.Run.Writer` and `cliprogress.Run.Lines`, which the program puts in place of its own and puts back once `cliprogress.Run.Finish` has returned |
+| Whether a command that succeeded leaves the summary | the argument of `cliprogress.Run.Finish` |
+| How an error of the command line is reported | the program marks the errors `cliprogress.Choose` and `cliprogress.Start` return as its usage errors |
+| How the displays look: a theme, in how many colours, or none | `display.TreeOptions.Theme`, `display.CounterOptions.Theme`, `display.PlainOptions.Theme` and `display.Summary.Theme`, one of `display.Themes`, which `display.ParseTheme` reads, drawn in 256 colours, `Colours16` or `NoColours` by `Theme.In`; the zero `Theme` draws in no colour, as before (decisions 19 and 20); `cliprogress.Options.Theme` |
 
 A Bus hands on what it was told: `Bus.Program`, `Bus.PanicLog` and
 `Bus.Classify` answer for the Bus that `progress.BusFrom` finds in a
@@ -188,12 +202,20 @@ option of its own it falls back to "the program", standard error and
 rule that tells an item canceled is the one that classes its target, so
 the step and its targets agree (decision 12).
 
-What stays in the program: its flags and environment variables, which display
-to draw and whether the terminal can show one, whether to draw in colour and
-in how many colours (from NO_COLOR, TERM, COLORTERM and whether standard
-error is a terminal), its exit codes, and reading the environment. The kit
-reads no variable and sets nothing process-wide, so two Buses in one
-process, one per call of a server, share no state.
+What stays in the program: the names of its flags and variables, and
+reading them, its own, NO_COLOR, TERM, COLORTERM and the locale's among
+them; whether a stream is a terminal; whether to draw in colour and in how
+many colours (from NO_COLOR, TERM, COLORTERM and whether standard error is a
+terminal); taking TRACEPARENT and TRACESTATE out of its environment; its
+signals and its exit codes; which commands show progress, and the span each
+runs in; and putting its own writers, and its logger's, through the
+Terminal while a display is drawn, and back. `cliprogress` picks the
+display, and whether the terminal can show one, from what the program tells
+it, and makes and takes down the Bus, the display, the summary and the
+event log; a program that picks by a rule of its own uses `display`
+directly. The kit reads no variable, sets nothing process-wide and ends no
+process, so two Buses in one process, one per call of a server, share no
+state.
 
 ## Standard error
 
