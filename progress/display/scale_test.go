@@ -33,6 +33,7 @@ func TestTheCostOfALargeStep(t *testing.T) {
 	t.Run("failures of their own cost what they number", testFailuresOfTheirOwnCostWhatTheyNumber)
 	t.Run("batches that end cost what their targets number", testBatchesThatEndCostWhatTheirTargetsNumber)
 	t.Run("a frame draws the running targets that fit", testAFrameDrawsTheRunningTargetsThatFit)
+	t.Run("targets that advance cost what they number", testTargetsThatAdvanceCostWhatTheyNumber)
 }
 
 // within logs how many times as long large took as small, which go test
@@ -255,4 +256,53 @@ func testAFrameDrawsTheRunningTargetsThatFit(t *testing.T) {
 	}
 	queued, running := cost(false), cost(true)
 	within(t, "frames over 30,000 targets running against as many queued, a few rows more", queued, running, 15)
+}
+
+// Each advance of a target's work goes to the tree's Meter, which rolls it
+// up into the step and the command, under the lock the Bus waits for, and
+// each frame reads the work of the rows it draws. Ten times as many
+// targets, each advancing ten times a second with a frame drawn after
+// each round, have to cost about ten times as much: rolling up an advance
+// costs what the tree is deep, not what the step is wide.
+func testTargetsThatAdvanceCostWhatTheyNumber(t *testing.T) {
+	cost := func(n int) time.Duration {
+		best := time.Duration(1 << 62)
+		for range 5 {
+			screen := &progresstest.Screen{Width: 100}
+			term := display.NewTerminal(screen, display.TerminalOptions{Size: func() (int, int, error) { return 100, 30, nil }})
+			c := &clock{now: time.Date(2026, 9, 26, 12, 0, 0, 0, time.UTC)}
+			tree := display.NewTree(term, display.TreeOptions{Now: c.Now})
+			bus := progress.NewBus(progress.BusOptions{Sinks: []progress.Sink{tree}, Now: c.Now})
+			ctx, command := progress.Start(progress.WithBus(context.Background(), bus), progress.KindCommand, "deploy")
+			ctx, step := progress.Start(ctx, progress.KindStep, "copying the image", progress.WithFlags(progress.Fold),
+				progress.Total(n), progress.Limit(n))
+			spans := make([]*progress.Span, n)
+			for i := range spans {
+				name := fmt.Sprintf("exe%05d", i+1)
+				_, spans[i] = progress.Start(ctx, progress.KindTarget, name, progress.Queued(), progress.Node(name),
+					progress.Work(progress.Bytes, 1<<30))
+				spans[i].Run()
+			}
+			runtime.GC()
+			start := time.Now()
+			for range 10 {
+				c.Add(100 * time.Millisecond)
+				for _, span := range spans {
+					span.Advance(1 << 20)
+				}
+				tree.Draw()
+			}
+			best = min(best, time.Since(start))
+			for _, span := range spans {
+				span.End(nil)
+			}
+			step.End(nil)
+			command.End(nil)
+			bus.Close()
+			tree.Close()
+		}
+		return best
+	}
+	small, large := cost(1000), cost(10000)
+	within(t, "10,000 targets that advance against 1,000, 10 times the work", small, large, 30)
 }

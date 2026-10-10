@@ -613,3 +613,44 @@ func treeThemeBar(t *testing.T, what, frame string, width, cols int) {
 		}
 	}
 }
+
+// In a theme the bar of the counted step fills with its share of the work
+// done, the cells of the target that failed at its end, and each running
+// target with a bounded share draws a bar of six cells before its amount;
+// the amount and the rate are muted, and the share takes the colour of the
+// bar. In ASCII the bars are of #.
+func TestTheWorkOfATreeInATheme(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		theme display.Theme
+		ascii bool
+		want  string
+	}{
+		{display.Tide, false, `
+«1»deploy«38;5;66» ◦ «38;5;31»0:35.0«»
+«38;5;66»╎ «1»copying the image«»  «38;5;32»◉◉◉◉◉◉◉«38;5;166»◉«38;5;66»◌◌«» 7/12«38;5;66» ◦ «38;5;166»1 failed«38;5;66» ◦ «38;5;29»4 running«38;5;66» ◦ 1 queued ◦ 18.8 GiB ◦ «38;5;32»82%«38;5;66» ◦ 640 MiB/s ◦ ~9s left«»
+  «38;5;66»╎ «1;38;5;166»✕«» exe4  transport: transport: dial tcp: i/o timeout
+  «38;5;66»╎ «38;5;29»◠«» exe8  «38;5;32»◉«38;5;66»◌◌◌◌◌«» «38;5;66»0.6/2.0 GiB ◦ «38;5;32»31%«38;5;66» ◦ 64.0 MiB/s ◦ ~22s left«»  «38;5;66»10.0s«»  copy
+  «38;5;66»╎ «38;5;29»◠«» exe9  «38;5;32»◉◉◉«38;5;66»◌◌◌«» «38;5;66»1.2/2.0 GiB ◦ «38;5;32»62%«38;5;66» ◦ 128 MiB/s ◦ ~6s left«»  «38;5;66»10.0s«»  copy
+  «38;5;66»╎ «38;5;29»◠«» exe10  «38;5;32»◉◉◉◉◉«38;5;66»◌«» «38;5;66»1.9/2.0 GiB ◦ «38;5;32»93%«38;5;66» ◦ 192 MiB/s ◦ ~1s left«»  «38;5;66»10.0s«»  copy
+  «38;5;66»╎ «38;5;29»◠«» exe11  «38;5;32»◉◉◉◉◉◉«» «38;5;66»2.5/2.0 GiB ◦ «38;5;32»100%«38;5;66» ◦ 256 MiB/s«»  «38;5;66»10.0s«»  copy
+  «38;5;66»╎ «1;38;5;32»✓«» exe[1-3,5-7]
+`},
+		{display.Tide, true, `
+«1»deploy«38;5;66» - «38;5;31»0:35.0«»
+  «1»copying the image«»  «38;5;66»[«38;5;32»#######«38;5;166»#«38;5;66»..]«» 7/12«38;5;66» - «38;5;166»1 failed«38;5;66» - «38;5;29»4 running«38;5;66» - 1 queued - 18.8 GiB - «38;5;32»82%«38;5;66» - 640 MiB/s - ~9s left«»
+    «1;38;5;166»x«» exe4  transport: transport: dial tcp: i/o timeout
+    «38;5;29»>«» exe8  «38;5;66»[«38;5;32»#«38;5;66».....]«» «38;5;66»0.6/2.0 GiB - «38;5;32»31%«38;5;66» - 64.0 MiB/s - ~22s left«»  «38;5;66»10.0s«»  copy
+    «38;5;29»>«» exe9  «38;5;66»[«38;5;32»###«38;5;66»...]«» «38;5;66»1.2/2.0 GiB - «38;5;32»62%«38;5;66» - 128 MiB/s - ~6s left«»  «38;5;66»10.0s«»  copy
+    «38;5;29»>«» exe10  «38;5;66»[«38;5;32»#####«38;5;66».]«» «38;5;66»1.9/2.0 GiB - «38;5;32»93%«38;5;66» - 192 MiB/s - ~1s left«»  «38;5;66»10.0s«»  copy
+    «38;5;29»>«» exe11  «38;5;66»[«38;5;32»######«38;5;66»]«» «38;5;66»2.5/2.0 GiB - «38;5;32»100%«38;5;66» - 256 MiB/s«»  «38;5;66»10.0s«»  copy
+    «1;38;5;32»+«» exe[1-3,5-7]
+`},
+	} {
+		f := newTreeFixture(t, "deploy", treeSetup{width: 140, theme: tc.theme, ascii: tc.ascii, styles: true})
+		copyImage(f)
+		if got := f.screen.Styled(); got != tc.want[1:] {
+			t.Errorf("%s:\n%s\nwant:\n%s", treeThemeName(tc.theme, tc.ascii), got, tc.want[1:])
+		}
+	}
+}

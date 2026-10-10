@@ -19,6 +19,7 @@ import (
 	"github.com/GSI-HPC/go-clikit/progress"
 	"github.com/GSI-HPC/go-clikit/progress/display"
 	"github.com/GSI-HPC/go-clikit/progress/progresstest"
+	"github.com/GSI-HPC/go-clikit/termtext"
 	"github.com/GSI-HPC/go-nodeset"
 )
 
@@ -400,40 +401,194 @@ prog: slurm node drain: done in 3.0s
 	}
 }
 
-// The work a span reports, which no display draws yet, changes nothing a
-// display draws: a session whose calls advance their work draws the frames
-// and leaves the lines of one whose calls report none.
-func TestWorkChangesNoFrame(t *testing.T) {
+// The work a span reports, which the counter does not draw yet, changes
+// nothing it draws: a session whose calls advance their work draws the
+// frames and leaves the lines of one whose calls report none.
+func TestWorkChangesNoFrameOfTheCounter(t *testing.T) {
 	t.Parallel()
-	for name, newDisplay := range map[string]func(*display.Terminal, func() time.Time) drawer{
-		"counter": counterDisplay, "tree": treeDisplay,
+	var frames [2][]string
+	var ends [2]string
+	for i, advance := range []bool{false, true} {
+		s := newSession(t, "fetch", counterDisplay)
+		_, _ = fanout.Map(s.ctx, []string{"exe0001", "exe0002"}, fanout.MapOptions[string]{Step: "copy", Limit: 1},
+			func(ctx context.Context, _ string) (struct{}, error) {
+				_, call := progress.Start(ctx, progress.KindCall, "copy")
+				if advance {
+					call.Update(progress.Work(progress.Bytes, 2<<30))
+					call.Advance(1 << 30)
+				}
+				s.draw()
+				if advance {
+					call.Advance(1 << 30)
+				}
+				s.draw()
+				call.End(nil)
+				return struct{}{}, nil
+			})
+		ends[i] = s.end(t, nil)
+		frames[i] = s.frames
+	}
+	if !slices.Equal(frames[0], frames[1]) || ends[0] != ends[1] {
+		t.Errorf("with work:\n%s\n%s\nwithout:\n%s\n%s",
+			strings.Join(frames[1], "\n"), ends[1], strings.Join(frames[0], "\n"), ends[0])
+	}
+}
+
+// copyImage runs a pool of f's command that copies an image of 2 GiB to
+// each of 12 nodes, four at a time, each target's copy a call that rolls up
+// into it, and draws a frame: six copies have ended, one failed, four run,
+// each at its own rate, and one is queued.
+func copyImage(f *treeFixture) {
+	ctx, _ := progress.Start(f.ctx, progress.KindStep, "copying the image",
+		progress.WithFlags(progress.Fold), progress.Total(12), progress.Limit(4))
+	ctxs, spans := targets(ctx, nodes(12)...)
+	copying := func(i int) *progress.Span {
+		spans[i].Run()
+		_, call := progress.Start(ctxs[i], progress.KindCall, "copy", progress.Work(progress.Bytes, 2<<30))
+		return call
+	}
+	for i := range 7 {
+		call := copying(i)
+		if i == 3 {
+			f.clock.Add(time.Second)
+			call.Advance(1 << 29)
+			err := unreachable("transport: dial tcp: i/o timeout")
+			call.End(err)
+			spans[i].End(err)
+			continue
+		}
+		for range 4 {
+			f.clock.Add(time.Second)
+			call.Advance(1 << 29)
+		}
+		call.End(nil)
+		spans[i].End(nil)
+	}
+	var calls []*progress.Span
+	for i := 7; i < 11; i++ {
+		calls = append(calls, copying(i))
+	}
+	for range 10 {
+		f.clock.Add(time.Second)
+		for j, call := range calls {
+			call.Advance(int64(j+1) << 26)
+		}
+	}
+	f.draw(0)
+}
+
+// The rows of the tree draw the work of their spans: the step's after how
+// its targets stand, rolled up from its targets, and a target's after its
+// name, before how long it has run. On a terminal too narrow for the whole
+// row, the step's row gives up the time left, the rate and the amount, in
+// that order, to keep its share; a target's row gives up its request
+// first, as it does now, and then the same parts of its work.
+func TestTheTreeDrawsTheWorkOfAPool(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		width int
+		want  string
+	}{
+		{120, `
+deploy · 0:35.0
+  copying the image  7/12 · 1 failed · 4 running · 1 queued · 18.8 GiB · 82% · 640 MiB/s · ~9s left
+    ✗ exe4  transport: transport: dial tcp: i/o timeout
+    ▸ exe8  0.6/2.0 GiB · 31% · 64.0 MiB/s · ~22s left  10.0s  copy
+    ▸ exe9  1.2/2.0 GiB · 62% · 128 MiB/s · ~6s left  10.0s  copy
+    ▸ exe10  1.9/2.0 GiB · 93% · 192 MiB/s · ~1s left  10.0s  copy
+    ▸ exe11  2.5/2.0 GiB · 100% · 256 MiB/s  10.0s  copy
+    ✓ exe[1-3,5-7]
+`},
+		{80, `
+deploy · 0:35.0
+  copying the image  7/12 · 1 failed · 4 running · 1 queued · 18.8 GiB · 82%
+    ✗ exe4  transport: transport: dial tcp: i/o timeout
+    ▸ exe8  0.6/2.0 GiB · 31% · 64.0 MiB/s · ~22s left  10.0s  copy
+    ▸ exe9  1.2/2.0 GiB · 62% · 128 MiB/s · ~6s left  10.0s  copy
+    ▸ exe10  1.9/2.0 GiB · 93% · 192 MiB/s · ~1s left  10.0s  copy
+    ▸ exe11  2.5/2.0 GiB · 100% · 256 MiB/s  10.0s  copy
+    ✓ exe[1-3,5-7]
+`},
+		{60, `
+deploy · 0:35.0
+  copying the image  7/12 · 1 failed · 4 running · 1 queued
+    ✗ exe4  transport: transport: dial tcp: i/o timeout
+    ▸ exe8  0.6/2.0 GiB · 31% · 64.0 MiB/s  10.0s  copy
+    ▸ exe9  1.2/2.0 GiB · 62% · 128 MiB/s · ~6s left  10.0s
+    ▸ exe10  1.9/2.0 GiB · 93% · 192 MiB/s  10.0s  copy
+    ▸ exe11  2.5/2.0 GiB · 100% · 256 MiB/s  10.0s  copy
+    ✓ exe[1-3,5-7]
+`},
 	} {
-		t.Run(name, func(t *testing.T) {
-			t.Parallel()
-			var frames [2][]string
-			var ends [2]string
-			for i, advance := range []bool{false, true} {
-				s := newSession(t, "fetch", newDisplay)
-				_, _ = fanout.Map(s.ctx, []string{"exe0001", "exe0002"}, fanout.MapOptions[string]{Step: "copy", Limit: 1},
-					func(ctx context.Context, _ string) (struct{}, error) {
-						_, call := progress.Start(ctx, progress.KindCall, "copy")
-						if advance {
-							call.Update(progress.Work(progress.Bytes, 2<<30))
-							call.Advance(1 << 30)
-						}
-						s.draw()
-						call.Advance(1 << 30)
-						s.draw()
-						call.End(nil)
-						return struct{}{}, nil
-					})
-				ends[i] = s.end(t, nil)
-				frames[i] = s.frames
+		f := newTreeFixture(t, "deploy", treeSetup{width: tc.width})
+		copyImage(f)
+		if got := f.screen.String(); got != tc.want[1:] {
+			t.Errorf("on %d columns:\n%s\nwant:\n%s", tc.width, got, tc.want[1:])
+		}
+	}
+}
+
+// workKinds returns which parts of a span's work row holds, as the tree
+// draws them with no theme: the amount, the share, the rate and the time
+// left. The last part of a row as wide as a terminal of width columns
+// allows may have been cut by the terminal: whole leaves it out, and drawn
+// counts it in.
+func workKinds(row string, width int) (whole, drawn map[string]bool) {
+	var parts []string
+	for _, field := range strings.Split(row, "  ") {
+		parts = append(parts, strings.Split(field, " · ")...)
+	}
+	whole, drawn = map[string]bool{}, map[string]bool{}
+	for i, part := range parts {
+		kind := ""
+		switch {
+		case strings.HasSuffix(part, " left"):
+			kind = "left"
+		case strings.HasSuffix(part, "/s"):
+			kind = "rate"
+		case strings.HasSuffix(part, "%"):
+			kind = "share"
+		case strings.HasSuffix(part, "iB"):
+			kind = "amount"
+		default:
+			continue
+		}
+		drawn[kind] = true
+		if i < len(parts)-1 || termtext.Width(row) < width-1 {
+			whole[kind] = true
+		}
+	}
+	return whole, drawn
+}
+
+// On every width, each row of the pool fits the terminal, gives up the
+// parts of its work in order, the time left first, then the rate, then the
+// amount, and keeps its share while it keeps anything else; and a wider
+// terminal never draws less of a row's work than a narrower one.
+func TestTheWorkOfTheTreeFitsEveryWidth(t *testing.T) {
+	t.Parallel()
+	chain := []string{"left", "rate", "amount", "share"}
+	var before []map[string]bool
+	for width := 40; width <= 120; width++ {
+		f := newTreeFixture(t, "deploy", treeSetup{width: width})
+		copyImage(f)
+		rows := strings.Split(strings.TrimSuffix(f.screen.String(), "\n"), "\n")
+		if len(rows) != 8 {
+			t.Fatalf("on %d columns, %d rows, want 8:\n%s", width, len(rows), f.screen.String())
+		}
+		var kinds []map[string]bool
+		for i, row := range rows {
+			k, drawn := workKinds(row, width)
+			kinds = append(kinds, k)
+			for j := 0; j+1 < len(chain); j++ {
+				if k[chain[j]] && !drawn[chain[j+1]] {
+					t.Errorf("on %d columns, row %d keeps the %s but gives up the %s: %s", width, i+1, chain[j], chain[j+1], row)
+				}
 			}
-			if !slices.Equal(frames[0], frames[1]) || ends[0] != ends[1] {
-				t.Errorf("with work:\n%s\n%s\nwithout:\n%s\n%s",
-					strings.Join(frames[1], "\n"), ends[1], strings.Join(frames[0], "\n"), ends[0])
+			if before != nil && len(k) < len(before[i]) {
+				t.Errorf("on %d columns, row %d draws less of its work than on %d: %s", width, i+1, width-1, row)
 			}
-		})
+		}
+		before = kinds
 	}
 }

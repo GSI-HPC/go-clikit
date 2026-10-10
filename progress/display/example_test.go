@@ -147,6 +147,45 @@ func ExampleNewTree() {
 	// ✓ powering on  2.0s  4 ok
 }
 
+// A span reports its work as it goes: Work gives its unit and size, and
+// Advance adds to the amount done. The Tree draws the work on the row of
+// the step the call is made for, which it rolls up into.
+func ExampleNewTree_work() {
+	clock := newExampleClock()
+	screen := &progresstest.Screen{Width: 120}
+	term := display.NewTerminal(screen, display.TerminalOptions{Size: func() (int, int, error) { return 120, 24, nil }})
+	tree := display.NewTree(term, display.TreeOptions{Now: clock.Now})
+	bus := progress.NewBus(progress.BusOptions{Sinks: []progress.Sink{tree}, Now: clock.Now})
+	ctx, command := progress.Start(progress.WithBus(context.Background(), bus), progress.KindCommand, "fetch")
+
+	ctx, step := progress.Start(ctx, progress.KindStep, "fetching the base image")
+	_, call := progress.Start(ctx, progress.KindCall, "download",
+		progress.HTTP("GET", "/images/rocky-9.4.qcow2"), progress.Work(progress.Bytes, 2<<30))
+	for range 144 {
+		clock.Add(100 * time.Millisecond)
+		call.Advance(8 << 20)
+	}
+	tree.Draw()
+	fmt.Print(screen.String())
+	fmt.Println("---")
+
+	for range 112 {
+		clock.Add(100 * time.Millisecond)
+		call.Advance(8 << 20)
+	}
+	call.End(nil)
+	step.End(nil)
+	command.End(nil)
+	bus.Close()
+	tree.Close()
+	fmt.Print(screen.String())
+	// Output:
+	// fetch · 0:14.4
+	//   fetching the base image  1.1/2.0 GiB · 56% · 80.0 MiB/s · ~12s left  14.4s  GET /images/rocky-9.4.qcow2
+	// ---
+	// ✓ fetching the base image  25s  2.0 GiB at 80.0 MiB/s
+}
+
 // The Counter draws one line, for a terminal too small for the tree or a
 // user who wants no more.
 func ExampleNewCounter() {

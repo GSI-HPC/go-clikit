@@ -77,6 +77,21 @@ const (
 // tick in tenths of a second, so a frame differs from the one before while
 // anything runs. A pause counts down in whole seconds.
 //
+// The work a span reports, rolled up the tree by a progress.Meter, is drawn
+// on its row: a step's or a batch's after how its targets stand, or after
+// its name when it counts none, and a running target's, or that of a call
+// made for the command, after its name, before how long it has run. It
+// reads as the amount, out of the size when there is one, the share done,
+// the rate and the time left, "1.1/2.0 GiB · 56% · 80.0 MiB/s · ~12s left",
+// with how long the work has stalled in place of the rate once it has not
+// grown for five seconds; work in progress.Percent draws its share and its
+// time left alone, and work of no known size its amount and its rate. A row
+// too wide for the terminal gives up its request first, as it is cut off,
+// then the time left, the rate, the amount and the bar, in that order. The
+// line a step leaves says what its work came to after how long it took, and
+// how fast it went on average: "2.0 GiB at 80.0 MiB/s". A span that reports
+// no work, and has none below it, draws as it always has.
+//
 // A hidden span is drawn only once it has run for a second, and a line is
 // left for it only when it failed or took that long. A span that ends well
 // within a tenth of a second, with nothing drawn below it, is done without
@@ -98,12 +113,17 @@ const (
 // no theme draws: a spinner in place of the mark of a running target, which
 // turns with the time since the tree was made, so that a frame drawn at the
 // same instant is drawn the same; on the row of a step or a batch whose
-// count it knows, a bar of how many of its targets are done, between its
-// name and its count, when the row fits the terminal with it; a guide at
-// the innermost level of each indent; and colours, on the marks, the counts
-// of how the targets stand and ended, the clock, the times, the separators
-// and the names of the command and its steps, while the names of targets,
-// errors, requests and lines of output stay in the terminal's own. A theme
+// count it knows, a bar of its share of the work done, or of how many of
+// its targets are done when it has none, between its name and its count,
+// the targets that failed at its end, when the row fits the terminal with
+// it; before the work of a running target, call or step with a share done,
+// a bar of six cells; a guide at the innermost level of each indent; and
+// colours, on the marks, the counts of how the targets stand and ended, the
+// clock, the times, the separators, the amounts and rates of work, its
+// share done, in the colour of the bar, how long it has stalled, in that of
+// a cancellation, and the names of the command and its steps, while the
+// names of targets, errors, requests and lines of output stay in the
+// terminal's own. A theme
 // draws as many rows as no theme, with the same words in the same order,
 // and sets the colours back after each piece it colours, so that none runs
 // on past a row or a line.
@@ -122,7 +142,10 @@ type Tree struct {
 	// read, and what the line of a counter is drawn from, which the tree
 	// draws in its place on a terminal too small for it.
 	counts counting
-	spans  map[progress.SpanID]*treeSpan
+	// meter rolls up the work of the spans, which their rows read at each
+	// frame.
+	meter progress.Meter
+	spans map[progress.SpanID]*treeSpan
 	// roots are the open spans started under none: the command.
 	roots []*treeSpan
 	// shown says the tree has been drawn, or would have been: the lines
@@ -282,6 +305,7 @@ func (t *Tree) Handle(e progress.Event) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	count, counted := t.counts.add(e)
+	worked, hasWork := t.meter.Add(e)
 	s := t.spans[e.Span]
 	switch e.Type {
 	case progress.TypeStart:
@@ -303,7 +327,7 @@ func (t *Tree) Handle(e progress.Event) {
 		}
 	case progress.TypeEnd:
 		if s != nil {
-			t.end(e, s, count, counted)
+			t.end(e, s, count, counted, worked, hasWork)
 		}
 	}
 }
@@ -337,7 +361,7 @@ func (t *Tree) begin(e progress.Event) {
 	}
 }
 
-func (t *Tree) end(e progress.Event, s *treeSpan, count progress.Count, counted bool) {
+func (t *Tree) end(e progress.Event, s *treeSpan, count progress.Count, counted bool, worked progress.Reading, hasWork bool) {
 	delete(t.spans, e.Span)
 	s.fields = e.Fields
 	s.over = true
@@ -374,7 +398,7 @@ func (t *Tree) end(e progress.Event, s *treeSpan, count progress.Count, counted 
 			p.fold().canceled.add(s.fields.Node)
 		}
 	case progress.KindStep:
-		t.finished(e, s, count, counted)
+		t.finished(e, s, count, counted, worked, hasWork)
 	}
 }
 
@@ -382,8 +406,9 @@ func (t *Tree) end(e progress.Event, s *treeSpan, count progress.Count, counted 
 // that failed below it, unless the step is one the tree does not show:
 // one with no name, one under a target, a hidden one that ended well
 // within a second, or one that ended well at once with nothing drawn below
-// it. t.mu is held.
-func (t *Tree) finished(e progress.Event, s *treeSpan, count progress.Count, counted bool) {
+// it. A step that ran with work says after how long it took what its work
+// came to, as worked has it. t.mu is held.
+func (t *Tree) finished(e progress.Event, s *treeSpan, count progress.Count, counted bool, worked progress.Reading, hasWork bool) {
 	if e.Name == "" || s.underTarget {
 		return
 	}
@@ -407,6 +432,11 @@ func (t *Tree) finished(e progress.Event, s *treeSpan, count progress.Count, cou
 		text += "  " + g.paint(roleMuted, took(d)) + "  " + ended(g, count)
 	default:
 		text += "  " + g.paint(roleMuted, took(d))
+	}
+	if ran && hasWork {
+		if done := endedText(g, worked); done != "" {
+			text += "  " + done
+		}
 	}
 	t.lines.WriteString(text + "\n")
 	if s.ended != nil {
@@ -834,15 +864,17 @@ func (f *frame) span(s *treeSpan, depth int) {
 		if s.kind == progress.KindBatch {
 			name = "batch " + name
 		}
-		text := g.paint(roleTitle, name)
+		head := g.paint(roleTitle, name)
+		r, worked := f.t.meter.Read(s.id, f.now)
+		c := f.call(s)
+		var text string
 		if count, ok := f.t.counts.tally.Count(s.id); ok {
-			text = f.counted(depth, text, count)
-			if c := f.call(s); c != nil {
+			text = f.counted(depth, head, count, r, worked)
+			if c != nil {
 				text += "  " + g.paint(roleMuted, f.took(s, c)) + "  " + describe(c, nil)
 			}
 		} else {
-			c := f.call(s)
-			text += "  " + g.paint(roleMuted, f.took(s, c))
+			text = f.fitted(depth, head, r, worked, "  "+g.paint(roleMuted, f.took(s, c)))
 			if c != nil {
 				text += "  " + describe(c, nil)
 			}
@@ -870,24 +902,71 @@ func (f *frame) span(s *treeSpan, depth int) {
 		if s.parent != nil && s.parent.kind != progress.KindCommand || !f.drawn(s) {
 			return
 		}
-		f.row(depth, describe(s, nil)+"  "+g.paint(roleMuted, f.took(s, s)))
+		r, worked := f.t.meter.Read(s.id, f.now)
+		f.row(depth, f.fitted(depth, describe(s, nil), r, worked, "  "+g.paint(roleMuted, f.took(s, s))))
 	}
 }
 
 // counted is the row of a step or a batch whose count is known, after its
-// indent at depth, up to the end of its count: head, its name, the bar of
-// the count, where the row fits the terminal with it, and how its targets
-// stand.
-func (f *frame) counted(depth int, head string, c progress.Count) string {
+// indent at depth, up to the end of its work: head, its name, the bar of
+// the count, how its targets stand, and its work r, when it has any. The
+// bar fills with the share of the work done, when it has one, and with the
+// share of the targets done otherwise. A row that does not fit the
+// terminal gives up the time left, the rate, the amount and the bar, in
+// that order, until it does.
+func (f *frame) counted(depth int, head string, c progress.Count, r progress.Reading, worked bool) string {
 	g := f.t.g
 	standing := standingOf(c, g)
-	if bar := g.bar(c, treeBar); bar != "" {
-		row := head + "  " + bar + " " + standing
-		if termtext.Width(visible(g.indent(depth)+row)) <= f.width-1 {
+	bar := g.bar(c, treeBar)
+	var w work
+	if worked {
+		w = workOf(g, r, 0)
+		if r.Bound != progress.Unbounded {
+			bar = g.fractionBar(r.Fraction, c, treeBar)
+		}
+	}
+	return f.giveUp(depth, func(giveUp int) string {
+		row := head + "  "
+		if bar != "" && giveUp < giveUps {
+			row += bar + " "
+		}
+		row += standing
+		if text := w.text(g.paint(roleMuted, g.sep), giveUp); text != "" {
+			row += g.paint(roleMuted, g.sep) + text
+		}
+		return row
+	})
+}
+
+// fitted is a row, after its indent at depth, of head, the work r when it
+// has any, and then tail, how long the span has run: the work gives up its
+// parts, as counted's does, until the row fits the terminal.
+func (f *frame) fitted(depth int, head string, r progress.Reading, worked bool, tail string) string {
+	if !worked {
+		return head + tail
+	}
+	g := f.t.g
+	w := workOf(g, r, workBar)
+	return f.giveUp(depth, func(giveUp int) string {
+		row := head
+		if text := w.text(g.paint(roleMuted, g.sep), giveUp); text != "" {
+			row += "  " + text
+		}
+		return row + tail
+	})
+}
+
+// giveUp returns the row build makes, after its indent at depth, giving up
+// fewest parts of its work for it to fit the terminal; giving up every
+// one, when none does.
+func (f *frame) giveUp(depth int, build func(giveUp int) string) string {
+	pad := f.t.g.indent(depth)
+	for n := range giveUps {
+		if row := build(n); termtext.Width(visible(pad+row)) <= f.width-1 {
 			return row
 		}
 	}
-	return head + "  " + standing
+	return build(giveUps)
 }
 
 // header is the command's row: its name and how long it has run, and,
@@ -971,7 +1050,7 @@ func (f *frame) below(s *treeSpan, depth int) {
 			render: func(keep int) []string {
 				rows := make([]string, 0, keep)
 				for _, target := range longest(running, keep, f.t.start) {
-					rows = append(rows, pad+f.target(target))
+					rows = append(rows, pad+f.target(target, depth))
 				}
 				return rows
 			}})
@@ -1023,14 +1102,15 @@ func longest(running []*treeSpan, k int, start time.Time) []*treeSpan {
 	return top
 }
 
-// target is the row of a running target: the running mark, a spinner's
-// frame in a theme that has one, its name, how long it has run, and what
-// it waits for now, or the last line of its output.
-func (f *frame) target(s *treeSpan) string {
+// target is the row of a running target at depth: the running mark, a
+// spinner's frame in a theme that has one, its name, its work when it has
+// any, how long it has run, and what it waits for now, or the last line of
+// its output.
+func (f *frame) target(s *treeSpan, depth int) string {
 	g := f.t.g
-	text := g.spinner(f.now.Sub(f.t.start)) + " " + s.name
 	inner := f.innermost(s)
-	text += "  " + g.paint(roleMuted, f.took(s, inner))
+	r, worked := f.t.meter.Read(s.id, f.now)
+	text := f.fitted(depth, g.spinner(f.now.Sub(f.t.start))+" "+s.name, r, worked, "  "+g.paint(roleMuted, f.took(s, inner)))
 	switch {
 	case s.flags&progress.ShowLines != 0 && s.line != "":
 		text += "  " + s.line
