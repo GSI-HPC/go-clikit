@@ -163,15 +163,17 @@ func TestTheEventLogWritesEveryEventOnALineOfItsOwn(t *testing.T) {
 		status.End(nil)
 
 		// A third command reports work in each unit: a download whose size
-		// is known once its headers are, advanced every 100 ms, with an
-		// amount not yet sent when it ends, which its end carries; a walk
+		// is known once its headers are, advanced every 100 ms for 1.2 s,
+		// of which the log writes the first advance and the one a second
+		// later, and leaves out the rest, with an amount not yet sent when
+		// it ends, which its end carries; a walk
 		// that counts what it indexed, with no size; and a remote task
 		// that says how far it has got.
 		ctx, fetch := progress.Start(busCtx, progress.KindCommand, "fetch")
 		stepCtx, image := progress.Start(ctx, progress.KindStep, "fetching the base image")
 		_, download := progress.Start(stepCtx, progress.KindCall, "download", progress.HTTP("GET", "/images/rocky-9.4.qcow2"))
 		download.Update(progress.Work(progress.Bytes, 2<<30))
-		for range 2 {
+		for range 12 {
 			clock.Add(100 * time.Millisecond)
 			download.Advance(8 << 20)
 		}
@@ -204,8 +206,23 @@ func TestTheEventLogWritesEveryEventOnALineOfItsOwn(t *testing.T) {
 	if log != string(want) {
 		t.Errorf("event log:\n%s\nwant %s:\n%s", log, logFixture, want)
 	}
-	if n := strings.Count(log, "\n"); n != len(events)+1 {
-		t.Errorf("%d lines for %d events and the trace", n, len(events))
+	// Every event is a line, but those of the advances the log left out,
+	// which the end of each span counts.
+	leftOut := 0
+	for line := range strings.Lines(log) {
+		var l struct {
+			Type    string
+			LeftOut int
+		}
+		if err := json.Unmarshal([]byte(line), &l); err != nil {
+			t.Fatalf("%q: %v", line, err)
+		}
+		if l.Type == "end" {
+			leftOut += l.LeftOut
+		}
+	}
+	if n := strings.Count(log, "\n"); n != len(events)+1-leftOut {
+		t.Errorf("%d lines for %d events less %d left out, and the trace", n, len(events), leftOut)
 	}
 	if strings.Contains(log, "secret") {
 		t.Errorf("the log holds the text of a line:\n%s", log)
@@ -945,5 +962,101 @@ func TestTheEventLogTakesTheProgramFromTheBus(t *testing.T) {
 				t.Errorf("the first line is %s, want %s", first, tc.want)
 			}
 		})
+	}
+}
+
+// advancesLogged feeds a log with options o one advance of a span every
+// 100 ms from the start of the second one, n of them, and the span's end,
+// and returns the lines it wrote as seq and leftOut pairs, "end" for the
+// end.
+func advancesLogged(t *testing.T, o progress.LogOptions, n int) [][2]int {
+	t.Helper()
+	var out bytes.Buffer
+	o.Run = "0123456789abcdef"
+	log := progress.NewLog(&out, o)
+	at := time.Date(2026, 10, 10, 12, 0, 0, 0, time.UTC)
+	span := progress.SpanID(7)
+	for i := 1; i <= n; i++ {
+		log.Handle(progress.Event{Seq: uint64(i), Time: at.Add(time.Duration(i) * 100 * time.Millisecond),
+			Type: progress.TypeAdvance, Span: span, Kind: progress.KindCall, Name: "download"})
+	}
+	log.Handle(progress.Event{Seq: uint64(n + 1), Time: at.Add(time.Duration(n+1) * 100 * time.Millisecond),
+		Type: progress.TypeEnd, Span: span, Kind: progress.KindCall, Name: "download"})
+	if err := log.Close(); err != nil {
+		t.Fatal(err)
+	}
+	var got [][2]int
+	for line := range strings.Lines(out.String()) {
+		var l struct {
+			Seq     int
+			Type    string
+			LeftOut int
+		}
+		if err := json.Unmarshal([]byte(line), &l); err != nil {
+			t.Fatalf("%q: %v", line, err)
+		}
+		if l.Type == "trace" {
+			continue
+		}
+		got = append(got, [2]int{l.Seq, l.LeftOut})
+	}
+	return got
+}
+
+// The log writes the first advance of a span, then one once AdvanceEvery
+// has passed by the events' times, and counts the others it leaves out
+// on the next it writes and on the span's end.
+func TestTheLogSamplesTheAdvancesOfASpan(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name  string
+		every time.Duration
+		n     int
+		want  [][2]int
+	}{
+		{"a second by default", 0, 25, [][2]int{{1, 0}, {11, 9}, {21, 9}, {26, 4 + 18}}},
+		{"a positive value", 250 * time.Millisecond, 7, [][2]int{{1, 0}, {4, 2}, {7, 2}, {8, 4}}},
+		{"every advance for a negative value", -1, 5, [][2]int{{1, 0}, {2, 0}, {3, 0}, {4, 0}, {5, 0}, {6, 0}}},
+		{"one advance is always written", 0, 1, [][2]int{{1, 0}, {2, 0}}},
+		{"none, no end to count", 0, 0, [][2]int{{1, 0}}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			if got := advancesLogged(t, progress.LogOptions{AdvanceEvery: tt.every}, tt.n); !slices.Equal(got, tt.want) {
+				t.Errorf("seq and leftOut of the lines = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+// A span's sampling is forgotten at its end, and a span whose id comes
+// again is sampled afresh.
+func TestTheLogForgetsTheSamplingOfASpanThatEnded(t *testing.T) {
+	t.Parallel()
+	var out bytes.Buffer
+	log := progress.NewLog(&out, progress.LogOptions{Run: "0123456789abcdef"})
+	at := time.Date(2026, 10, 10, 12, 0, 0, 0, time.UTC)
+	for i, typ := range []progress.Type{progress.TypeAdvance, progress.TypeAdvance, progress.TypeEnd,
+		progress.TypeAdvance, progress.TypeEnd} {
+		log.Handle(progress.Event{Seq: uint64(i + 1), Time: at.Add(time.Duration(i) * time.Millisecond),
+			Type: typ, Span: 9, Kind: progress.KindCall, Name: "download"})
+	}
+	if err := log.Close(); err != nil {
+		t.Fatal(err)
+	}
+	lines := strings.Split(strings.TrimSpace(out.String()), "\n")
+	// The trace line is missing: Begin was not called. Every advance is
+	// written but the second, and the second end counts none.
+	if len(lines) != 4 {
+		t.Fatalf("%d lines, want 4:\n%s", len(lines), out.String())
+	}
+	for i, want := range []string{`"seq":1,`, `"seq":3,`, `"seq":4,`, `"seq":5,`} {
+		if !strings.Contains(lines[i], want) {
+			t.Errorf("line %d = %s, want %s", i, lines[i], want)
+		}
+	}
+	if !strings.Contains(lines[1], `"leftOut":1`) || strings.Contains(lines[3], "leftOut") {
+		t.Errorf("the ends count %s and %s, want 1 and none", lines[1], lines[3])
 	}
 }
