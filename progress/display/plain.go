@@ -34,7 +34,8 @@ const (
 // is written as a step or a batch starts and ends, as a pause of a known
 // length starts, and as a wait fails or is interrupted; for each
 // target that fails, once; and, every ten seconds, for each counted step
-// under way, a root of a progress.Tally, with how far it has got. The line
+// under way, a root of a progress.Tally, and each step or batch with work
+// that no counted span is above, with how far it has got. The line
 // that starts a step or a batch says how many targets it expects, in the
 // word PlainOptions.Noun gives, and as "targets" without one. Hidden
 // spans and calls get no line, and neither do the lines of output the work
@@ -56,6 +57,18 @@ const (
 //
 //	[0:03] ✗ bmc power › power off › exe0007 failed (transport): exe0007.mgmt: dial tcp: i/o timeout
 //
+// The work a span reports, rolled up by a progress.Meter, follows how the
+// targets of a step stand, or stands alone for a step that counts none, the
+// parts split by commas as the counts are, and the line a step leaves at its
+// end says what the work came to and its mean rate after how it ended:
+//
+//	[0:10] fetch › fetching the base image: 0.8/2.0 GiB, 39%, 80.0 MiB/s, ~16s left
+//	[0:25] fetch › fetching the base image: done in 25s: 2.0 GiB at 80.0 MiB/s
+//	[13:20] deploy › copying the image: 310/480 done, 1 failed, 8 running, 162 queued, 625 GiB, 65%, 797 MiB/s, ~7m08s left
+//	[20:33] deploy › copying the image: failed in 20m33s: 479 ok, 1 failed, 958 GiB at 796 MiB/s
+//
+// A step with no work and no count says nothing every ten seconds.
+//
 // The lines go out through the Terminal: ahead of whatever the command
 // writes after the events they tell of, never into a line the command has
 // not ended, and not while a question is asked. A Plain is a progress.Sink
@@ -76,11 +89,14 @@ type Plain struct {
 
 	mu    sync.Mutex
 	tally progress.Tally
+	// meter rolls up the work of the spans, which the steps say how far it
+	// has got and what it came to.
+	meter progress.Meter
 	// spans are the open spans.
 	spans map[progress.SpanID]*plainSpan
-	// beats are the counted steps under way that no counted span is
+	// beats are the steps and batches under way that no counted span is
 	// above, in the order they started, with when each is due to say
-	// how far it has got.
+	// how far it has got, if it counts targets or has work.
 	beats []beat
 	// lines are the lines not yet written, each ended by a newline.
 	lines strings.Builder
@@ -210,6 +226,7 @@ func (p *Plain) Handle(e progress.Event) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	count, counted := p.tally.Add(e)
+	worked, hasWork := p.meter.Add(e)
 	switch e.Type {
 	case progress.TypeStart:
 		p.begin(e)
@@ -220,7 +237,7 @@ func (p *Plain) Handle(e progress.Event) {
 	case progress.TypeEnd:
 		if s := p.spans[e.Span]; s != nil {
 			delete(p.spans, e.Span)
-			p.end(e, s, count, counted)
+			p.end(e, s, count, counted, worked, hasWork)
 		}
 	}
 }
@@ -271,7 +288,7 @@ func (p *Plain) run(e progress.Event, s *plainSpan) {
 	switch e.Kind {
 	case progress.KindStep, progress.KindBatch:
 		p.say(e.Time, p.runMark(), s.path, p.look.paint(roleRunning, "start")+p.sizes(e.Fields))
-		if s.counts && !s.below {
+		if !s.below {
 			p.beats = append(p.beats, beat{span: e.Span, due: e.Time.Add(plainBeat)})
 		}
 	case progress.KindWait:
@@ -281,8 +298,9 @@ func (p *Plain) run(e progress.Event, s *plainSpan) {
 	}
 }
 
-// end says how a span ended, if that is worth a line.
-func (p *Plain) end(e progress.Event, s *plainSpan, count progress.Count, counted bool) {
+// end says how a span ended, if that is worth a line, and what its work came
+// to, as worked has it, when it had any.
+func (p *Plain) end(e progress.Event, s *plainSpan, count progress.Count, counted bool, worked progress.Reading, hasWork bool) {
 	for i, b := range p.beats {
 		if b.span == e.Span {
 			p.beats = append(p.beats[:i], p.beats[i+1:]...)
@@ -309,8 +327,15 @@ func (p *Plain) end(e progress.Event, s *plainSpan, count progress.Count, counte
 			return
 		}
 		text := fmt.Sprintf("%s in %s", wordIn(p.look, e.Status), p.look.paint(roleMuted, took(e.Time.Sub(s.ran))))
+		sep := ": "
 		if counted {
-			text += ": " + ended(p.look, count)
+			text += sep + ended(p.look, count)
+			sep = ", "
+		}
+		if hasWork {
+			if done := endedText(p.look, worked); done != "" {
+				text += sep + done
+			}
 		}
 		p.say(e.Time, p.endMark(e.Status), s.path, text)
 	case progress.KindWait:
@@ -332,12 +357,27 @@ func (p *Plain) heartbeats(now time.Time) {
 			b.due = b.due.Add(plainBeat)
 		}
 		s := p.spans[b.span]
-		count, ok := p.tally.Count(b.span)
-		if s == nil || !ok {
+		if s == nil {
 			continue
 		}
-		p.say(now, p.runMark(), s.path, standing(p.look, count))
+		if text := p.standing(b.span, now); text != "" {
+			p.say(now, p.runMark(), s.path, text)
+		}
 	}
+}
+
+// standing says how far the step or batch span has got at now: how its
+// targets stand when it counts them, then its work when it has any; "" for
+// a step that has neither. p.mu is held.
+func (p *Plain) standing(span progress.SpanID, now time.Time) string {
+	var parts []string
+	if count, ok := p.tally.Count(span); ok {
+		parts = append(parts, standing(p.look, count))
+	}
+	if r, ok := p.meter.Read(span, now); ok {
+		parts = append(parts, workOf(p.look, r, 0).text(", ", 0))
+	}
+	return strings.Join(parts, ", ")
 }
 
 // line adds a line at t to those not yet written, mark and text after the

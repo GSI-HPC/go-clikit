@@ -50,8 +50,25 @@ const (
 //
 //	◶ power on ⋄ batch 3/60 ⋄ ▰▱▱▱▱▱▱▱ 17/480 ⋄ 1 failed ⋄ 8 running ⋄ 0:41.3
 //
-// A line that would not fit the terminal with its bars is drawn without
-// any.
+// A line without work that would not fit the terminal with its bars is
+// drawn without any.
+//
+// The work a span reports, rolled up by a progress.Meter, follows the counts
+// of a counted step, or the name of the step the line names when none is
+// under way: the amount, out of the size when there is one, the share done,
+// the rate and the time left, split by the same separator, as the Tree draws
+// them:
+//
+//	copying the image · 312/480 · 1 failed · 8 running · 160 queued · 629 GiB · 65% · 797 MiB/s · ~7m03s left · 13:28.4
+//	fetching the base image · 1.1/2.0 GiB · 56% · 80.0 MiB/s · ~12s left · 0:14.4
+//
+// The bar of a counted step whose work has a share fills with it, the cells
+// of the targets that failed at its end. Work in progress.Percent draws its
+// share alone, and work of no known size its amount and rate. The work of
+// the command is not drawn. A line too long for the terminal gives up the
+// time left, then the rate, then the amount, and then the bars, until it
+// fits, as a row of the Tree does; a line without work thus loses its bars
+// first, as before.
 //
 // A Counter is a progress.Sink and a progress.Suspender. Its methods are
 // safe for concurrent use.
@@ -63,6 +80,8 @@ type Counter struct {
 
 	mu     sync.Mutex
 	counts counting
+	// meter rolls up the work of the spans, which the line reads.
+	meter progress.Meter
 
 	ticker ticker
 }
@@ -84,6 +103,9 @@ type counting struct {
 type named struct {
 	span progress.SpanID
 	name string
+	// step says the span is a step, not the command, whose work the line
+	// draws while it names the span.
+	step bool
 }
 
 // CounterOptions configure a Counter.
@@ -129,7 +151,7 @@ func (c *Counter) Draw() {
 	line := func() string {
 		c.mu.Lock()
 		defer c.mu.Unlock()
-		return c.counts.line(now, c.start, c.g, width)
+		return c.counts.line(now, c.start, c.g, width, &c.meter)
 	}()
 	c.term.draw([]string{line})
 }
@@ -143,6 +165,7 @@ func (c *Counter) Handle(e progress.Event) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.counts.add(e)
+	c.meter.Add(e)
 }
 
 // add counts e in, and returns what the tally says of the step or batch e
@@ -164,7 +187,7 @@ func (c *counting) add(e progress.Event) (progress.Count, bool) {
 		}
 		c.labels[e.Span] = label
 		if titled && e.Flags&progress.Hidden == 0 {
-			c.named = append(c.named, named{e.Span, e.Name})
+			c.named = append(c.named, named{e.Span, e.Name, e.Kind == progress.KindStep})
 		}
 	case progress.TypeEnd:
 		delete(c.labels, e.Span)
@@ -184,11 +207,26 @@ func (c *Counter) Suspend() { c.term.suspend() }
 // Resume lets the line back.
 func (c *Counter) Resume() { c.term.resume() }
 
+// reading is the work of a span as a progress.Meter reads it, when it has
+// any.
+type reading struct {
+	progress.Reading
+	ok bool
+}
+
+// readSpan returns the work of span at now, as m has it.
+func readSpan(m *progress.Meter, span progress.SpanID, now time.Time) reading {
+	r, ok := m.Read(span, now)
+	return reading{r, ok}
+}
+
 // line is the line to draw at now, for a command that started at start, in
-// the look g, on a terminal width columns wide: with the bars of the
-// counted steps, unless they would take it past width-1 columns, where the
-// terminal cuts it, and then without any.
-func (c *counting) line(now, start time.Time, g look, width int) string {
+// the look g, on a terminal width columns wide: whole, unless that would
+// take it past width-1 columns, where the terminal cuts it, and then giving
+// up the time left, the rate, the amount and the bars of the counted steps
+// in turn until it fits. The work of each step, and of the step the line
+// names when it has no counted one, is read from m.
+func (c *counting) line(now, start time.Time, g look, width int, m *progress.Meter) string {
 	roots := c.tally.Roots()
 	shown := roots[:0]
 	for _, root := range roots {
@@ -198,23 +236,44 @@ func (c *counting) line(now, start time.Time, g look, width int) string {
 			shown = append(shown, root)
 		}
 	}
-	age := now.Sub(start)
-	line := c.drawn(shown, age, g, true)
-	if g.fill != "" && termtext.Width(visible(line)) > width-1 {
-		line = c.drawn(shown, age, g, false)
+	works := make([]reading, len(shown))
+	for i, root := range shown {
+		works[i] = readSpan(m, root.Span, now)
 	}
-	return line
+	// With no counted step the line names the newest named span, and draws
+	// its work when it is a step.
+	var current reading
+	if len(shown) == 0 && len(c.named) > 0 {
+		if n := c.named[len(c.named)-1]; n.step {
+			current = readSpan(m, n.span, now)
+		}
+	}
+	age := now.Sub(start)
+	for giveUp := range giveUps {
+		if line := c.drawn(shown, works, current, age, g, giveUp); termtext.Width(visible(line)) <= width-1 {
+			return line
+		}
+	}
+	return c.drawn(shown, works, current, age, g, giveUps)
 }
 
-// drawn is the line of the counted steps roots, at age since the command
-// started, in the look g, with their bars when bars is set.
-func (c *counting) drawn(roots []progress.Count, age time.Duration, g look, bars bool) string {
+// drawn is the line of the counted steps roots, whose work is works, at
+// age since the command started, in the look g, once it has given up
+// giveUp parts of each work as work.text does, the bars of the steps with
+// the last; current is the work of the span it names without any counted
+// step.
+func (c *counting) drawn(roots []progress.Count, works []reading, current reading, age time.Duration, g look, giveUp int) string {
 	var segments []string
-	for _, root := range roots {
-		segments = append(segments, segment(root, g, bars))
+	for i, root := range roots {
+		segments = append(segments, segment(root, works[i], g, giveUp))
 	}
 	if len(segments) == 0 && len(c.named) > 0 {
-		segments = append(segments, g.paint(roleTitle, c.named[len(c.named)-1].name))
+		sep := g.paint(roleMuted, g.sep)
+		parts := []string{g.paint(roleTitle, c.named[len(c.named)-1].name)}
+		if current.ok {
+			parts = appendWork(parts, workOf(g, current.Reading, 0).text(sep, giveUp))
+		}
+		segments = append(segments, strings.Join(parts, sep))
 	}
 	line := strings.Join(segments, g.paint(roleMuted, g.divider))
 	if line != "" {
@@ -228,8 +287,10 @@ func (c *counting) drawn(roots []progress.Count, age time.Duration, g look, bars
 
 // segment says how far one counted step has got, in the look g, its parts
 // split by g's separator, after its name when it has one, and with the bar
-// of its count before the count when bars is set and g draws one.
-func segment(n progress.Count, g look, bars bool) string {
+// of its count before the count when g draws one, unless giveUp has given
+// it up; the bar fills with the share of the step's work w done when it
+// has one. The work comes last, less the giveUp parts given up.
+func segment(n progress.Count, w reading, g look, giveUp int) string {
 	var parts []string
 	if n.Name != "" {
 		parts = append(parts, g.paint(roleTitle, n.Name))
@@ -238,8 +299,12 @@ func segment(n progress.Count, g look, bars bool) string {
 		parts = append(parts, "batch "+n.Batch)
 	}
 	done := fmt.Sprintf("%d/%d", n.Done, n.Total)
-	if bars {
-		if bar := g.bar(n, counterBar); bar != "" {
+	if giveUp < giveUps {
+		bar := g.bar(n, counterBar)
+		if w.ok && w.Bound != progress.Unbounded {
+			bar = g.fractionBar(w.Fraction, n, counterBar)
+		}
+		if bar != "" {
 			done = bar + " " + done
 		}
 	}
@@ -248,7 +313,20 @@ func segment(n progress.Count, g look, bars bool) string {
 	if n.Waits > 0 {
 		parts = append(parts, g.paint(roleMuted, "waiting"))
 	}
-	return strings.Join(parts, g.paint(roleMuted, g.sep))
+	sep := g.paint(roleMuted, g.sep)
+	if w.ok {
+		parts = appendWork(parts, workOf(g, w.Reading, 0).text(sep, giveUp))
+	}
+	return strings.Join(parts, sep)
+}
+
+// appendWork appends the text of some work to parts, unless giving up its
+// parts has left none.
+func appendWork(parts []string, text string) []string {
+	if text == "" {
+		return parts
+	}
+	return append(parts, text)
 }
 
 // elapsed reads d as minutes and seconds, or hours, minutes and seconds,

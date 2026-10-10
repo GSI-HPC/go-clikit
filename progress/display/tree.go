@@ -252,7 +252,7 @@ func (t *Tree) Draw() {
 		line := func() string {
 			t.mu.Lock()
 			defer t.mu.Unlock()
-			return t.counts.line(now, t.start, t.g, width)
+			return t.counts.line(now, t.start, t.g, width, &t.meter)
 		}()
 		t.term.draw([]string{line})
 		return

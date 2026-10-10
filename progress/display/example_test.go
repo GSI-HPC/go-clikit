@@ -217,6 +217,68 @@ func ExampleNewCounter() {
 	// uptime · 2/3 · 1 failed · 1 running · 0:41.3
 }
 
+// The Counter draws, in place of a counted step, the work of the newest
+// step it names.
+func ExampleNewCounter_work() {
+	clock := newExampleClock()
+	screen := &progresstest.Screen{}
+	term := display.NewTerminal(screen, display.TerminalOptions{})
+	counter := display.NewCounter(term, display.CounterOptions{Now: clock.Now})
+	bus := progress.NewBus(progress.BusOptions{Sinks: []progress.Sink{counter}, Now: clock.Now})
+	ctx, command := progress.Start(progress.WithBus(context.Background(), bus), progress.KindCommand, "fetch")
+
+	ctx, step := progress.Start(ctx, progress.KindStep, "fetching the base image")
+	_, call := progress.Start(ctx, progress.KindCall, "download", progress.Work(progress.Bytes, 2<<30))
+	for range 144 {
+		clock.Add(100 * time.Millisecond)
+		call.Advance(8 << 20)
+	}
+	counter.Draw()
+	fmt.Println(screen.String())
+
+	call.End(nil)
+	step.End(nil)
+	command.End(nil)
+	bus.Close()
+	counter.Close()
+	// Output:
+	// fetching the base image · 1.1/2.0 GiB · 56% · 80.0 MiB/s · ~12s left · 0:14.4
+}
+
+// Plain says how far a step with work has got every ten seconds, and what
+// its work came to when it ends; the Summary says what the command moved.
+func ExampleNewPlain_work() {
+	clock := newExampleClock()
+	term := display.NewTerminal(os.Stdout, display.TerminalOptions{})
+	plain := display.NewPlain(term, display.PlainOptions{Now: clock.Now})
+	summary := &display.Summary{}
+	bus := progress.NewBus(progress.BusOptions{Sinks: []progress.Sink{plain, summary}, Now: clock.Now})
+	ctx, command := progress.Start(progress.WithBus(context.Background(), bus), progress.KindCommand, "fetch")
+
+	ctx, step := progress.Start(ctx, progress.KindStep, "fetching the base image")
+	_, call := progress.Start(ctx, progress.KindCall, "download", progress.Work(progress.Bytes, 2<<30))
+	for range 100 {
+		clock.Add(100 * time.Millisecond)
+		call.Advance(8 << 20)
+	}
+	plain.Draw()
+	for range 150 {
+		clock.Add(100 * time.Millisecond)
+		call.Advance(8 << 20)
+	}
+	call.End(nil)
+	step.End(nil)
+	command.End(nil)
+	bus.Close()
+	plain.Close()
+	fmt.Println(summary.Line())
+	// Output:
+	// [0:00] fetch › fetching the base image: start
+	// [0:10] fetch › fetching the base image: 0.8/2.0 GiB, 39%, 80.0 MiB/s, ~16s left
+	// [0:25] fetch › fetching the base image: done in 25s: 2.0 GiB at 80.0 MiB/s
+	// fetch: done in 25s: 2.0 GiB at 80.0 MiB/s
+}
+
 // A program takes the theme from a flag, which the text methods of a Theme
 // read, and draws it in as many colours as its terminal shows: here in
 // none, as under NO_COLOR, which keeps the theme's art.
