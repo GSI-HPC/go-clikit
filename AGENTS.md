@@ -26,7 +26,7 @@ each carried (decision 21). v0: the API may still change in a minor release
 | `progress/display` | the live tree, the counter, plain lines, the summary | v0.1.0 |
 | `progress/progresstest` | capturing and checking the events a command reports | v0.1.0 |
 | `fanout` | bounded worker pools that report their targets as progress | v0.1.0 |
-| `progress/cliprogress` | the words of `--progress`, a command's display and event log, the private log file | unreleased |
+| `progress/cliprogress` | the words of `--progress`, a command's display and event log, the private log file | v0.3.0 |
 | `cobratree`, `progress/mcpprogress` | cobra helpers, progress over MCP | later, each once a second program needs it |
 
 ## Layout

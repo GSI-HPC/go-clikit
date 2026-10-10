@@ -21,7 +21,7 @@ The packages were written for [clusterctl](https://github.com/GSI-HPC/clusterctl
 command-line tool for administering HPC clusters, and became a module of
 their own when [sind](https://github.com/GSI-HPC/sind), which runs Slurm
 clusters in Docker, set out to use them too. They moved here with their
-history, as clusterctl v0.4.0 shipped them, and their first release will be
+history, as clusterctl v0.4.0 shipped them, and were first released in
 v0.1.0. `progress/cliprogress` was written here, from the command-line glue
 clusterctl and sind each carried
 ([decision 21](doc/decisions.md#21-the-command-lines-glue-for-progress-is-the-kits)).
