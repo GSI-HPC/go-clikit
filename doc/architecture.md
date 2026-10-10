@@ -38,7 +38,7 @@ each carried
 | Package | Holds | Imports |
 | --- | --- | --- |
 | `termtext` | Escaping untrusted text for a terminal, and the columns text takes there | `golang.org/x/text/width` |
-| `progress` | Spans carried in a `context.Context`, the `Bus` that orders their events, `Tally`, `Sanitize`, the JSONL event log and the W3C trace context | `termtext` |
+| `progress` | Spans carried in a `context.Context`, the `Bus` that orders their events, `Tally`, `Meter`, `Sanitize`, the JSONL event log and the W3C trace context | `termtext` |
 | `progress/display` | The `Terminal` a display shares with the command, the live `Tree`, the `Counter`, `Plain` lines and the `Summary` | `progress`, `termtext`, `go-nodeset` |
 | `progress/cliprogress` | The words of `--progress` and the rule that picks a display from them, a command's `Run`, which makes and takes down its Bus, display, summary and event log, the private file the log is appended to, and the probes of a command's streams | `progress`, `progress/display`, `termtext`, `golang.org/x/sys` |
 | `progress/progresstest` | `Capture`, `Check`, `Watch` and its `Watcher`, and `Screen`, a terminal for tests | `progress`, `termtext`, `go-nodeset` |
@@ -103,6 +103,34 @@ than the limit, and reaches its total however the work ends.
 `progresstest.Check` holds every source of events to this, and `fanout`
 keeps it without a line of the caller's.
 
+## Work
+
+A span may also report its work: an amount in a unit, out of a size when one
+is known (decision 23). The span's own `Advance`, `SetAmount`,
+`CountWriter` and `CountReader` add to an atomic amount and nothing else, so
+a copy that writes a hundred thousand times a second takes no lock. The Bus
+samples that amount: it sends it as a `TypeAdvance` event at most every
+100 ms a span, by its own clock, the newest amount never lost, and with the
+span's `End`. `Advance` and `SetAmount` read that clock, `BusOptions.Now`,
+on the goroutine that calls them and outside the Bus's lock, so the clock
+must be safe for concurrent use. A span without a Bus costs nothing, as
+everything else on a nil span.
+
+An event carries only what its span said. `progress.Meter` is the sink-side
+half: given every event in order, as `Tally` is, it keeps the work of each
+span and rolls it up the tree, an amount within a unit, a share done from the
+span's own size, else from the targets it counts, short of done until their
+count is complete, else from the work below, where a span with a size of its
+own counts for everything below it, and the rate, the time left and a stall from the amounts' times. The
+displays each keep a `Meter` and read it at the time of a frame, so the
+rows move between events; `progresstest.Capture` is sent every advance, and
+`progresstest.Check` holds them to their rules.
+
+The event log samples on its own. It writes an advance of a span at most once
+a second by default (`LogOptions.AdvanceEvery`), by the events' times, and
+counts the advances it leaves out in `leftOut`; they are the only gaps in
+`seq`. The displays, the `Meter` and `Capture` miss none.
+
 ## Concurrency
 
 - **Sinks run under the Bus's lock.** The Bus calls every sink's `Handle`
@@ -112,7 +140,9 @@ keeps it without a line of the caller's.
   and its stack goes to `BusOptions.PanicLog`. The Bus knows its sinks by
   where they are listed, never by comparing them, and releases its lock
   however a call under it ends, so neither a sink nor a clock that panics
-  leaves it locked.
+  leaves it locked. The clock, `BusOptions.Now`, is the one thing the Bus
+  calls outside its lock as well, from `Advance` and `SetAmount`, so it must
+  be safe for concurrent use.
 - **Displays draw on their own time.** `Start` gives a display a goroutine
   that draws from what `Handle` kept, ten times a second for the tree and
   the counter; a test calls `Draw` instead, on a clock it moves. The event
@@ -178,7 +208,7 @@ The kit knows no program. What depends on one is a parameter or a hook:
 | The class of an error that says none of its own, such as the program's rule for its exit codes | `progress.BusOptions.Classify`, `fanout.MapOptions.Classify` in place of the Bus's, `progresstest.Classify`, `cliprogress.Options.Classify` |
 | The error a pool's step ends with, such as the program's exit code on the kit's summary | `fanout.MapOptions.Summarize`, which is given a `fanout.Summary`, with `fanout.Failure` as the default |
 | The noun for the targets, such as "1 host" and "480 hosts"; Plain says "1 target" and "480 targets" without one | `display.PlainOptions.Noun`, `fanout.MapOptions.Noun`, `fanout.Failure`, `cliprogress.Options.Noun` |
-| What a display names an item by, and what an item needs besides its place in the pool | `fanout.MapOptions.Describe`, which returns a `fanout.Item`, and `fanout.MapOptions.Acquire` |
+| What a display names an item by, and what an item needs besides its place in the pool, such as the unit and size of its work | `fanout.MapOptions.Describe`, which returns a `fanout.Item`, and `fanout.MapOptions.Acquire` |
 | The terminal's size, whether the process is in its foreground, whether its locale shows UTF-8, and the interrupt | `display.TerminalOptions`, the `ASCII` options, `display.TreeOptions.Interrupted`; `cliprogress.Options.Size`, `.Foreground` and `.ASCII`, which `cliprogress.TerminalSize`, `cliprogress.InForeground` and `cliprogress.UTF8Locale` find out, and the end of the context `cliprogress.Start` is given |
 | The trace another program handed on | `progress.BusOptions.Trace`, as `progress.ParseTraceContext` reads it from the values the program read from `TRACEPARENT` and `TRACESTATE`; `cliprogress.Options.Trace`, which `cliprogress.Start` calls only once it makes a Bus |
 | Where a panic's stack goes | the `PanicLog` options |

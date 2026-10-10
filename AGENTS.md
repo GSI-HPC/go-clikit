@@ -39,8 +39,9 @@ each carried (decision 21). v0: the API may still change in a minor release
   the `Bus`, spans and `Suspend`; `classify.go`, `Classify`, `ErrSkipped`
   and `Skip`; `lines.go`, `Tee` and the lines of output; `sanitize.go`;
   `tally.go`; `work.go`, `Advance`, `SetAmount` and how often the Bus
-  sends the amount; `meter.go`, `Meter`, which rolls the work up the tree;
-  `log.go`, the event log; `trace.go`, the W3C trace context.
+  sends the amount; `count.go`, `CountWriter` and `CountReader`;
+  `meter.go`, `Meter`, which rolls the work up the tree; `log.go`, the
+  event log; `trace.go`, the W3C trace context.
   `testdata/log-v1.jsonl` is the golden event log.
 - `progress/display/`: `terminal.go`, the `Terminal` and its writers;
   `style.go`, cutting a row that sets colours by the columns it shows;
@@ -67,8 +68,8 @@ each carried (decision 21). v0: the API may still change in a minor release
   the packages fit together, `event-log.md` describes the event log,
   `testing.md` says how the kit is tested, `decisions.md` records what was
   decided and why, and `release.md` says how a release is cut.
-  `proposals/` holds designs not yet decided, which become a decision or
-  are dropped.
+  A design not yet decided goes in `proposals/` until it becomes a
+  decision or is dropped.
 - `.github/workflows/ci.yml`: tests on both Go lines and on macOS, the cost
   tests, coverage, fuzzing, lint, Markdown, REUSE, govulncheck and the tag
   verification test.
