@@ -65,6 +65,8 @@ each carried (decision 21). v0: the API may still change in a minor release
   the packages fit together, `event-log.md` describes the event log,
   `testing.md` says how the kit is tested, `decisions.md` records what was
   decided and why, and `release.md` says how a release is cut.
+  `proposals/` holds designs not yet decided, which become a decision or
+  are dropped.
 - `.github/workflows/ci.yml`: tests on both Go lines and on macOS, the cost
   tests, coverage, fuzzing, lint, Markdown, REUSE, govulncheck and the tag
   verification test.

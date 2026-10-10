@@ -15,6 +15,7 @@ which pkg.go.dev publishes:
 | [testing.md](testing.md) | What is tested and how: the contract of the events, fake clocks, the Screen, the command line, the pools, fuzzing, the path that allocates nothing and the cost of a large step |
 | [decisions.md](decisions.md) | What was decided, why, and what it costs, the measured comparison with other display and pool libraries among it |
 | [release.md](release.md) | Cutting, withdrawing and verifying a release |
+| [proposals/](proposals/) | Designs not yet decided, each to become a decision or be dropped: [span-work.md](proposals/span-work.md), the work of a span and how it rolls up |
 
 ## Everything else
 
