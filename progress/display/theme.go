@@ -488,13 +488,39 @@ func (l look) bar(c progress.Count, cells int) string {
 		return ""
 	}
 	done := min(max(c.Done, 0), c.Total)
-	failed := min(max(c.Failed, 0), done)
-	filled := cells * done / c.Total
-	bad := 0
-	if failed > 0 {
-		bad = max(1, cells*failed/c.Total)
-		filled = max(filled, bad)
+	return l.cells(cells*done/c.Total, l.failedCells(c, cells), cells)
+}
+
+// fractionBar returns a bar, cells wide besides its caps, filled with the
+// share f of some work done, cut down to whole cells and never full while f
+// is short of 1, with the targets of c that failed at the end of it as bar
+// draws them. It is "" when the look
+// draws no bar.
+func (l look) fractionBar(f float64, c progress.Count, cells int) string {
+	if l.fill == "" {
+		return ""
 	}
+	n := int(float64(cells)*f + 1e-9)
+	if f < 1 {
+		n = min(n, cells-1)
+	}
+	return l.cells(n, l.failedCells(c, cells), cells)
+}
+
+// failedCells returns how many cells of a bar cells wide the targets of c
+// that failed take: their share, at least one when any did.
+func (l look) failedCells(c progress.Count, cells int) int {
+	failed := min(max(c.Failed, 0), max(c.Done, 0), c.Total)
+	if failed <= 0 {
+		return 0
+	}
+	return max(1, cells*failed/c.Total)
+}
+
+// cells draws a bar cells wide besides its caps with filled cells done, the
+// last bad of them, at least that many, in the colour of a failure.
+func (l look) cells(filled, bad, cells int) string {
+	filled = max(filled, bad)
 	// Cells of one colour side by side, the caps among them, are set in it
 	// once.
 	var b, run strings.Builder

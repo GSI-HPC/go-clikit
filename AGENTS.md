@@ -46,7 +46,7 @@ each carried (decision 21). v0: the API may still change in a minor release
   `style.go`, cutting a row that sets colours by the columns it shows;
   `theme.go`, `Theme`, `Colours`, the five themes and the look a display
   draws with; `tree.go`, `counter.go`, `plain.go` and `summary.go`, one
-  display each.
+  display each; `work.go`, the forms the work of a span is drawn in.
   `contract_test.go` holds the displays to their promises on a `Screen`,
   and `scale_test.go` the tree's cost to the number of targets.
 - `progress/progresstest/`: `progresstest.go`, `Capture`, `Check`,

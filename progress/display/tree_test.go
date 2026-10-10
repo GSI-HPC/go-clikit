@@ -1356,3 +1356,129 @@ exec · 0:02.0
 exec · 0:02.1
 `)
 }
+
+// Work of no known size draws its amount and its rate, and no share or time
+// left: a walk counts the files it indexes, and a download with no length
+// its bytes, in the step's row with the call's request after how long the
+// step has run. Once the download has not grown for five seconds, how long
+// it has stalled stands in place of its rate, as a live clock.
+func TestTheTreeDrawsWorkOfNoKnownSize(t *testing.T) {
+	t.Parallel()
+	f := newTreeFixture(t, "index", treeSetup{})
+	_, walk := progress.Start(f.ctx, progress.KindStep, "indexing the archive", progress.Work(progress.Items, 0))
+	ctx, dump := progress.Start(f.ctx, progress.KindStep, "receiving the dump")
+	_, call := progress.Start(ctx, progress.KindCall, "dump", progress.HTTP("GET", "/export"), progress.Work(progress.Bytes, -1))
+	for range 73 {
+		f.clock.Add(100 * time.Millisecond)
+		walk.Advance(660)
+		call.Advance(4 << 20)
+	}
+	checkScreen(t, f.draw(0), `
+index · 0:07.3
+  indexing the archive  48.2k · 6.6k/s  7.3s
+  receiving the dump  292 MiB · 40.0 MiB/s  7.3s  GET /export
+`)
+	walk.End(nil)
+	f.clock.Add(6100 * time.Millisecond)
+	checkScreen(t, f.draw(0), `
+✓ indexing the archive  7.3s  48.2k at 6.6k/s
+index · 0:13.4
+  receiving the dump  292 MiB · stalled 6.1s  13.4s  GET /export
+`)
+	call.End(nil)
+	dump.End(nil)
+}
+
+// Work in Percent draws its share alone, with the time left, and no amount
+// or rate: a firmware update sets the percentage its task reports, and the
+// step over six BMCs is as far as the two that ended and the shares of the
+// three running. The line the step leaves adds no amount.
+func TestTheTreeDrawsWorkInPercent(t *testing.T) {
+	t.Parallel()
+	f := newTreeFixture(t, "bmc firmware", treeSetup{})
+	ctx, step := progress.Start(f.ctx, progress.KindStep, "updating the BMC firmware",
+		progress.WithFlags(progress.Fold), progress.Total(6), progress.Limit(3))
+	ctxs, spans := targets(ctx, "exe0311", "exe0312", "exe0313", "exe0314", "exe0315", "exe0316")
+	update := func(i int) *progress.Span {
+		spans[i].Run()
+		_, call := progress.Start(ctxs[i], progress.KindCall, "firmware update",
+			progress.HTTP("GET", fmt.Sprintf("/redfish/v1/TaskService/Tasks/%d", i+5)), progress.Work(progress.Percent, 100))
+		return call
+	}
+	for i := range 2 {
+		call := update(i)
+		f.clock.Add(20 * time.Second)
+		call.SetAmount(100)
+		call.End(nil)
+		spans[i].End(nil)
+	}
+	calls := []*progress.Span{update(2), update(3), update(4)}
+	for s := range 21 {
+		f.clock.Add(time.Second)
+		for j, call := range calls {
+			call.SetAmount(int64((s + 1) * []int{40, 33, 38}[j] / 21))
+		}
+	}
+	checkScreen(t, f.draw(0), `
+bmc firmware · 1:01.0
+  updating the BMC firmware  2/6 · 3 running · 1 queued · 51% · ~52s left
+    ▸ exe0313  40% · ~30s left  21.0s  GET /redfish/v1/TaskService/Tasks/7
+    ▸ exe0314  33% · ~42s left  21.0s  GET /redfish/v1/TaskService/Tasks/8
+    ▸ exe0315  38% · ~31s left  21.0s  GET /redfish/v1/TaskService/Tasks/9
+    ✓ exe[0311-0312]
+`)
+	for i, call := range calls {
+		call.SetAmount(100)
+		call.End(nil)
+		spans[i+2].End(nil)
+	}
+	update(5).End(nil)
+	spans[5].End(nil)
+	f.clock.Add(11 * time.Second)
+	step.End(nil)
+	checkScreen(t, f.draw(0), `
+✓ updating the BMC firmware  1m12s  6 ok
+bmc firmware · 1:12.0
+`)
+}
+
+// A call made for the command draws its work in its own row, after its
+// request; the line a counted step leaves says what its targets' work came
+// to after how they ended, and one that failed, as quickly as it did, what
+// its work came to before.
+func TestTheTreeDrawsTheWorkOfACallAndTheLinesOfSteps(t *testing.T) {
+	t.Parallel()
+	f := newTreeFixture(t, "deploy", treeSetup{})
+	_, call := progress.Start(f.ctx, progress.KindCall, "upload", progress.HTTP("PUT", "/images/rocky.qcow2"),
+		progress.Work(progress.Bytes, 512<<20))
+	ctx, step := progress.Start(f.ctx, progress.KindStep, "copying the image",
+		progress.WithFlags(progress.Fold), progress.Total(2), progress.Limit(2))
+	_, spans := progress.Start(ctx, progress.KindTarget, "exe1", progress.Queued(), progress.Work(progress.Items, 40))
+	_, other := progress.Start(ctx, progress.KindTarget, "exe2", progress.Queued(), progress.Work(progress.Items, 0))
+	spans.Run()
+	for range 20 {
+		f.clock.Add(100 * time.Millisecond)
+		call.Advance(10 << 20)
+		spans.Advance(2)
+	}
+	checkScreen(t, f.draw(0), `
+deploy · 0:02.0
+  PUT /images/rocky.qcow2  200/512 MiB · 39% · 100 MiB/s · ~4s left  2.0s
+  copying the image  0/2 · 1 running · 1 queued · 40 · 50% · 20/s · ~2s left
+    ▸ exe1  40/40 · 100% · 20/s  2.0s
+`)
+	spans.End(nil)
+	other.Run()
+	other.Advance(3)
+	other.End(nil)
+	step.End(nil)
+	_, failed := progress.Start(f.ctx, progress.KindStep, "checking the image", progress.Work(progress.Bytes, 0))
+	failed.Advance(1536)
+	failed.End(errors.New("checksum mismatch"))
+	call.End(nil)
+	checkScreen(t, f.draw(0), `
+✓ copying the image  2.0s  2 ok  43 at 22/s
+✗ checking the image  0.0s  1.5 KiB
+deploy · 0:02.0
+`)
+}
