@@ -39,8 +39,8 @@ each carried (decision 21). v0: the API may still change in a minor release
   the `Bus`, spans and `Suspend`; `classify.go`, `Classify`, `ErrSkipped`
   and `Skip`; `lines.go`, `Tee` and the lines of output; `sanitize.go`;
   `tally.go`; `work.go`, `Advance`, `SetAmount` and how often the Bus
-  sends the amount; `log.go`, the event log; `trace.go`, the W3C trace
-  context.
+  sends the amount; `meter.go`, `Meter`, which rolls the work up the tree;
+  `log.go`, the event log; `trace.go`, the W3C trace context.
   `testdata/log-v1.jsonl` is the golden event log.
 - `progress/display/`: `terminal.go`, the `Terminal` and its writers;
   `style.go`, cutting a row that sets colours by the columns it shows;

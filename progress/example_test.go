@@ -324,3 +324,46 @@ func ExampleCountWriter() {
 	// end copy 4194304/4194304 bytes
 	// copied 4194304 bytes
 }
+
+// A Meter rolls the work of a Bus's spans up the tree. A step that counts
+// its targets is as far as the targets that ended, and the share done of
+// each one running: here two of four ended and one is half done.
+func ExampleMeter() {
+	now := time.Date(2026, 10, 10, 12, 0, 0, 0, time.UTC)
+	capture := &progresstest.Capture{}
+	bus := progress.NewBus(progress.BusOptions{
+		Sinks: []progress.Sink{capture},
+		Now:   func() time.Time { return now },
+	})
+	ctx, _ := progress.Start(progress.WithBus(context.Background(), bus), progress.KindCommand, "deploy")
+
+	ctx, _ = progress.Start(ctx, progress.KindStep, "copying the image",
+		progress.WithFlags(progress.Fold), progress.Total(4))
+	targets := make([]*progress.Span, 4)
+	for i, node := range []string{"exe01", "exe02", "exe03", "exe04"} {
+		_, targets[i] = progress.Start(ctx, progress.KindTarget, node, progress.Queued(),
+			progress.Node(node), progress.Work(progress.Bytes, 1<<30))
+	}
+	for _, target := range targets[:2] {
+		target.Run()
+		target.Advance(1 << 30)
+		target.End(nil)
+	}
+	targets[2].Run()
+	now = now.Add(5 * time.Second)
+	targets[2].Advance(1 << 29)
+
+	var meter progress.Meter
+	var counted progress.SpanID
+	for _, e := range capture.Events() {
+		meter.Add(e)
+		if e.Kind == progress.KindStep && e.Type == progress.TypeStart {
+			counted = e.Span
+		}
+	}
+	r, _ := meter.Read(counted, now)
+	fmt.Println(r.Bound, r.Fraction, r.Amount, r.Size)
+	bus.Close()
+	// Output:
+	// targets 0.625 2684354560 0
+}

@@ -158,8 +158,8 @@ interrupt too, keeps the contract above.
 
 ## Fuzzing
 
-Four fuzz targets check what must hold for any text a remote host sends,
-and for the rows a display draws in colour:
+Five fuzz targets check what must hold for any text a remote host sends,
+for the rows a display draws in colour, and for the work a span reports:
 
 - `termtext.FuzzEscape`: neither escaper leaves a rune its policy names, and
   escaping twice changes nothing;
@@ -169,6 +169,11 @@ and for the rows a display draws in colour:
   the runes set;
 - `progress.FuzzSanitize`: what comes out is UTF-8, holds nothing a terminal
   would act on, keeps to its bound and is the same when sanitised again;
+- `progress.FuzzMeter`: whatever events of spans that start, run, report
+  work and end it is given, in whatever order, a `Meter` reads a span's
+  amount as its own and that of every span below it in its unit, those
+  that ended included, gives a span with work of its own a reading in its
+  unit, and holds every share to 0 to 1;
 - `display.FuzzCut`: a row cut to its columns shows what `termtext.Truncate`
   keeps of its text, with every colour sequence whole and none after the
   cut, and a row holding an escape that was shortened ends by setting the
