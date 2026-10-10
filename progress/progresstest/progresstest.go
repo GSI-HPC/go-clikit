@@ -589,7 +589,7 @@ func violations(events []progress.Event) []string {
 			if s.e.Kind == progress.KindTarget {
 				run(s, 1)
 			}
-		case progress.TypeUpdate:
+		case progress.TypeUpdate, progress.TypeAdvance:
 		case progress.TypeLine:
 			if e.Stream != progress.Stdout && e.Stream != progress.Stderr {
 				bad("event %d is a line of no stream", e.Seq)

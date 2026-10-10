@@ -36,3 +36,24 @@ func TestALineThatCannotBeEncodedStopsTheLog(t *testing.T) {
 		t.Errorf("Close = %v, want the encoder's error", err)
 	}
 }
+
+// A timer that fires once its span has ended, after an advance that raced
+// with the End, sends nothing: no event follows a span's End.
+func TestATimerAfterTheEndSendsNothing(t *testing.T) {
+	t.Parallel()
+	var events []Event
+	b := NewBus(BusOptions{Sinks: []Sink{sinkFunc(func(e Event) { events = append(events, e) })}})
+	_, s := Start(WithBus(context.Background(), b), KindCall, "download")
+	s.End(nil)
+	s.work.amount.Add(5)
+	s.late()
+	b.Close()
+	if n := len(events); n != 2 || events[1].Type != TypeEnd {
+		t.Errorf("%d events, the last a %s; want the start and the end", n, events[n-1].Type)
+	}
+}
+
+// sinkFunc is a func as a Sink.
+type sinkFunc func(Event)
+
+func (f sinkFunc) Handle(e Event) { f(e) }

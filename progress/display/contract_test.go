@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -396,5 +397,43 @@ prog: slurm node drain: done in 3.0s
 `)
 	if strings.Contains(s.screen.String(), "·") {
 		t.Error("the tree was left on the terminal")
+	}
+}
+
+// The work a span reports, which no display draws yet, changes nothing a
+// display draws: a session whose calls advance their work draws the frames
+// and leaves the lines of one whose calls report none.
+func TestWorkChangesNoFrame(t *testing.T) {
+	t.Parallel()
+	for name, newDisplay := range map[string]func(*display.Terminal, func() time.Time) drawer{
+		"counter": counterDisplay, "tree": treeDisplay,
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			var frames [2][]string
+			var ends [2]string
+			for i, advance := range []bool{false, true} {
+				s := newSession(t, "fetch", newDisplay)
+				_, _ = fanout.Map(s.ctx, []string{"exe0001", "exe0002"}, fanout.MapOptions[string]{Step: "copy", Limit: 1},
+					func(ctx context.Context, _ string) (struct{}, error) {
+						_, call := progress.Start(ctx, progress.KindCall, "copy")
+						if advance {
+							call.Update(progress.Work(progress.Bytes, 2<<30))
+							call.Advance(1 << 30)
+						}
+						s.draw()
+						call.Advance(1 << 30)
+						s.draw()
+						call.End(nil)
+						return struct{}{}, nil
+					})
+				ends[i] = s.end(t, nil)
+				frames[i] = s.frames
+			}
+			if !slices.Equal(frames[0], frames[1]) || ends[0] != ends[1] {
+				t.Errorf("with work:\n%s\n%s\nwithout:\n%s\n%s",
+					strings.Join(frames[1], "\n"), ends[1], strings.Join(frames[0], "\n"), ends[0])
+			}
+		})
 	}
 }

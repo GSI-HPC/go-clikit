@@ -55,12 +55,14 @@ const (
 //	{"v":1,"run":"5d0c…a1f3","trace":"4bf9…4736","seq":7,"time":"2026-09-26T12:00:03.000000000Z","type":"end","span":"9f3c…0007","parent":"9f3c…0002","kind":"target","name":"exe0002","state":"ended","node":"exe0002","host":"exe0002.hpc.example.org","status":"failed","class":"transport","err":"…"}
 //
 // The run tells the lines of one Log from those of others appending to the
-// same file, which may share the trace. A Timeout is in seconds. A key whose
-// value is zero or empty is left out. A line of output is written without
-// its text, which never leaves the process: the event says only which
-// stream it came from and how many lines before it were not sent; and since
-// the log is no LineSink, and so asks for no lines, there are line events
-// only while a display asks for them.
+// same file, which may share the trace. A Timeout is in seconds. The
+// Amount, Size and Unit of a span's work are on every line of the span from
+// the first event that sets them, and an advance is written as "advance".
+// A key whose value is zero or empty is left out. A line of output is
+// written without its text, which never leaves the process: the event says
+// only which stream it came from and how many lines before it were not
+// sent; and since the log is no LineSink, and so asks for no lines, there
+// are line events only while a display asks for them.
 //
 // The lines are written by a goroutine of the log's own, never under the
 // Bus's lock, in pieces of whole lines of at most 64 KiB, a longer line on
@@ -177,6 +179,9 @@ type logEvent struct {
 	Source     string  `json:"source,omitempty"`
 	Timeout    float64 `json:"timeout,omitempty"`
 	Exit       *int    `json:"exit,omitempty"`
+	Amount     int64   `json:"amount,omitempty"`
+	Size       int64   `json:"size,omitempty"`
+	Unit       string  `json:"unit,omitempty"`
 
 	Status  string `json:"status,omitempty"`
 	Class   string `json:"class,omitempty"`
@@ -226,6 +231,8 @@ func (l *Log) Handle(e Event) {
 		Source:     e.Source,
 		Timeout:    e.Timeout.Seconds(),
 		Exit:       e.Exit,
+		Amount:     e.Amount,
+		Size:       e.Size,
 
 		Err:     e.Err,
 		Dropped: e.Dropped,
@@ -250,6 +257,9 @@ func (l *Log) Handle(e Event) {
 	}
 	if e.Stream != 0 {
 		line.Stream = e.Stream.String()
+	}
+	if e.Unit != 0 {
+		line.Unit = e.Unit.String()
 	}
 	l.mu.Lock()
 	defer l.mu.Unlock()

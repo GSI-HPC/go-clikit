@@ -54,7 +54,7 @@ runs that write to a pipe or to NFS at once each need a file of their own.
 | `run`, `trace` | As on the first line |
 | `seq` | The event's number, from 1 with no gaps within a run: the one order every sink saw |
 | `time` | When the event happened, in UTC, as RFC 3339 with nine digits after the second, so that the times of one run sort as they happened |
-| `type` | `start`; `run`, a queued span that starts to run; `update`; `line`, a line of output; `end`; `suspend` and `resume`, the displays taken off the terminal for a question and put back |
+| `type` | `start`; `run`, a queued span that starts to run; `update`, a span whose total, message, or unit and size of work changed; `line`, a line of output; `end`; `suspend` and `resume`, the displays taken off the terminal for a question and put back; `advance`, a span whose `amount` changed, which the Bus sends at most once each 100 ms a span, by its clock |
 | `span`, `parent` | The span the event is about and the one it was started under, 16 hexadecimal digits each; the root has no `parent`. A `suspend` or `resume` has only a `span`, the one it was asked for under, if any |
 | `kind` | `command`, `step`, `batch`, `target`, `call` or `wait` |
 | `name` | What the span is, in few words |
@@ -67,6 +67,8 @@ runs that write to a pipe or to NFS at once each need a file of their own.
 | `cache`, `source` | Where a lookup was answered from, such as `hit`, `miss`, `memory` or `disk`; and the kind of source a secret or a credential was read from, never the value |
 | `timeout` | The bound of a call, or the length of a wait, in seconds |
 | `exit` | The exit code of a command; `0` is written, and a command that gave none has no `exit` |
+| `amount`, `size` | How much of the span's own work is done, and how much there is, in its `unit`; never what is below it. A span has them on every event from the first that sets them, the `amount` the Bus last sent in an `advance`, and its `end` the final one; a `size` left out is one not known |
+| `unit` | What the span's work is counted in: `items`, `bytes` or `percent`, whose `size` is always 100 |
 | `status` | How the span ended: `ok`, `failed`, `canceled` or `skipped` |
 | `class` | Why a span that failed did: `target`, `transport`, `timeout`, `auth`, `pin`, `usage` or `canceled` |
 | `err` | The error the span ended with, on one line |
@@ -128,7 +130,7 @@ has returned, after which the writer may be closed.
 `progress/testdata/log-v1.jsonl` is a run that has every key this document
 lists, but `program`, which came after it and which a test of its own checks
 on the first line, and every value this document lists for a key: each
-`type`, `kind`, `flags`, `state`, `status`, `class` and `stream`. Of the
+`type`, `kind`, `flags`, `state`, `status`, `class`, `stream` and `unit`. Of the
 keys whose values are the program's to choose, text such as `name` and
 `err`, where a lookup was answered from, `cache`, and the kind of source a
 `source` names, it has an example each, and each of the examples this
@@ -148,4 +150,6 @@ The file is changed only by adding to it. Its first 48 lines, the trace and
 and a test fails when they are not, byte for byte. What the file has said
 since, a value of `cache` and a `dropped` count among them, comes after
 them, from a second command, `status`, run on the same Bus once `exec` has
-ended, so its events go on from seq 48 and its spans from `#18`.
+ended, so its events go on from seq 48 and its spans from `#18`. A third
+command, `fetch`, run once `status` has ended, reports work in each unit,
+with its `advance` events and its `amount`, `size` and `unit`.
