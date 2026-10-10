@@ -98,6 +98,11 @@ type Item struct {
 	// Role is the host role of the item, as progress.Fields.Role; empty
 	// says none.
 	Role string
+	// Unit and Size are the work of the item's target, as progress.Work
+	// gives them; a zero Unit is none. A target given them starts bounded,
+	// so that a display shows its share while it is still queued.
+	Unit progress.Unit
+	Size int64
 }
 
 // Outcome is what the work for one item came to.
@@ -145,7 +150,8 @@ type Outcome[R any] struct {
 //
 // The work is reported under the span ctx carries as a step, o.Step, with
 // a target for each item, as every pool reports it: every target is
-// announced, queued, before the first one runs; each is marked running when
+// announced, queued, before the first one runs, with the work its item
+// gives it, if any, as Item says; each is marked running when
 // it takes its place and ended before it gives the place up, so that a
 // display never counts more running than the limit; those the pool left
 // out end canceled once it is done, so that the count reaches its total;
@@ -193,8 +199,15 @@ func Map[T, R any](ctx context.Context, items []T, o MapOptions[T], fn func(ctx 
 	for i, item := range items {
 		d := o.describe(item)
 		names[i] = d.Node
-		ctxs[i], spans[i] = progress.Start(stepCtx, progress.KindTarget, d.Node, progress.Queued(),
-			progress.Node(d.Node), progress.Host(d.Host), progress.Role(d.Role))
+		// The options go inline, in two calls rather than a slice, so that
+		// they stay off the heap when ctx carries no Bus.
+		if d.Unit == 0 {
+			ctxs[i], spans[i] = progress.Start(stepCtx, progress.KindTarget, d.Node, progress.Queued(),
+				progress.Node(d.Node), progress.Host(d.Host), progress.Role(d.Role))
+		} else {
+			ctxs[i], spans[i] = progress.Start(stepCtx, progress.KindTarget, d.Node, progress.Queued(),
+				progress.Node(d.Node), progress.Host(d.Host), progress.Role(d.Role), progress.Work(d.Unit, d.Size))
+		}
 	}
 
 	out := make([]Outcome[R], len(items))

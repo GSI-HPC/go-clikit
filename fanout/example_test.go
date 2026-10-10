@@ -4,9 +4,11 @@
 package fanout_test
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -78,6 +80,46 @@ func ExampleMapOptions_describe() {
 	// Output:
 	// exe01 exe01-bmc compute
 	// mds01 mds01-bmc storage
+}
+
+// An Item with a Unit and a Size starts its target bounded, so that a queued
+// target shows its size before it runs. Each worker counts the bytes it
+// copies through progress.CountWriter, and the targets' amounts reach the
+// Capture's tree as they copy.
+func ExampleMapOptions_work() {
+	type image struct {
+		node string
+		size int64
+	}
+	capture := &progresstest.Capture{}
+	bus := progress.NewBus(progress.BusOptions{Sinks: []progress.Sink{capture}})
+	ctx := progress.WithBus(context.Background(), bus)
+
+	images := []image{{"exe01", 4 << 20}, {"exe02", 2 << 20}, {"exe03", 1 << 20}}
+	outcomes, err := fanout.Map(ctx, images, fanout.MapOptions[image]{
+		Step:  "copy",
+		Limit: 2,
+		Describe: func(im image) fanout.Item {
+			return fanout.Item{Node: im.node, Unit: progress.Bytes, Size: im.size}
+		},
+	}, func(ctx context.Context, im image) (int64, error) {
+		return io.Copy(progress.CountWriter(ctx, io.Discard), bytes.NewReader(make([]byte, im.size)))
+	})
+	for i, o := range outcomes {
+		fmt.Println(images[i].node, o.Value, o.Err)
+	}
+	fmt.Println(err)
+	bus.Close()
+	fmt.Print(capture.Tree())
+	// Output:
+	// exe01 4194304 <nil>
+	// exe02 2097152 <nil>
+	// exe03 1048576 <nil>
+	// <nil>
+	// step copy total=3 limit=2 [fold]: ok
+	//   target exe01 amount=4194304 size=4194304 unit=bytes: ok
+	//   target exe02 amount=2097152 size=2097152 unit=bytes: ok
+	//   target exe03 amount=1048576 size=1048576 unit=bytes: ok
 }
 
 // Each is the one bounded loop the pools run on: once ctx ends, no
