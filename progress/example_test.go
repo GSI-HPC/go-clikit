@@ -8,12 +8,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"regexp"
 	"strings"
 	"time"
 
 	"github.com/GSI-HPC/go-clikit/progress"
+	"github.com/GSI-HPC/go-clikit/progress/progresstest"
 )
 
 // printer is a sink that prints each event on a line of its own.
@@ -290,4 +292,35 @@ func ExampleSpan_SetAmount() {
 	// advance "firmware update" 75/100 percent
 	// advance "firmware update" 100/100 percent
 	// end "firmware update" 100/100 percent
+}
+
+// ExampleCountWriter copies an image through CountWriter under a call that
+// gives its size. The Bus sends the amount when its place comes, and the
+// call's End carries the newest.
+func ExampleCountWriter() {
+	now := time.Date(2026, 10, 10, 12, 0, 0, 0, time.UTC)
+	capture := &progresstest.Capture{}
+	bus := progress.NewBus(progress.BusOptions{
+		Sinks: []progress.Sink{capture},
+		Now:   func() time.Time { return now },
+	})
+	ctx, step := progress.Start(progress.WithBus(context.Background(), bus), progress.KindStep, "copying the image")
+	ctx, call := progress.Start(ctx, progress.KindCall, "copy", progress.Work(progress.Bytes, 4<<20))
+	image := bytes.NewReader(make([]byte, 4<<20))
+	var dst bytes.Buffer
+	n, err := io.Copy(progress.CountWriter(ctx, &dst), image)
+	call.End(err)
+	step.End(err)
+	bus.Close()
+	for _, e := range capture.Events() {
+		if e.Kind == progress.KindCall {
+			fmt.Printf("%s %s %d/%d %s\n", e.Type, e.Name, e.Amount, e.Size, e.Unit)
+		}
+	}
+	fmt.Println("copied", n, "bytes")
+	// Output:
+	// start copy 0/4194304 bytes
+	// advance copy 4194304/4194304 bytes
+	// end copy 4194304/4194304 bytes
+	// copied 4194304 bytes
 }
