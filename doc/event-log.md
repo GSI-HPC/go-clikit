@@ -52,7 +52,7 @@ runs that write to a pipe or to NFS at once each need a file of their own.
 | --- | --- |
 | `v` | The version of the format, `1` |
 | `run`, `trace` | As on the first line |
-| `seq` | The event's number, from 1 with no gaps within a run: the one order every sink saw |
+| `seq` | The event's number, from 1, as the Bus numbered it: the one order every sink saw. It has no gaps but those of the advances the log left out, which `leftOut` on the span's `end` counts |
 | `time` | When the event happened, in UTC, as RFC 3339 with nine digits after the second, so that the times of one run sort as they happened |
 | `type` | `start`; `run`, a queued span that starts to run; `update`, a span whose total, message, or unit and size of work changed; `line`, a line of output; `end`; `suspend` and `resume`, the displays taken off the terminal for a question and put back; `advance`, a span whose `amount` changed, which the Bus sends at most once each 100 ms a span, by its clock |
 | `span`, `parent` | The span the event is about and the one it was started under, 16 hexadecimal digits each; the root has no `parent`. A `suspend` or `resume` has only a `span`, the one it was asked for under, if any |
@@ -74,6 +74,7 @@ runs that write to a pipe or to NFS at once each need a file of their own.
 | `err` | The error the span ended with, on one line |
 | `stream` | The stream a line of output came from, `stdout` or `stderr` |
 | `dropped` | The lines of output the sinks were not sent: on a `line`, those left out since the span's previous line, and on an `end`, all of the span's |
+| `leftOut` | The advances of the span the log did not write: on an `advance`, those since the span's previous advance that it wrote, and on an `end`, all of the span's. `LogOptions.AdvanceEvery` sets how often the log writes an advance of a span, a second by default, by the events' times, and the first of a span is always written; a negative value writes every one the Bus sends, and then there is no `leftOut`. Unlike `dropped`, which lines the sinks were never sent, the Bus sent these to every sink, and only the log leaves them out |
 
 A key whose value is zero or empty is left out, but for `exit`. `name`,
 `message` and `err` are text for people, not names to match: a program may
@@ -152,4 +153,4 @@ since, a value of `cache` and a `dropped` count among them, comes after
 them, from a second command, `status`, run on the same Bus once `exec` has
 ended, so its events go on from seq 48 and its spans from `#18`. A third
 command, `fetch`, run once `status` has ended, reports work in each unit,
-with its `advance` events and its `amount`, `size` and `unit`.
+with its `advance` events, one of them with a `leftOut` and its `end` with another, and its `amount`, `size` and `unit`.

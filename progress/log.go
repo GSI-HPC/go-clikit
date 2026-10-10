@@ -37,9 +37,9 @@ const (
 	logTime = "2006-01-02T15:04:05.000000000Z07:00"
 )
 
-// Log is a sink that writes the events of a Bus as JSON, one line each: an
-// event log, for a bug report, a test, or a converter to another tracing
-// system.
+// Log is a sink that writes the events of a Bus as JSON, one line each but
+// for the advances it samples out (see LogOptions.AdvanceEvery): an event
+// log, for a bug report, a test, or a converter to another tracing system.
 //
 // The first line is the run, the trace its events belong to, where the
 // trace came from when another program handed it on, and the program and
@@ -57,7 +57,10 @@ const (
 // The run tells the lines of one Log from those of others appending to the
 // same file, which may share the trace. A Timeout is in seconds. The
 // Amount, Size and Unit of a span's work are on every line of the span from
-// the first event that sets them, and an advance is written as "advance".
+// the first event that sets them, and an advance is written as "advance",
+// at most once each LogOptions.AdvanceEvery a span: the others are left out,
+// and counted in "leftOut" on the next advance written and on the span's
+// end.
 // A key whose value is zero or empty is left out. A line of output is
 // written without its text, which never leaves the process: the event says
 // only which stream it came from and how many lines before it were not
@@ -91,6 +94,9 @@ type Log struct {
 	enc     *json.Encoder
 	trace   string
 	pending []byte
+	// sampled holds, for each span with an advance the log saw, what it
+	// samples by; an entry goes at the span's end.
+	sampled map[SpanID]*sampling
 	err     error
 	closed  bool
 	// abandoned says Close stopped waiting: the goroutine that writes
@@ -116,6 +122,28 @@ type LogOptions struct {
 	// Run names the run on every line; empty draws 16 hexadecimal digits
 	// at random.
 	Run string
+	// AdvanceEvery is the least time between two advances of a span that
+	// the log writes, by the events' times; the advances in between are
+	// left out, and counted in "leftOut". 0 is a second; a negative value
+	// writes every advance the Bus sends.
+	AdvanceEvery time.Duration
+}
+
+// advanceEvery is the least time between two advances of a span the log
+// writes, as LogOptions.AdvanceEvery gives it.
+func (o LogOptions) advanceEvery() time.Duration {
+	if o.AdvanceEvery == 0 {
+		return time.Second
+	}
+	return o.AdvanceEvery
+}
+
+// sampling is what the log keeps of a span's advances to sample them: when
+// it last wrote one, and how many it has left out, since then and in all.
+type sampling struct {
+	written time.Time
+	since   int
+	total   int
 }
 
 // NewLog returns a Log that writes to w, and starts the goroutine that
@@ -188,6 +216,8 @@ type logEvent struct {
 	Err     string `json:"err,omitempty"`
 	Stream  string `json:"stream,omitempty"`
 	Dropped int    `json:"dropped,omitempty"`
+	// LeftOut counts the advances of a span the log did not write.
+	LeftOut int `json:"leftOut,omitempty"`
 }
 
 // Begin writes the run the events belong to, the log's first line: its
@@ -207,7 +237,9 @@ func (l *Log) Begin(r Run) {
 	l.write(line)
 }
 
-// Handle writes e as a line of its own.
+// Handle writes e as a line of its own, but for an advance the log samples
+// out (see LogOptions.AdvanceEvery), which it only counts, in "leftOut" on
+// the span's next advance it writes and on its end.
 func (l *Log) Handle(e Event) {
 	line := logEvent{
 		V:     LogVersion,
@@ -264,10 +296,46 @@ func (l *Log) Handle(e Event) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	line.Run, line.Trace = l.run, l.trace
+	if !l.sample(e, &line) {
+		return
+	}
 	l.write(line)
 	if e.Type == TypeEnd && (e.Kind == KindCommand || e.Kind == KindStep || e.Kind == KindBatch) {
 		l.due()
 	}
+}
+
+// sample decides whether the log writes e, when it is an advance, and puts
+// the advances it left out on the line of the next advance it writes, and
+// on the line of the span's end. l.mu is held.
+func (l *Log) sample(e Event, line *logEvent) bool {
+	switch e.Type {
+	case TypeAdvance:
+		every := l.o.advanceEvery()
+		if every < 0 {
+			return true
+		}
+		if l.sampled == nil {
+			l.sampled = make(map[SpanID]*sampling)
+		}
+		s := l.sampled[e.Span]
+		if s == nil {
+			l.sampled[e.Span] = &sampling{written: e.Time}
+			return true
+		}
+		if e.Time.Sub(s.written) < every {
+			s.since++
+			s.total++
+			return false
+		}
+		s.written, line.LeftOut, s.since = e.Time, s.since, 0
+	case TypeEnd:
+		if s := l.sampled[e.Span]; s != nil {
+			line.LeftOut = s.total
+			delete(l.sampled, e.Span)
+		}
+	}
+	return true
 }
 
 // write keeps v as a line, whole, for the goroutine that writes, and has it
