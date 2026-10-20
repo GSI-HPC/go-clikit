@@ -153,6 +153,15 @@ A pseudo-terminal opened through `/dev/ptmx`, with the standard library's
 Linux. A terminal that is not the process's controlling terminal cannot say
 who its foreground is, and is taken to be the process's.
 
+`cobratree` is tested on a tree of its own, made strict and executed as a
+program executes it: a table of command lines that name no command, with
+the exact text of each error, which is an interface (decision 24), and of
+those that name one, which run or print their help; and the flags pflag
+cannot parse, before the command, after it and on a command the tree
+traverses, each a usage error. What the toolchain records is tested inside
+the package, on a `debug.BuildInfo` per kind of build: none, a checkout,
+one of a tag, one with changes, and `go install` of a release.
+
 ## The pools
 
 A fake that answers at once rarely has two calls under way together, so a
@@ -244,7 +253,8 @@ Every package has `Example` functions for its main entry points, which
 pkg.go.dev shows next to them. Those with an `// Output:` comment run with the
 tests and fail when their output changes, so the documentation cannot drift
 from what the code does; the one that shows a test, `progresstest`'s `Watch`,
-is compiled but not run.
+is compiled but not run, as is `cobratree`'s `ReadBuildInfo`, whose output
+depends on how the binary was built.
 
 ## Coverage
 

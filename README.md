@@ -22,9 +22,10 @@ command-line tool for administering HPC clusters, and became a module of
 their own when [sind](https://github.com/GSI-HPC/sind), which runs Slurm
 clusters in Docker, set out to use them too. They moved here with their
 history, as clusterctl v0.4.0 shipped them, and their first release will be
-v0.1.0. `progress/cliprogress` was written here, from the command-line glue
-clusterctl and sind each carried
-([decision 21](doc/decisions.md#21-the-command-lines-glue-for-progress-is-the-kits)).
+v0.1.0. `progress/cliprogress` and `cobratree` were written here, from the
+command-line code clusterctl and sind each carried
+([decision 21](doc/decisions.md#21-the-command-lines-glue-for-progress-is-the-kits),
+[decision 24](doc/decisions.md#24-the-strict-command-tree-is-the-kits-in-cobratree)).
 [`doc/architecture.md`](doc/architecture.md) says how they fit together.
 
 | Package | What it holds |
@@ -35,6 +36,7 @@ clusterctl and sind each carried
 | `progress/cliprogress` | the words of `--progress`, a command's display and event log, the private log file |
 | `progress/progresstest` | capturing and checking the events a command reports |
 | `fanout` | bounded worker pools that report their targets as progress |
+| `cobratree` | a strict cobra command tree, usage errors, the build info |
 
 ## Install
 
