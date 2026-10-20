@@ -15,9 +15,9 @@ gitignored).
 
 The packages, most of them moved here with their history from the
 repository where they were written, which `README.md` names;
-`progress/cliprogress` was written here, from the glue clusterctl and sind
-each carried (decision 21). v0: the API may still change in a minor release
-(see Compatibility).
+`progress/cliprogress` and `cobratree` were written here, from the code
+clusterctl and sind each carried (decisions 21 and 24). v0: the API may
+still change in a minor release (see Compatibility).
 
 | Package | What it holds | Release |
 | --- | --- | --- |
@@ -27,7 +27,8 @@ each carried (decision 21). v0: the API may still change in a minor release
 | `progress/progresstest` | capturing and checking the events a command reports | v0.1.0 |
 | `fanout` | bounded worker pools that report their targets as progress | v0.1.0 |
 | `progress/cliprogress` | the words of `--progress`, a command's display and event log, the private log file | unreleased |
-| `cobratree`, `progress/mcpprogress` | cobra helpers, progress over MCP | later, each once a second program needs it |
+| `cobratree` | a strict cobra command tree, usage errors, the build info | unreleased |
+| `progress/mcpprogress` | progress over MCP | later, once a second program needs it |
 
 ## Layout
 
@@ -62,6 +63,9 @@ each carried (decision 21). v0: the API may still change in a minor release
 - `fanout/`: `each.go`, `Each` and the package comment; `map.go`, `Map`,
   `MapOptions`, `Item`, `Outcome`, `Summary` and `Failure`; `batches.go`;
   `recover.go`, `Recovered` and `PanicError`.
+- `cobratree/`: `cobratree.go`, the package comment and `Strict`;
+  `usage.go`, `Usage`, `Usagef` and `IsUsage`; `buildinfo.go`,
+  `BuildInfo` and `ReadBuildInfo`.
 - Every package has an `example_test.go`. Failing fuzz inputs go under the
   package's `testdata/fuzz/`.
 - `doc/`: `README.md` maps the documentation; `architecture.md` says how
@@ -107,9 +111,9 @@ go-test-coverage: `go install github.com/vladopajic/go-test-coverage/v2@latest`.
 - Requirements follow decision 3: `go-nodeset` and `golang.org/x/text`,
   `golang.org/x/sys` in `progress/cliprogress` alone (decision 22), and
   anything else only with a record. Never the MCP Go SDK, charmbracelet,
-  testify or OpenTelemetry. cobra only in `cobratree`; `termtext`,
-  `progress` and `fanout`, which library packages import too, never import
-  it. depguard enforces this.
+  testify or OpenTelemetry. cobra and pflag only in `cobratree` (decision
+  24); `termtext`, `progress` and `fanout`, which library packages import
+  too, never import them. depguard enforces this.
 - Test helpers ship as `xxxtest` packages and report through `testing.TB`.
   Tests use the standard library, table-driven, with `t.Errorf`/`t.Fatalf`.
 - Every file stays at 100% statement coverage. A branch no test can reach is
@@ -120,7 +124,8 @@ go-test-coverage: `go install github.com/vladopajic/go-test-coverage/v2@latest`.
   or type is API.
 - The kit knows no program: a program's name and the noun for its targets,
   such as "hosts", are parameters, and exit-code rules stay in the program,
-  behind hooks such as `Classify`.
+  behind hooks such as `Classify` and predicates such as
+  `cobratree.IsUsage`.
 - Interfaces beyond the Go API: the six span kinds, the JSONL event log
   (version 1: keys may be added, never renamed or removed), the text the
   displays draw with the zero `Theme`, which consumers compare in their
@@ -129,8 +134,9 @@ go-test-coverage: `go install github.com/vladopajic/go-test-coverage/v2@latest`.
   rules `progresstest.Check` enforces (decision 15), and the words
   `cliprogress.Modes` names, in their order, and the texts of the errors and
   notes `cliprogress` returns and writes, the refusals of the log's file
-  included (decision 21). Changing any of them is a breaking change; a new
-  or stricter `Check` rule is one too.
+  included (decision 21), and the texts of the errors `cobratree.Strict`'s
+  checks return (decision 24). Changing any of them is a breaking change; a
+  new or stricter `Check` rule is one too.
 - The kit reads no environment: whether to draw in colour, NO_COLOR and
   TERM included, is the program's to decide, and a theme is a parameter;
   `cliprogress` is told what the program read. It sets nothing

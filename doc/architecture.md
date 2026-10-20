@@ -3,7 +3,7 @@
 
 # Architecture
 
-The kit is six packages that a command-line program and the library
+The kit is seven packages that a command-line program and the library
 packages it calls share: a library reports what it does, and the command
 decides how that is shown. This document says where the packages came from,
 how they fit together, what runs on which goroutine, what a program fills
@@ -31,7 +31,10 @@ with their history, as they shipped in clusterctl v0.4.0, under paths of
 their own. `progress/cliprogress` was written here afterwards, from the glue
 between the command line and the progress packages that clusterctl and sind
 each carried
-([decision 21](decisions.md#21-the-command-lines-glue-for-progress-is-the-kits)).
+([decision 21](decisions.md#21-the-command-lines-glue-for-progress-is-the-kits)),
+and `cobratree` from the code both carried to make a cobra command tree
+strict and to read the build info
+([decision 24](decisions.md#24-the-strict-command-tree-is-the-kits-in-cobratree)).
 
 ## The packages
 
@@ -43,19 +46,24 @@ each carried
 | `progress/cliprogress` | The words of `--progress` and the rule that picks a display from them, a command's `Run`, which makes and takes down its Bus, display, summary and event log, the private file the log is appended to, and the probes of a command's streams | `progress`, `progress/display`, `termtext`, `golang.org/x/sys` |
 | `progress/progresstest` | `Capture`, `Check`, `Watch` and its `Watcher`, and `Screen`, a terminal for tests | `progress`, `termtext`, `go-nodeset` |
 | `fanout` | `Each`, `Map` and `Batches`, the bounded pools that report their items as targets | `progress`, `go-nodeset` |
+| `cobratree` | `Strict`, which makes a cobra command tree strict about its command line, the usage errors, and the build info | cobra, pflag |
 
 Every arrow points down the table: nothing imports `cliprogress`,
 `progresstest` or `fanout`, only `cliprogress` imports `display`, `progress`
-imports only `termtext`, and `termtext` only `golang.org/x/text`. A library
-imports `progress`, and `fanout` when it works on many items; the command
-imports `cliprogress`, or `display` when it picks its displays by a rule of
-its own; tests import `progresstest`. `go-nodeset` folds the names of
+imports only `termtext`, and `termtext` only `golang.org/x/text`.
+`cobratree` stands apart: it imports no package of the kit, and none
+imports it. A library imports `progress`, and `fanout` when it works on many
+items; the command imports `cliprogress`, or `display` when it picks its
+displays by a rule of its own, and `cobratree` when it is built with cobra;
+tests import `progresstest`. `go-nodeset` folds the names of
 targets into node sets, `exe[0001-0480]`, in the tree, the tests' trees and
 the summary of a pool that failed.
 [Decision 3](decisions.md#3-what-the-kit-may-require) says what else the kit
 may require, which is nothing without a record;
 [decision 22](decisions.md#22-the-kit-may-require-golangorgxsys-in-cliprogress-alone)
-lets `cliprogress` alone require `golang.org/x/sys`.
+lets `cliprogress` alone require `golang.org/x/sys`, and
+[decision 24](decisions.md#24-the-strict-command-tree-is-the-kits-in-cobratree)
+`cobratree` alone cobra and pflag.
 
 ## Spans and the Bus
 
@@ -217,7 +225,9 @@ The kit knows no program. What depends on one is a parameter or a hook:
 | Where the notes go, and the display and the summary | `cliprogress.Options.Notes`, `cliprogress.Options.Stderr` |
 | Which of the program's writers, and its logger's, go through the display's Terminal | the writers of `cliprogress.Run.Writer` and `cliprogress.Run.Lines`, which the program puts in place of its own and puts back once `cliprogress.Run.Finish` has returned |
 | Whether a command that succeeded leaves the summary | the argument of `cliprogress.Run.Finish` |
-| How an error of the command line is reported | the program marks the errors `cliprogress.Choose` and `cliprogress.Start` return as its usage errors |
+| How an error of the command line is reported | the program marks the errors `cliprogress.Choose` and `cliprogress.Start` return as its usage errors, with `cobratree.Usage` when it is built with cobra; `cobratree.Strict` marks those of its tree's argument checks, and `cobratree.IsUsage` tells them, and pflag's, from other errors, for the program's exit code |
+| The commands a program dropped, and what replaced them | the `moved` argument of `cobratree.Strict` |
+| How the program words its version: the word for a build that is no release, how much of the commit it shows, and a version injected at build time | the program, from the fields of `cobratree.BuildInfo`, which `cobratree.ReadBuildInfo` returns |
 | How the displays look: a theme, in how many colours, or none | `display.TreeOptions.Theme`, `display.CounterOptions.Theme`, `display.PlainOptions.Theme` and `display.Summary.Theme`, one of `display.Themes`, which `display.ParseTheme` reads, drawn in 256 colours, `Colours16` or `NoColours` by `Theme.In`; the zero `Theme` draws in no colour, as before (decisions 19 and 20); `cliprogress.Options.Theme` |
 
 A Bus hands on what it was told: `Bus.Program`, `Bus.PanicLog` and

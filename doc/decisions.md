@@ -12,7 +12,7 @@ names it.
 | --- | --- | --- |
 | [1](#1-apache-20-and-gsi-holds-the-copyright) | Apache-2.0, and GSI holds the copyright | accepted |
 | [2](#2-the-go-line-is-the-oldest-go-release-still-supported) | The go line is the oldest Go release still supported | accepted |
-| [3](#3-what-the-kit-may-require) | What the kit may require | accepted, refined by [22](#22-the-kit-may-require-golangorgxsys-in-cliprogress-alone) |
+| [3](#3-what-the-kit-may-require) | What the kit may require | accepted, refined by [22](#22-the-kit-may-require-golangorgxsys-in-cliprogress-alone) and [24](#24-the-strict-command-tree-is-the-kits-in-cobratree) |
 | [4](#4-a-release-is-a-signed-tag) | A release is a signed tag | accepted, superseded in part by [10](#10-a-daily-audit-holds-the-releases-to-their-record) |
 | [5](#5-progress-and-its-displays-are-the-kits-own) | Progress and its displays are the kit's own | accepted |
 | [6](#6-the-pools-are-the-kits-own) | The pools are the kit's own | accepted, refined by [12](#12-the-programs-identity-lives-on-the-bus) |
@@ -33,6 +33,7 @@ names it.
 | [21](#21-the-command-lines-glue-for-progress-is-the-kits) | The command line's glue for progress is the kit's | accepted |
 | [22](#22-the-kit-may-require-golangorgxsys-in-cliprogress-alone) | The kit may require golang.org/x/sys, in cliprogress alone | accepted |
 | [23](#23-a-span-reports-its-work-sampled-and-a-sink-rolls-it-up) | A span reports its work, sampled, and a sink rolls it up | accepted |
+| [24](#24-the-strict-command-tree-is-the-kits-in-cobratree) | The strict command tree is the kit's, in cobratree | accepted |
 
 ## 1. Apache-2.0, and GSI holds the copyright
 
@@ -139,6 +140,7 @@ since v0.42.0 requires Go 1.26.
 
 Status: accepted, refined by
 [decision 22](#22-the-kit-may-require-golangorgxsys-in-cliprogress-alone)
+and [decision 24](#24-the-strict-command-tree-is-the-kits-in-cobratree)
 
 ### Context
 
@@ -1231,3 +1233,108 @@ each copy something showed its share done only as targets ended.
   advances left out, which `leftOut` counts.
 - Rule 3 lets a share fall back when work below starts that was not known.
 - The time left is an estimate, and reads wrong while the rate changes.
+
+## 24. The strict command tree is the kit's, in cobratree
+
+Status: accepted
+
+### Context
+
+sind (`cmd/sind/root.go`, `exitcode.go` and `version.go`, adapted from
+clusterctl's) and clusterctl v0.4.0 (`internal/cli/root.go`,
+`internal/exitcode` and `internal/version`) carry the same plumbing around
+cobra, about 190 lines in sind. Cobra is lenient where a script needs it
+strict: a command that only holds subcommands prints its help and succeeds
+for a word that names none of them, so a script that misspelt one, or
+called one that was renamed, goes on to its next step; help prints the
+root's help and succeeds for a topic that names no command; and its
+argument checks, such as `cobra.ExactArgs`, return plain errors that name
+neither the arguments wanted nor the command, which a program exits with
+as with any failure. Both programs add help and completion to the tree
+before it runs, make such commands and help refuse those words, and mark
+the errors of their argument checks as usage errors. Both also report
+their version from what the Go toolchain recorded in the binary, taking
+the module version only from a build without VCS stamps, `go install
+…@v1.2.3`, since the version the toolchain derives in a checkout, from a
+tag or as a pseudo-version, names no release.
+
+The copies had drifted:
+
+- clusterctl suggests every close subcommand, `; did you mean a or b?`,
+  and sind the first, `(did you mean "a"?)`.
+- Only sind appends the command's usage line to the error of an argument
+  check, and names the command that replaced one it dropped,
+  `(it is now "get cluster")`.
+- clusterctl marks a usage error with its own package of exit codes, and a
+  flag cobra cannot parse with a `FlagErrorFunc`. sind marks its own, and
+  takes pflag's typed errors for usage errors wherever it finds them, since
+  cobra passes only the flags of the command that runs through its
+  `FlagErrorFunc`, not those of the parents it traverses with
+  `TraverseChildren`, nor those of a command that parses its own.
+- clusterctl prints `devel`, twelve digits of the revision, the commit's
+  date, the Go version and the platform on one line; sind prints `dev`,
+  seven digits and `-dirty`, and sind-action reads the `version` field of
+  `sind version --json`.
+
+Decision 3 allowed cobra only in a package about cobra, `cobratree`, and
+recorded no requirement for it.
+
+### Decision
+
+- `cobratree` holds `Strict(root, moved)`, which makes a built tree strict;
+  `Usage`, `Usagef` and `IsUsage`; and `BuildInfo`, which `ReadBuildInfo`
+  returns.
+- The kit may require `github.com/spf13/cobra` and `github.com/spf13/pflag`,
+  which only `cobratree` imports; depguard refuses both in every other
+  package, and `cliprogress` is still given what its flag holds (decision
+  21). It requires cobra v1.10.2, which sind and clusterctl v0.4.0 require,
+  and pflag v1.0.9, the version cobra requires, which clusterctl has, so
+  that the first release raises neither program's; sind requires v1.0.10.
+  Dependabot then moves them, as it moves golang.org/x/sys (decision 22).
+  `github.com/inconshreveable/mousetrap`, which cobra imports on Windows,
+  comes in as an indirect requirement.
+- Where the programs differed, the kit's one wording is sind's: the first
+  suggestion, `(did you mean "get"?)`; the usage line after the error of
+  an argument check, `(usage: prog power on NODES)`, for a command that
+  holds no subcommands; and a moved command's new place,
+  `(it is now "get cluster")`, where no subcommand is close. sind takes
+  the package with no change to what it prints; clusterctl's suggestions
+  and arity errors change when it takes it.
+- A moved command is data: `moved` maps a command line the program no
+  longer takes, its words after the program's name, to the one that
+  replaced it.
+- A usage error is a mark, not an exit code: the kit names no number, and
+  a program maps `IsUsage` to its own, 2 in both. The error type is not
+  exported. pflag's four typed errors, an unknown flag, a missing value, a
+  value it does not take and a syntax it does not know, count as usage
+  errors wherever `errors.As` finds them, so that no `FlagErrorFunc` is
+  needed.
+- The build info is data and no words: the module version of a build from
+  the proxy, the full revision, the commit's time and whether the checkout
+  had changes. Which word a build that is no release gets, how many digits
+  of the revision are printed, and the Go version and platform, which
+  `runtime` gives, are the program's, so sind keeps `dev` and seven digits
+  and clusterctl `devel` and twelve; so is a version injected with
+  `-ldflags`, which the program prefers. It lives in `cobratree`, beside
+  the tree whose version command prints it, as both programs that read it
+  have one.
+- Interfaces beyond the Go API: the texts of the errors that `Strict`'s
+  checks return, around the names of the commands in the tree. Programs
+  pin them in their tests, and scripts may read them; changing one is a
+  breaking change.
+
+### Costs
+
+- Every program that requires the kit has cobra and pflag in its module
+  graph, whether it builds `cobratree` or not, as with golang.org/x/sys
+  (decision 22), and a release of the kit that follows cobra raises the
+  program's. Both programs require them already.
+- `Strict` replaces the argument check of every command that holds
+  subcommands and runs nothing, and of help, so a check a program set
+  there is lost, and it adds help and completion when it is called, so the
+  completion scripts go to the output the root has then.
+- The texts are frozen with the API: rewording one waits for a breaking
+  release, and clusterctl adopts sind's.
+- A program without cobra that wants the build info takes `cobratree` and
+  cobra with it, until a later decision gives `BuildInfo` a package of its
+  own, which would be a breaking change.

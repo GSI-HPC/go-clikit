@@ -11,13 +11,15 @@
 //	github.com/GSI-HPC/go-clikit/progress/cliprogress   the words of --progress, a command's display, summary and event log
 //	github.com/GSI-HPC/go-clikit/progress/progresstest  capturing and checking the events a command reports
 //	github.com/GSI-HPC/go-clikit/fanout                 bounded worker pools that report their targets as progress
+//	github.com/GSI-HPC/go-clikit/cobratree              a strict cobra command tree, usage errors, the build info
 //
 // A library package reports what it does through progress, which costs
 // nothing when no command is listening, and runs work for many targets with
 // fanout. A command decides how the work is shown: it creates a
 // progress.Bus, attaches a display from progress/display and, if asked, an
 // event log, and passes the Bus down in its context.Context, or has
-// progress/cliprogress do so from its flags. The kit knows no program: a
-// program's name, the noun for its targets and its rule for exit codes are
-// parameters.
+// progress/cliprogress do so from its flags. A command built with cobra
+// makes its tree strict about its command line with cobratree. The kit
+// knows no program: a program's name, the noun for its targets and its
+// rule for exit codes are parameters.
 package clikit

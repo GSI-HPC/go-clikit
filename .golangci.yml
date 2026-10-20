@@ -39,14 +39,16 @@ linters:
             - pkg: go.opentelemetry.io
               desc: report progress through the progress package (doc/decisions.md, decision 3)
         # Library packages import termtext, progress and fanout too, so
-        # cobra reaches only the package that is about cobra.
+        # cobra and its flags reach only the package that is about cobra.
         cobra-only-in-cobratree:
           files:
             - $all
             - "!**/cobratree/**"
           deny:
             - pkg: github.com/spf13/cobra
-              desc: only cobratree may import cobra (doc/decisions.md, decision 3)
+              desc: only cobratree may import cobra (doc/decisions.md, decisions 3 and 24)
+            - pkg: github.com/spf13/pflag
+              desc: only cobratree may import pflag; cliprogress is given what a flag holds (doc/decisions.md, decisions 21 and 24)
         # The ioctls and fcntls cliprogress makes; every other package
         # leaves the system alone (doc/decisions.md, decision 22).
         x-sys-only-in-cliprogress:
