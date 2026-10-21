@@ -26,8 +26,8 @@ still change in a minor release (see Compatibility).
 | `progress/display` | the live tree, the counter, plain lines, the summary | v0.1.0 |
 | `progress/progresstest` | capturing and checking the events a command reports | v0.1.0 |
 | `fanout` | bounded worker pools that report their targets as progress | v0.1.0 |
-| `progress/cliprogress` | the words of `--progress`, a command's display and event log, the private log file | unreleased |
-| `cobratree` | a strict cobra command tree, usage errors, the build info | unreleased |
+| `progress/cliprogress` | the words of `--progress`, a command's display and event log, the private log file | v0.3.0 |
+| `cobratree` | a strict cobra command tree, usage errors, the build info | v0.4.0 |
 | `progress/mcpprogress` | progress over MCP | later, once a second program needs it |
 
 ## Layout
