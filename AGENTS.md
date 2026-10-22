@@ -26,6 +26,7 @@ still change in a minor release (see Compatibility).
 | `progress/display` | the live tree, the counter, plain lines, the summary | v0.1.0 |
 | `progress/progresstest` | capturing and checking the events a command reports | v0.1.0 |
 | `fanout` | bounded worker pools that report their targets as progress | v0.1.0 |
+| `fanout/fanouttest` | counting the calls a fake is in the middle of, to prove a limit | v0.6.0 |
 | `progress/cliprogress` | the words of `--progress`, a command's display and event log, the private log file | v0.3.0 |
 | `cobratree` | a strict cobra command tree, usage errors, the build info | v0.4.0 |
 | `cliout` | a command's result as a table aligned by display width, and as JSON, escaped | v0.6.0 |
@@ -65,7 +66,8 @@ still change in a minor release (see Compatibility).
   not Unix.
 - `fanout/`: `each.go`, `Each` and the package comment; `map.go`, `Map`,
   `MapOptions`, `Item`, `Outcome`, `Summary` and `Failure`; `batches.go`;
-  `recover.go`, `Recovered` and `PanicError`.
+  `recover.go`, `Recovered` and `PanicError`; `keyed.go`, `Keyed`.
+- `fanout/fanouttest/`: `fanouttest.go`, `InFlight`.
 - `cliout/`: `table.go`, the package comment, `Table` and `Column`;
   `json.go`, `WriteJSON`.
 - `cobratree/`: `cobratree.go`, the package comment and `Strict`;
