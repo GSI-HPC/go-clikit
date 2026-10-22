@@ -5,6 +5,7 @@ package termtext_test
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/GSI-HPC/go-clikit/termtext"
 )
@@ -46,4 +47,29 @@ func ExampleTruncate() {
 	// Output:
 	// "dial tcp"
 	// "ノー"
+}
+
+// Wrap fills a paragraph to a number of columns, with an indent for its
+// first line and for the others, and never cuts a word.
+func ExampleWrap() {
+	text := "Run the command on every host in the set, one after the other, and stop at the first failure."
+	fmt.Print(termtext.Wrap(text, 36, "  -x, --exit  ", "              "))
+	// Output:
+	//   -x, --exit  Run the command on
+	//               every host in the set,
+	//               one after the other,
+	//               and stop at the first
+	//               failure.
+}
+
+// The output of a program is written escaped, line by line, as it comes,
+// whatever the writes were cut as.
+func ExampleNewEscapeWriter() {
+	w := termtext.NewEscapeWriter(os.Stdout)
+	fmt.Fprint(w, "copying\x1b]0;owned\x07 20%\r")
+	fmt.Fprint(w, "copying 100%\n\tdone")
+	w.Close()
+	// Output:
+	// copying\x1b]0;owned\x07 20%\rcopying 100%
+	// 	done
 }

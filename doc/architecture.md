@@ -40,7 +40,7 @@ strict and to read the build info
 
 | Package | Holds | Imports |
 | --- | --- | --- |
-| `termtext` | Escaping untrusted text for a terminal, and the columns text takes there | `golang.org/x/text/width` |
+| `termtext` | Escaping untrusted text for a terminal, as a string or as a stream, the columns text takes there, and filling text to a number of them | `golang.org/x/text/width` |
 | `progress` | Spans carried in a `context.Context`, the `Bus` that orders their events, `Tally`, `Meter`, `Sanitize`, the JSONL event log and the W3C trace context | `termtext` |
 | `progress/display` | The `Terminal` a display shares with the command, the live `Tree`, the `Counter`, `Plain` lines and the `Summary` | `progress`, `termtext`, `go-nodeset` |
 | `progress/cliprogress` | The words of `--progress` and the rule that picks a display from them, a command's `Run`, which makes and takes down its Bus, display, summary and event log, the private file the log is appended to, and the probes of a command's streams | `progress`, `progress/display`, `termtext`, `golang.org/x/sys` |
