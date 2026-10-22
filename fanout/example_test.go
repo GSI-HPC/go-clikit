@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -194,4 +195,73 @@ func ExampleMap_skip() {
 	// Output:
 	// <nil> false
 	// nothing to push true
+}
+
+// Keyed bounds the work under way on each key, such as a host, whatever the
+// pool's own limit is. Here eight items go through the pool at once, four
+// to each of two gateways, and the function for each takes its place on its
+// gateway around its work, so that no more than two are ever under way on
+// one gateway. The most there were at once is at most the limit, however
+// the scheduler runs them, so that is what is printed.
+func ExampleKeyed() {
+	gateways := []string{"gw1.example.org", "gw2.example.org"}
+	keys := &fanout.Keyed{Limit: 2}
+	var mu sync.Mutex
+	now, peak := map[string]int{}, map[string]int{}
+
+	fanout.Each(context.Background(), 8, 8, func(i int) {
+		gateway := gateways[i%len(gateways)]
+		release, err := keys.Acquire(context.Background(), gateway)
+		if err != nil {
+			return
+		}
+		defer release()
+
+		mu.Lock()
+		now[gateway]++
+		peak[gateway] = max(peak[gateway], now[gateway])
+		mu.Unlock()
+		time.Sleep(time.Millisecond)
+		mu.Lock()
+		now[gateway]--
+		mu.Unlock()
+	})
+	for _, gateway := range gateways {
+		fmt.Printf("%s: at most 2 at once: %t\n", gateway, peak[gateway] <= 2)
+	}
+	// Output:
+	// gw1.example.org: at most 2 at once: true
+	// gw2.example.org: at most 2 at once: true
+}
+
+// With Map, the place is taken in MapOptions.Acquire, which keeps the item
+// queued while it waits and calls the release the function returns once the
+// work is done. An item that goes through two hosts, such as a node and
+// the gateway in front of it, names both, and the places are taken in one
+// order whatever order that is.
+func ExampleKeyed_acquire() {
+	keys := &fanout.Keyed{Limit: 1}
+	type job struct{ node, gateway string }
+	jobs := []job{{"exe01", "gw1"}, {"exe02", "gw1"}, {"exe03", "gw2"}}
+
+	outcomes, err := fanout.Map(context.Background(), jobs, fanout.MapOptions[job]{
+		Step: "uptime",
+		Describe: func(j job) fanout.Item {
+			return fanout.Item{Node: j.node}
+		},
+		Acquire: func(ctx context.Context, j job) (func(), error) {
+			return keys.Acquire(ctx, j.gateway, j.node)
+		},
+	}, func(_ context.Context, j job) (string, error) {
+		return j.node + " via " + j.gateway, nil
+	})
+	for _, o := range outcomes {
+		fmt.Println(o.Value, o.Err)
+	}
+	fmt.Println(err)
+	// Output:
+	// exe01 via gw1 <nil>
+	// exe02 via gw1 <nil>
+	// exe03 via gw2 <nil>
+	// <nil>
 }

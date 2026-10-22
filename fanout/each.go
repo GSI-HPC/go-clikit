@@ -8,6 +8,10 @@
 // pause between them, and reports them as a step with a span for each
 // batch, under which the work of a batch reports its targets.
 //
+// Keyed is no pool but what a pool's function takes: it bounds the work
+// under way on each key, such as a host, at most Limit at a time on any one
+// key, however many keys the pool works on at once.
+//
 // Map and Batches keep the promises progresstest.Check holds an emitter
 // to: every target or batch is announced queued before the first runs,
 // each is ended before its place is given up, and those never started end
