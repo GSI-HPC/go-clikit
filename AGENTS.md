@@ -35,6 +35,8 @@ still change in a minor release (see Compatibility).
 | `cobratree/cobratreetest` | running a command tree in a test, checking a manual's command lines | v0.6.0 |
 | `localweb` | the guard of a local web server: its listener, the Host and cross-site checks, the headers | v0.8.0 |
 | `localweb/session` | the launch token exchanged for a session cookie, and the CSRF token | v0.8.0 |
+| `localweb/sse` | a page's live fragments as Server-Sent Events, and the topics they change in | v0.8.0 |
+| `localweb/localwebtest` | a signed-in client and a reader of event streams, for a test of a local web server | v0.8.0 |
 
 ## Layout
 
@@ -97,6 +99,10 @@ still change in a minor release (see Compatibility).
   `peer_other.go` are for systems that are not Unix, or not Linux.
 - `localweb/session/`: `session.go`, the package comment, `NewToken`,
   `Options`, `Sessions`, `New`, `Middleware` and `CSRF`.
+- `localweb/sse/`: `sse.go`, the package comment, `Serve`, `Options`,
+  `Event` and `Format`; `notifier.go`, `Notifier` and `Subscription`.
+- `localweb/localwebtest/`: `localwebtest.go`, `Client`, `Login` and
+  `Reader`.
 - Every package has an `example_test.go`. Failing fuzz inputs go under the
   package's `testdata/fuzz/`.
 - `doc/`: `README.md` maps the documentation; `architecture.md` says how

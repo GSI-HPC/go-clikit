@@ -94,6 +94,7 @@ jobs:
           - {package: progress, target: FuzzMeter}
           - {package: progress/eventlog, target: FuzzDecode}
           - {package: progress/display, target: FuzzCut}
+          - {package: localweb/sse, target: FuzzFormat}
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-go

@@ -54,6 +54,8 @@ strict and to read the build info
 | `cobratree/cobratreetest` | `Run`, which runs a command tree in a test and keeps its standard output and standard error apart, and `CheckCommandLines`, which checks the command lines of a manual against the tree | `cobratree`, cobra, pflag |
 | `localweb` | `Listen`, which binds a loopback address or a private Unix socket, `PeerListener`, which closes another user's connections, the checks `Hosts`, `SameOrigin` and `Headers`, and `Serve`, which serves with every timeout set | none |
 | `localweb/session` | `Sessions`, which exchange the launch token for a session cookie and hold each session's CSRF token, and `NewToken` | `localweb` |
+| `localweb/sse` | `Notifier` and `Subscription`, which tell a stream the exact topics that changed, and `Serve`, which streams a page's fragments as Server-Sent Events, every one first and then those that changed | none |
+| `localweb/localwebtest` | `Login`, a client that signs in and sends requests as the server's own pages do, and `Reader`, which reads the events of a stream | `localweb/session`, `localweb/sse` |
 
 Every arrow points down the table: nothing imports `cliprogress`,
 `progresstest`, `mcpprogress`, `eventlog` or `fanout`, only `cliprogress` imports `display`,
@@ -259,6 +261,7 @@ The kit knows no program. What depends on one is a parameter or a hook:
 | How the displays look: a theme, in how many colours, or none | `display.TreeOptions.Theme`, `display.CounterOptions.Theme`, `display.PlainOptions.Theme` and `display.Summary.Theme`, one of `display.Themes`, which `display.ParseTheme` reads, drawn in 256 colours, `Colours16` or `NoColours` by `Theme.In`; the zero `Theme` draws in no colour, as before (decisions 19 and 20); `cliprogress.Options.Theme`; `cliprogress.ThemeFor` picks the colours from what the program read of NO_COLOR, TERM and COLORTERM |
 | Where a local web server listens, which user it serves, and how a refusal is written and logged | the address the program passes `localweb.Listen`, the uid it passes `localweb.PeerListener`, and the `localweb.Refuser` of each check; the program prints the address and opens the browser |
 | The names of a local web server's session cookie and CSRF header, and the line a refusal adds to tell the user where the address is | `session.Options.Cookie`, `.Header` and `.Refuse`; the program makes the token with `session.NewToken` and prints it in the address |
+| Which fragments a page streams, the topics each depends on, and how long changes gather | the program's store, which calls `sse.Notifier.Notify`, the render it passes `sse.Serve`, and `sse.Options` |
 | What a page may load, and which other origins a development server adds | the policy the program passes `localweb.Headers`, `""` for `localweb.ContentSecurityPolicy`, and `localweb.Origin.Others` |
 
 A Bus hands on what it was told: `Bus.Program`, `Bus.PanicLog` and
@@ -321,6 +324,14 @@ Behind them, `localweb/session` lets in only the browser that opened the
 address the program printed: the launch token in it is exchanged for a
 session cookie, and a request that may change something carries the
 session's CSRF token.
+
+`localweb/sse` streams the live parts of a page. The program's store
+notifies the topics it changes; a stream subscribes, sends every
+fragment of the page first, since the page may be older than a change
+the stream did not hear of, and then each fragment whose topic changed
+and whose HTML differs from what it last sent. A subscriber that falls
+behind keeps the set of topics it missed, so it renders no more than
+changed. The stream is let in from the page's own origin alone.
 
 A program chains them, outermost first: `Headers`, `Hosts`, `SameOrigin`,
 `session.Sessions.Middleware` and its handler; `Serve` serves the chain with every timeout set. Each
