@@ -57,8 +57,12 @@ works without it. Nothing that must survive or be shared goes there.
 
 ## Headers
 
-- `Referrer-Policy: no-referrer` on every response, so that the launch URL
-  and its token never leave in a `Referer` header.
+- `Referrer-Policy: same-origin` on every response, so that the launch URL
+  and its token never leave for another site in a `Referer` header. Not
+  `no-referrer`: under it a browser sends a form's POST with the origin
+  `null`, which the origin check of `localweb` refuses
+  ([decision 34](decisions.md#34-localweb-guards-a-local-web-server-keeps-its-sessions-and-streams-its-pages)).
+  `localweb.Headers` sets it.
 - The other headers (CSP, `X-Content-Type-Options`, frame options) are the
   defence of `localweb`, not of the convention.
 
