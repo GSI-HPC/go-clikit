@@ -267,6 +267,8 @@ The kit knows no program. What depends on one is a parameter or a hook:
 | The names of a local web server's session cookie and CSRF header, and the line a refusal adds to tell the user where the address is | `session.Options.Cookie`, `.Header` and `.Refuse`; the program makes the token with `session.NewToken` and prints it in the address |
 | Which fragments a page streams, the topics each depends on, and how long changes gather | the program's store, which calls `sse.Notifier.Notify`, the render it passes `sse.Serve`, and `sse.Options` |
 | What a page may load, and which other origins a development server adds | the policy the program passes `localweb.Headers`, `""` for `localweb.ContentSecurityPolicy`, and `localweb.Origin.Others` |
+| Where the record of a running server lives, and whether a browser opens | the runtime directory the program passes `launch.Acquire`, and a directory of its own without one; the program calls `launch.Opener.Skip` and `Open`, prints the address in any case, and removes the redirect file when it stops |
+| The files a page loads and the templates it renders, and working on them without a build | the `fs.FS` and prefix the program passes `assets.New`, the patterns and functions it passes `page.Parse`, and `assets.Options.Dev` and `page.Options.Reload` on a directory of its own |
 
 A Bus hands on what it was told: `Bus.Program`, `Bus.PanicLog` and
 `Bus.Classify` answer for the Bus that `progress.BusFrom` finds in a
@@ -342,6 +344,19 @@ A program chains them, outermost first: `Headers`, `Hosts`, `SameOrigin`,
 check answers a refused request through a `Refuser`, which the program may
 give to write it in its own form and log the reason; the messages are an
 interface of the kit.
+
+Around the server, `localweb/launch` keeps one per user and opens the
+browser on it (decision 35). A start takes the lock of
+`Acquire`; when `Running` finds the record of a server that still runs,
+whose listening socket is the user's, the start opens that one and ends;
+otherwise it listens, `Publish`es its address and drops the lock. The
+`Opener` writes the address, token and all, into a file only the user can
+read, and hands that file to the desktop's opener, as a command line is
+readable by every user. `localweb/assets` serves the page's files under a
+hash of them all, so a browser keeps each for good; `localweb/page`
+renders the page and its fragments from one template set, the same
+blocks the stream of `sse` sends; and `localweb/htmx` holds the scripts
+that swap them in, checked against their releases.
 
 ## Standard error
 

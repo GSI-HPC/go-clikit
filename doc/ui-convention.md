@@ -65,6 +65,10 @@ works without it. Nothing that must survive or be shared goes there.
   `localweb.Headers` sets it.
 - The other headers (CSP, `X-Content-Type-Options`, frame options) are the
   defence of `localweb`, not of the convention.
+- A page that uses htmx loads the scripts of `localweb/htmx` and sets
+  `<meta name="htmx-config" content='…'>` to `htmx.Config`, so that htmx
+  keeps to the CSP
+  ([decision 35](decisions.md#35-localweb-starts-a-server-once-opens-the-browser-on-it-and-serves-its-files-and-pages)).
 
 ## Accessibility floor
 

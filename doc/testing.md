@@ -184,6 +184,16 @@ a test gives, so they hold as root and as a user. `PeerListener` reads
 tables in the format of `/proc/net/tcp` and `tcp6`, and a real connection
 of the test's own user; `ListenerOwner` a real listener of it.
 
+`launch` is tested with an `Opener` whose `Start` records what it would
+run, so no browser opens, and with instances in directories the test
+makes: two starts in one process take turns on the lock, a record of
+each odd kind is refused, and `Running` on Linux finds a server of a
+real process and listener of the test's user. The checks of another
+user's file or socket take the user ID as a value, so they hold as root
+too. `assets` and `page` are tested on `fstest.MapFS`, changed between
+requests where a file is read anew, and `htmx` holds each script to its
+SHA-256.
+
 `localweb/localwebtest` is how a program tests its server, and how the
 kit tests `session` and `sse`: `Login` signs in with the launch token as
 the user's browser does, and the client sends each request with the

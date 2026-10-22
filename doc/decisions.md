@@ -34,7 +34,7 @@ names it.
 | [22](#22-the-kit-may-require-golangorgxsys-in-cliprogress-alone) | The kit may require golang.org/x/sys, in cliprogress alone | accepted, refined by [26](#26-golangorgxsys-also-in-fsutil-and-localweb) |
 | [23](#23-a-span-reports-its-work-sampled-and-a-sink-rolls-it-up) | A span reports its work, sampled, and a sink rolls it up | accepted |
 | [24](#24-the-strict-command-tree-is-the-kits-in-cobratree) | The strict command tree is the kit's, in cobratree | accepted, refined by [29](#29-cobratree-words-flag-values-carries-exit-statuses-and-shows-help-topics) |
-| [25](#25-the-local-web-server-is-the-kits-in-localweb) | The local web server is the kit's, in localweb | accepted, refined by [34](#34-localweb-guards-a-local-web-server-keeps-its-sessions-and-streams-its-pages) |
+| [25](#25-the-local-web-server-is-the-kits-in-localweb) | The local web server is the kit's, in localweb | accepted, refined by [34](#34-localweb-guards-a-local-web-server-keeps-its-sessions-and-streams-its-pages) and [35](#35-localweb-starts-a-server-once-opens-the-browser-on-it-and-serves-its-files-and-pages) |
 | [26](#26-golangorgxsys-also-in-fsutil-and-localweb) | golang.org/x/sys also in fsutil and localweb | accepted |
 | [27](#27-progress-over-mcp-is-built-now-in-mcpprogress) | Progress over MCP is built now, in mcpprogress | accepted, refined by [32](#32-mcpprogress-sends-a-line-that-counts-targets-and-stops-on-the-first-failure) and [33](#33-the-kit-reads-its-event-log-back-in-eventlog) |
 | [28](#28-code-of-the-programs-may-move-into-the-kit-under-the-kits-licence) | Code of the programs may move into the kit, under the kit's licence | accepted |
@@ -43,7 +43,8 @@ names it.
 | [31](#31-cliprogress-keeps-a-default-log-picks-colours-and-asks-questions) | cliprogress keeps a default log, picks colours and asks questions | accepted |
 | [32](#32-mcpprogress-sends-a-line-that-counts-targets-and-stops-on-the-first-failure) | mcpprogress sends a line that counts targets, and stops on the first failure | accepted |
 | [33](#33-the-kit-reads-its-event-log-back-in-eventlog) | The kit reads its event log back, in eventlog | accepted |
-| [34](#34-localweb-guards-a-local-web-server-keeps-its-sessions-and-streams-its-pages) | localweb guards a local web server, keeps its sessions and streams its pages | accepted |
+| [34](#34-localweb-guards-a-local-web-server-keeps-its-sessions-and-streams-its-pages) | localweb guards a local web server, keeps its sessions and streams its pages | accepted, refined by [35](#35-localweb-starts-a-server-once-opens-the-browser-on-it-and-serves-its-files-and-pages) |
+| [35](#35-localweb-starts-a-server-once-opens-the-browser-on-it-and-serves-its-files-and-pages) | localweb starts a server once, opens the browser on it, and serves its files and pages | accepted |
 
 ## 1. Apache-2.0, and GSI holds the copyright
 
@@ -1351,7 +1352,7 @@ recorded no requirement for it.
 
 ## 25. The local web server is the kit's, in localweb
 
-Status: accepted, refined by [34](#34-localweb-guards-a-local-web-server-keeps-its-sessions-and-streams-its-pages)
+Status: accepted, refined by [34](#34-localweb-guards-a-local-web-server-keeps-its-sessions-and-streams-its-pages) and [35](#35-localweb-starts-a-server-once-opens-the-browser-on-it-and-serves-its-files-and-pages)
 
 ### Context
 
@@ -1774,7 +1775,7 @@ lets the two be tested against each other.
 
 ## 34. localweb guards a local web server, keeps its sessions and streams its pages
 
-Status: accepted. Refines [25](#25-the-local-web-server-is-the-kits-in-localweb).
+Status: accepted, refined by [35](#35-localweb-starts-a-server-once-opens-the-browser-on-it-and-serves-its-files-and-pages). Refines [25](#25-the-local-web-server-is-the-kits-in-localweb).
 
 ### Context
 
@@ -1890,3 +1891,110 @@ out, so they come first.
   there serves on a Unix socket, or on a machine it has alone.
 - `localweb` is the kit's first package to import `net/http`; depguard
   keeps `net/http` and `html/template` out of every other package.
+
+## 35. localweb starts a server once, opens the browser on it, and serves its files and pages
+
+Status: accepted. Refines [25](#25-the-local-web-server-is-the-kits-in-localweb) and [34](#34-localweb-guards-a-local-web-server-keeps-its-sessions-and-streams-its-pages).
+
+### Context
+
+Decision 34 left `localweb/launch`, `localweb/assets`, `localweb/page` and
+`localweb/htmx` for a later release. sind and brig still carry the same
+guard of one server per user: a lock in `$XDG_RUNTIME_DIR/PROGRAM`, a
+record of the server's address and process, and a check that the user
+owns the socket that listens there, which keeps the token from another
+user's server on a port the recorded one gave up. sdash opens the browser
+in the safest way of the three: through a private file, in a session of
+its own, and not at all under SSH. sind and brig serve their static files
+under a hash of all of them, and parse their templates in two ways: sind
+into one set with a function `include`, brig into a base set cloned for
+each page. Both vendor htmx 2.0.11 and its SSE extension 2.2.4, sind
+idiomorph 0.7.4 too, byte for byte the same, with no checksum and no REUSE
+annotation. sdash serves a React page and has no Go templates. `fsutil`,
+on which decision 25 meant the launcher to build, is not built.
+
+### Decision
+
+- `localweb/launch` holds the `Opener` and the `Instance`:
+  - `Opener.Open` writes `DIR/open-PORT.html`, readable by the user alone,
+    under a temporary name renamed into place, which sends the browser on
+    to the address, and hands that file, never the address, to `xdg-open`
+    on Linux or `open` on macOS. `DIR` must be a directory of the user's
+    of mode 0700. The page holds no script and no style. `Opener.Start`
+    nil is `Detached`, which starts the opener in a session of its own and
+    waits for it in the background. `Opener.Skip` says why no browser can
+    open: no opener for the system, `SSH_CONNECTION` set, or on Linux
+    neither `DISPLAY` nor `WAYLAND_DISPLAY`. The program passes `GOOS`
+    and `Getenv`.
+  - `Acquire(runtimeDir, program)` makes `runtimeDir/program` for the user
+    alone, refuses one that is a link, another user's or not of mode
+    0700, and waits for the flock(2) of `ui.lock` in it (decision 26).
+    `Running` reads `ui.json`, which must be a regular file of the user's
+    that no other user can read or write, of at most 4096 bytes, with the
+    keys `url` and `pid`; the process must live, the URL be http on a
+    loopback IP address and a port, something must take a connection
+    there, and `localweb.ListenerOwner` must name the user. `Publish`
+    writes the record under a temporary name and drops the lock; `Retire`
+    removes the record, under the lock, when it is this process's. The
+    names `ui.lock` and `ui.json` and the two keys are sind's and brig's,
+    so that a program that adopts the kit finds a server an older version
+    of it started.
+  - `launch` checks a private directory itself until `fsutil` exists. On a
+    system that is not Unix, and on AIX, which has no flock, `Acquire`
+    returns an error that matches `errors.ErrUnsupported`.
+- `localweb.ListenerOwner` returns the user of the socket that listens at
+  an address, on Linux from `/proc/net/tcp` and `tcp6`, trusting only a
+  socket a process holds. Elsewhere it returns `errors.ErrUnsupported`,
+  so `Running` finds no server there, and a second start starts another.
+- `localweb/assets` serves the files of an `fs.FS` at
+  `PREFIX/VERSION/NAME`. `VERSION` is the first twelve hex digits of the
+  SHA-256 of every file's name, length and content. A file is sent with
+  `Cache-Control: private, max-age=31536000, immutable` and a
+  Content-Type from a fixed list, never the host's; an address of another
+  version, a name that is no regular file, and an address outside the
+  prefix get 404, and a method other than GET and HEAD 405.
+  `Options.Dev` serves under the version `dev`, reads each file anew and
+  sends `Cache-Control: no-cache`.
+- `localweb/page` parses a program's templates into one set, in which
+  every page and fragment is a block of its own name, and adds `include`,
+  which renders a block whose name is a value. One set, not a clone per
+  page, so that a fragment renders the same in its page, in an answer to
+  htmx and in an event of the stream. `Respond` renders the whole block
+  before it writes, and on a failure writes nothing and returns the
+  error; `Options.Reload` parses anew for each render. `Redirect` answers
+  htmx with 204 and `HX-Redirect`, and a plain form with 303;
+  `Retarget` sets `HX-Retarget` and `HX-Reswap`; `IsHTMX` reads
+  `HX-Request: true`.
+- `localweb/htmx` embeds htmx 2.0.11, `htmx-ext-sse` 2.2.4 and idiomorph
+  0.7.4 with its htmx extension, the files their projects publish on npm,
+  under the Zero-Clause BSD licence, which `REUSE.toml` and
+  `LICENSES/0BSD.txt` record. A test holds each file to its SHA-256. This
+  is the record decision 28 asks for code that is neither the kit's nor a
+  program's. `Config` is the htmx configuration the pages of sind and brig
+  set: no `eval`, no script swapped in, no style of htmx's own, requests
+  to the page's own origin only, and no history cache. A new version of a
+  script comes in a minor release that names it.
+- The default `Content-Security-Policy` keeps `manifest-src 'self'`: it
+  lets a page load a manifest from its own origin alone, so a program
+  without a manifest takes the default as it is.
+- These are interfaces of the kit: the names `ui.lock`, `ui.json` and
+  `open-PORT.html`, the keys of the record, the form of an address of
+  `assets`, its Cache-Control and Content-Types, the statuses and headers
+  of `Redirect` and `Retarget`, `htmx.Config`, and the version of each
+  script. The texts of the errors and of `Skip` are no interface.
+- What stays in the program: reading `$XDG_RUNTIME_DIR` and choosing a
+  directory without it; printing the address and choosing to open it;
+  removing the redirect file when the server stops; the prefix and the
+  files it serves; its templates, the names of their blocks and the pages
+  of its errors; and its flags for development.
+
+### Costs
+
+- brig renames the blocks of its page templates into one set on adoption,
+  and every program's assets move to a new address once, so a browser
+  loads them again.
+- On macOS a second start of a program starts another server, as the
+  owner of a listener cannot be told there.
+- A program that wants a newer htmx waits for a release of the kit.
+- `launch` carries a check of a private directory that `fsutil` will take
+  over.
