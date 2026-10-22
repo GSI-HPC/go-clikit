@@ -182,6 +182,34 @@ func TestDecodeSanitises(t *testing.T) {
 	}
 }
 
+// An exit status is a whole number; anything else is no exit status, not
+// exit 0.
+func TestDecodeExit(t *testing.T) {
+	zero, two := 0, 2
+	for _, tc := range []struct {
+		exit string
+		want *int
+	}{
+		{`"exit":0`, &zero},
+		{`"exit":2`, &two},
+		{`"other":1`, nil},
+		{`"exit":null`, nil},
+		{`"exit":"x"`, nil},
+		{`"exit":1.5`, nil},
+		{`"exit":true`, nil},
+		{`"exit":{}`, nil},
+	} {
+		l, err := eventlog.Decode([]byte(`{"v":1,"run":"r","time":"2026-09-25T12:00:00Z","type":"end","span":"0000000000000001",` + tc.exit + `}`))
+		if err != nil {
+			t.Errorf("%s: %v", tc.exit, err)
+			continue
+		}
+		if got := l.Event.Exit; !reflect.DeepEqual(got, tc.want) {
+			t.Errorf("%s: Exit = %v, want %v", tc.exit, got, tc.want)
+		}
+	}
+}
+
 func TestDecodeTimeout(t *testing.T) {
 	for _, tc := range []struct {
 		seconds string
@@ -251,6 +279,7 @@ func FuzzDecode(f *testing.F) {
 		f.Add([]byte(s))
 	}
 	f.Add([]byte(`{"v":1,"run":"r","time":"2026-09-25T12:00:00Z","type":"end","span":"0000000000000001","name":"a\u009bb","timeout":1e30}`))
+	f.Add([]byte(`{"v":1,"run":"r","time":"2026-09-25T12:00:00Z","type":"end","span":"0000000000000001","exit":"x"}`))
 	f.Fuzz(func(t *testing.T, b []byte) {
 		l, err := eventlog.Decode(b)
 		if err != nil {
