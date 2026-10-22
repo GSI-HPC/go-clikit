@@ -141,19 +141,24 @@ func ExampleHelpTopics() {
 	// unknown help topic "relam": unknown command "relam" for "prog"
 }
 
-// A program whose release builds inject their version with -ldflags falls
-// back to what the toolchain recorded, and words a build that is no
-// release as it likes.
-func ExampleReadBuildInfo() {
-	var version string // set with -ldflags "-X main.version=v1.2.3"
-	bi := cobratree.ReadBuildInfo()
-	line := "prog " + cmp.Or(version, bi.Version, "dev")
-	if bi.Commit != "" {
-		line += " (" + bi.Commit[:min(7, len(bi.Commit))]
-		if bi.Dirty {
-			line += "-dirty"
-		}
-		line += ")"
+// A program whose release builds inject their version and commit with
+// -ldflags falls back to what the toolchain recorded, and words a build
+// that is no release as it likes.
+func ExampleResolve() {
+	var version, commit string // set with -ldflags "-X main.version=v1.2.3 -X main.commit=…"
+	bi := cobratree.Resolve(version, commit)
+	line := "prog " + cmp.Or(bi.Version, "dev")
+	if rev := bi.Short(7); rev != "" {
+		line += " (" + rev + ")"
 	}
 	fmt.Println(line)
+}
+
+func ExampleBuildInfo_Short() {
+	bi := cobratree.BuildInfo{Commit: "ebed4872343d0123456789abcdef0123456789ab", Dirty: true}
+	fmt.Println(bi.Short(7))
+	fmt.Println(bi.Short(12))
+	// Output:
+	// ebed487-dirty
+	// ebed4872343d-dirty
 }
