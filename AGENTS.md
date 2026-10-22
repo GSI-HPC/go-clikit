@@ -37,6 +37,7 @@ still change in a minor release (see Compatibility).
 | `localweb/session` | the launch token exchanged for a session cookie, and the CSRF token | v0.8.0 |
 | `localweb/sse` | a page's live fragments as Server-Sent Events, and the topics they change in | v0.8.0 |
 | `localweb/localwebtest` | a signed-in client and a reader of event streams, for a test of a local web server | v0.8.0 |
+| `localweb/launch` | one server per user, and the browser opened on it without the token in a command line | v0.9.0 |
 
 ## Layout
 
@@ -104,6 +105,11 @@ still change in a minor release (see Compatibility).
   `Event` and `Format`; `notifier.go`, `Notifier` and `Subscription`.
 - `localweb/localwebtest/`: `localwebtest.go`, `Client`, `Login` and
   `Reader`.
+- `localweb/launch/`: `launch.go`, the package comment and `Opener`;
+  `instance.go`, `Instance`, `Record`, `Running`, `Publish` and `Retire`,
+  with `instance_unix.go`, `Acquire` and the lock; `start_unix.go`,
+  `Detached`. `instance_other.go` and `start_other.go` are for systems
+  that are not Unix, or have no flock.
 - Every package has an `example_test.go`. Failing fuzz inputs go under the
   package's `testdata/fuzz/`.
 - `doc/`: `README.md` maps the documentation; `architecture.md` says how
