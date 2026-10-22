@@ -58,6 +58,7 @@ strict and to read the build info
 | `localweb/localwebtest` | `Login`, a client that signs in and sends requests as the server's own pages do, and `Reader`, which reads the events of a stream | `localweb/session`, `localweb/sse` |
 | `localweb/launch` | `Opener`, which opens the browser on an address through a private file, and `Instance`, the lock and the record that keep one server per user | `localweb`, `golang.org/x/sys` |
 | `localweb/assets` | `Assets`, which serves a page's static files at addresses with a hash of them all | none |
+| `localweb/page` | `Set`, a program's templates in one set, which renders a block before it answers, and `IsHTMX`, `Redirect` and `Retarget` for the requests of htmx | none |
 
 Every arrow points down the table: nothing imports `cliprogress`,
 `progresstest`, `mcpprogress`, `eventlog` or `fanout`, only `cliprogress` imports `display`,

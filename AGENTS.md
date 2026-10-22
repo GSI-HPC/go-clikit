@@ -39,6 +39,7 @@ still change in a minor release (see Compatibility).
 | `localweb/localwebtest` | a signed-in client and a reader of event streams, for a test of a local web server | v0.8.0 |
 | `localweb/launch` | one server per user, and the browser opened on it without the token in a command line | v0.9.0 |
 | `localweb/assets` | a page's static files at addresses with a hash, cached for good | v0.9.0 |
+| `localweb/page` | a page's templates in one set, answers to htmx | v0.9.0 |
 
 ## Layout
 
@@ -113,6 +114,8 @@ still change in a minor release (see Compatibility).
   that are not Unix, or have no flock.
 - `localweb/assets/`: `assets.go`, the package comment, `Assets`,
   `Options` and `ContentType`.
+- `localweb/page/`: `page.go`, the package comment, `Set`, `Parse` and
+  `Options`; `htmx.go`, `IsHTMX`, `Redirect` and `Retarget`.
 - Every package has an `example_test.go`. Failing fuzz inputs go under the
   package's `testdata/fuzz/`.
 - `doc/`: `README.md` maps the documentation; `architecture.md` says how
