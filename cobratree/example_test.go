@@ -7,6 +7,7 @@ import (
 	"cmp"
 	"errors"
 	"fmt"
+	"os"
 
 	"github.com/GSI-HPC/go-clikit/cobratree"
 	"github.com/spf13/cobra"
@@ -109,6 +110,35 @@ func ExampleStatus() {
 	// 3 n1: connection refused
 	// 2 --count must be at least 1
 	// 1 n2 did not drain
+}
+
+// A program shows the concepts of its manual with help, beside its
+// commands, and lists them under a word of its own.
+func ExampleHelpTopics() {
+	root := &cobra.Command{Use: "prog", SilenceErrors: true, SilenceUsage: true}
+	root.AddCommand(&cobra.Command{Use: "version", RunE: func(*cobra.Command, []string) error { return nil }})
+	cobratree.Strict(root, nil)
+	topics := map[string]string{
+		"realm":  "A realm keeps the clusters of one user apart from another's.\n",
+		"topics": "realm   what a realm is\n",
+	}
+	help := cobratree.HelpTopics(root, func(name string) (string, bool) {
+		text, ok := topics[name]
+		return text, ok
+	})
+	help.Short = "Help about any command or topic"
+
+	root.SetOut(os.Stdout)
+	for _, args := range [][]string{{"help", "topics"}, {"help", "realm"}, {"help", "relam"}} {
+		root.SetArgs(args)
+		if err := root.Execute(); err != nil {
+			fmt.Println(err)
+		}
+	}
+	// Output:
+	// realm   what a realm is
+	// A realm keeps the clusters of one user apart from another's.
+	// unknown help topic "relam": unknown command "relam" for "prog"
 }
 
 // A program whose release builds inject their version with -ldflags falls
