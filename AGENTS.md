@@ -109,7 +109,8 @@ go-test-coverage: `go install github.com/vladopajic/go-test-coverage/v2@latest`.
   carries them after its front matter. A file that cannot hold a comment,
   such as `go.sum`, is annotated in `REUSE.toml`.
 - Requirements follow decision 3: `go-nodeset` and `golang.org/x/text`,
-  `golang.org/x/sys` in `progress/cliprogress` alone (decision 22), and
+  `golang.org/x/sys` in `progress/cliprogress`, `fsutil` and `localweb` alone
+  (decisions 22 and 26), and
   anything else only with a record. Never the MCP Go SDK, charmbracelet,
   testify or OpenTelemetry. cobra and pflag only in `cobratree` (decision
   24); `termtext`, `progress` and `fanout`, which library packages import

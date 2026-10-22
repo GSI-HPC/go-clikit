@@ -10,9 +10,9 @@ names it.
 
 | | Decision | Status |
 | --- | --- | --- |
-| [1](#1-apache-20-and-gsi-holds-the-copyright) | Apache-2.0, and GSI holds the copyright | accepted |
+| [1](#1-apache-20-and-gsi-holds-the-copyright) | Apache-2.0, and GSI holds the copyright | accepted, refined by [28](#28-code-of-the-programs-may-move-into-the-kit-under-the-kits-licence) |
 | [2](#2-the-go-line-is-the-oldest-go-release-still-supported) | The go line is the oldest Go release still supported | accepted |
-| [3](#3-what-the-kit-may-require) | What the kit may require | accepted, refined by [22](#22-the-kit-may-require-golangorgxsys-in-cliprogress-alone) and [24](#24-the-strict-command-tree-is-the-kits-in-cobratree) |
+| [3](#3-what-the-kit-may-require) | What the kit may require | accepted, refined by [22](#22-the-kit-may-require-golangorgxsys-in-cliprogress-alone), [26](#26-golangorgxsys-also-in-fsutil-and-localweb) and [24](#24-the-strict-command-tree-is-the-kits-in-cobratree) |
 | [4](#4-a-release-is-a-signed-tag) | A release is a signed tag | accepted, superseded in part by [10](#10-a-daily-audit-holds-the-releases-to-their-record) |
 | [5](#5-progress-and-its-displays-are-the-kits-own) | Progress and its displays are the kit's own | accepted |
 | [6](#6-the-pools-are-the-kits-own) | The pools are the kit's own | accepted, refined by [12](#12-the-programs-identity-lives-on-the-bus) |
@@ -31,13 +31,17 @@ names it.
 | [19](#19-the-displays-draw-in-themes-the-program-picks) | The displays draw in themes the program picks | accepted |
 | [20](#20-a-themes-look-may-change-in-a-minor-release) | A theme's look may change in a minor release | accepted |
 | [21](#21-the-command-lines-glue-for-progress-is-the-kits) | The command line's glue for progress is the kit's | accepted |
-| [22](#22-the-kit-may-require-golangorgxsys-in-cliprogress-alone) | The kit may require golang.org/x/sys, in cliprogress alone | accepted |
+| [22](#22-the-kit-may-require-golangorgxsys-in-cliprogress-alone) | The kit may require golang.org/x/sys, in cliprogress alone | accepted, refined by [26](#26-golangorgxsys-also-in-fsutil-and-localweb) |
 | [23](#23-a-span-reports-its-work-sampled-and-a-sink-rolls-it-up) | A span reports its work, sampled, and a sink rolls it up | accepted |
 | [24](#24-the-strict-command-tree-is-the-kits-in-cobratree) | The strict command tree is the kit's, in cobratree | accepted |
+| [25](#25-the-local-web-server-is-the-kits-in-localweb) | The local web server is the kit's, in localweb | accepted |
+| [26](#26-golangorgxsys-also-in-fsutil-and-localweb) | golang.org/x/sys also in fsutil and localweb | accepted |
+| [27](#27-progress-over-mcp-is-built-now-in-mcpprogress) | Progress over MCP is built now, in mcpprogress | accepted |
+| [28](#28-code-of-the-programs-may-move-into-the-kit-under-the-kits-licence) | Code of the programs may move into the kit, under the kit's licence | accepted |
 
 ## 1. Apache-2.0, and GSI holds the copyright
 
-Status: accepted
+Status: accepted, refined by [28](#28-code-of-the-programs-may-move-into-the-kit-under-the-kits-licence)
 
 ### Context
 
@@ -1112,7 +1116,7 @@ terminal can show one, was the program's to decide (`architecture.md`).
 
 ## 22. The kit may require golang.org/x/sys, in cliprogress alone
 
-Status: accepted
+Status: accepted, refined by [26](#26-golangorgxsys-also-in-fsutil-and-localweb)
 
 ### Context
 
@@ -1338,3 +1342,156 @@ recorded no requirement for it.
 - A program without cobra that wants the build info takes `cobratree` and
   cobra with it, until a later decision gives `BuildInfo` a package of its
   own, which would be a breaking change.
+
+## 25. The local web server is the kit's, in localweb
+
+Status: accepted
+
+### Context
+
+sind, brig and sdash each serve a web page to the user who started the
+program, on a loopback address or a Unix socket. Each wrote its own server
+guard, and no one has all the defences: the Host check, the check of the
+peer's user, the launch token that becomes a session, the CSRF token, the
+Origin and `Sec-Fetch-*` checks, the headers, the size cap and the
+timeouts. brig still accepts `Host: localhost:PORT` and sends nothing when
+an SSE stream opens, which sind fixed; sind has no `Sec-Fetch-*` check and
+no subscriber queue that drops a slow reader, which brig has. The copies
+drift further with every commit. A fix found in one program reaches the
+others only if someone remembers it.
+
+### Decision
+
+- The kit takes the web side of these programs as `localweb`, in this
+  module, in sub-packages: `localweb` (the guard), `localweb/session`,
+  `localweb/sse`, `localweb/launch`, `localweb/assets`, `localweb/page`,
+  `localweb/htmx` and `localweb/localwebtest`. They arrive in the releases
+  v0.9.0 and v0.10.0, each in a stack of pull requests on `main`.
+- The packages mirror the cobra side (decision 24): `net/http` and
+  `html/template` are imported by `localweb` and its sub-packages alone.
+  depguard refuses them in `termtext`, `progress`, `fanout` and `fsutil`,
+  which library packages import too, and `localweb` imports no cobra and no
+  `progress/cliprogress`.
+- A seed is the strictest variant, with the fixes of the others added
+  before its first release. The kit reads no environment (decision 21): the
+  program passes the runtime directory, the program name, the storage-key
+  prefix and the `GOOS` as parameters.
+- The cookie names, header names, the token format and the texts of the
+  errors a client can read are interfaces of the kit, as the texts in
+  decision 24 are. Each package that freezes one adds its own record
+  before its release.
+- What stays in the program: the pages and fragments, the actions, the
+  dialogs, the templates, the CSS, fonts and brand, and the read-only
+  rules. They name the program's domain.
+- A UI convention that the code cannot hold, such as the key table, is
+  written in `doc/ui-convention.md`.
+
+### Costs
+
+- Every release of the module that touches `localweb` is a release of every
+  web program's guard. A fix reaches them when they take it, and a mistake
+  reaches them too.
+- The module's `go.sum` does not grow: `localweb` takes the standard
+  library and `golang.org/x/sys` (decision 26) alone. The kit's size in the
+  graph of a program that builds no `localweb` package does not change.
+- The 100% statement coverage of every file (AGENTS.md) holds for the
+  Unix-only peer check only on Linux; the files for macOS are compiled and
+  not run, as the files for other systems of decision 22.
+- A second module for the web side was weighed and left: it would double
+  the release work, and the release flow and the coverage gate are here.
+
+## 26. golang.org/x/sys also in fsutil and localweb
+
+Status: accepted. Refines [22](#22-the-kit-may-require-golangorgxsys-in-cliprogress-alone).
+
+### Context
+
+`fsutil` takes a file lock for the doctor's and the launcher's single
+instance, and `localweb` asks the system which user is on the other end of
+a connection. On Linux the standard `syscall` package is enough for both.
+On macOS the peer of a Unix socket is read with `LOCAL_PEERCRED`, which
+`syscall` does not name, and `syscall.Syscall` there traps into the kernel
+without libc, which Apple does not support (decision 22). Without
+`golang.org/x/sys` the tools would not work on macOS, or would fail closed.
+
+### Decision
+
+- `fsutil` and `localweb` may import `golang.org/x/sys`, in their files
+  built for Unix, with files for other systems that say the call is not
+  supported and fail closed. `progress/cliprogress` keeps its right
+  (decision 22).
+- depguard allows `golang.org/x/sys` in these three packages and refuses it
+  in every other package. The version is the one decision 22 sets; no
+  program's requirement rises because of this decision.
+- `gofrs/flock` and `golang.org/x/term` are not required.
+
+### Costs
+
+- Every program that requires the kit already has `golang.org/x/sys` in its
+  module graph (decision 22). This decision adds no module.
+- The files for macOS and for other Unix systems are compiled in CI and
+  not run, as the files of decision 22.
+
+## 27. Progress over MCP is built now, in mcpprogress
+
+Status: accepted
+
+### Context
+
+clusterctl sends progress over MCP from a `Bus`: a `progress.Sink` on a
+`Tally` that reports a monotonic `(progress, total, message)` at most every
+500 ms. It is about 200 lines without the SDK and has 434 lines of tests.
+Only three plain fields touch the SDK. The first proposal was to wait until
+a second program needed it. sind sends no progress over MCP today, because
+a tool call runs the program again with progress off, but its tools are to
+run in process, and clusterctl's model makes that possible.
+
+### Decision
+
+- The kit builds `progress/mcpprogress` now, from clusterctl's notifier. It
+  takes a `Send func(progress, total float64, message string) error`, so it
+  imports no MCP SDK (decision 3).
+- Every program with an MCP server adopts it: clusterctl and sind. brig
+  and sdash have none.
+- The rate, 500 ms, and the rule that `progress` never goes down are
+  interfaces of the kit.
+
+### Costs
+
+- The package has one user at first, and sind's adoption depends on its
+  tools reporting in process. Until then the move removes one copy, not
+  two.
+- A change of the MCP progress notification in the specification reaches
+  the kit's package, not only one program.
+
+## 28. Code of the programs may move into the kit, under the kit's licence
+
+Status: accepted. Refines [1](#1-apache-20-and-gsi-holds-the-copyright).
+
+### Context
+
+The seeds of `fsutil`, `localweb` and the other packages of the plan come
+from clusterctl, sind, brig and sdash. clusterctl and sind (LGPL-3.0-or-later)
+and sdash (Apache-2.0) are GSI's, so decision 1 covers them. brig's files
+carry `SPDX-FileCopyrightText: Dennis Klein`, and decision 1 says GSI holds
+the kit's copyright.
+
+### Decision
+
+- All four repositories hold code written by Dennis Klein together with
+  Claude. Code from any of them may be copied, mixed and relicensed under
+  Apache-2.0 with GSI as the holder, as decision 1 sets for the kit.
+- A file that moves into the kit takes the two SPDX lines of the kit
+  (AGENTS.md). The commit that moves it says which program it came from.
+  The program's own copy is deleted in the program's adoption commit, not
+  kept under a second licence.
+- Code written by anyone else, and a dependency's code, does not move
+  under this decision. It needs its own record.
+
+### Costs
+
+- brig's moved code leaves the copyright line `Dennis Klein` behind in
+  brig's history only. The kit's files do not name him.
+- The statement is a record of the maintainer's decision. It is not legal
+  advice, and it does not cover a contribution that someone else made to
+  one of the repositories.

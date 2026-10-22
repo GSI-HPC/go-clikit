@@ -49,15 +49,18 @@ linters:
               desc: only cobratree may import cobra (doc/decisions.md, decisions 3 and 24)
             - pkg: github.com/spf13/pflag
               desc: only cobratree may import pflag; cliprogress is given what a flag holds (doc/decisions.md, decisions 21 and 24)
-        # The ioctls and fcntls cliprogress makes; every other package
-        # leaves the system alone (doc/decisions.md, decision 22).
-        x-sys-only-in-cliprogress:
+        # The ioctls and fcntls cliprogress makes, the file lock of fsutil
+        # and the peer check of localweb; every other package leaves the
+        # system alone (doc/decisions.md, decisions 22 and 26).
+        x-sys-only-where-decided:
           files:
             - $all
             - "!**/progress/cliprogress/**"
+            - "!**/fsutil/**"
+            - "!**/localweb/**"
           deny:
             - pkg: golang.org/x/sys
-              desc: only progress/cliprogress asks the system about terminals and descriptors (doc/decisions.md, decision 22)
+              desc: only progress/cliprogress, fsutil and localweb ask the system (doc/decisions.md, decisions 22 and 26)
     # The kit reads no environment, sets nothing process-wide and ends no
     # process (doc/decisions.md, decision 21): not through os, syscall or
     # golang.org/x/sys/unix, nor through log.Fatal.
