@@ -56,6 +56,7 @@ strict and to read the build info
 | `localweb/session` | `Sessions`, which exchange the launch token for a session cookie and hold each session's CSRF token, and `NewToken` | `localweb` |
 | `localweb/sse` | `Notifier` and `Subscription`, which tell a stream the exact topics that changed, and `Serve`, which streams a page's fragments as Server-Sent Events, every one first and then those that changed | none |
 | `localweb/localwebtest` | `Login`, a client that signs in and sends requests as the server's own pages do, and `Reader`, which reads the events of a stream | `localweb/session`, `localweb/sse` |
+| `localweb/launch` | `Opener`, which opens the browser on an address through a private file, and `Instance`, the lock and the record that keep one server per user | `localweb`, `golang.org/x/sys` |
 
 Every arrow points down the table: nothing imports `cliprogress`,
 `progresstest`, `mcpprogress`, `eventlog` or `fanout`, only `cliprogress` imports `display`,

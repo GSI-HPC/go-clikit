@@ -21,6 +21,7 @@
 //	github.com/GSI-HPC/go-clikit/localweb/session         the launch token exchanged for a session cookie, and the CSRF token
 //	github.com/GSI-HPC/go-clikit/localweb/sse             a page's live fragments as Server-Sent Events, and the topics they change in
 //	github.com/GSI-HPC/go-clikit/localweb/localwebtest    a signed-in client and a reader of event streams, for a test of a local server
+//	github.com/GSI-HPC/go-clikit/localweb/launch          one server per user, and the browser opened on it without the token in a command line
 //
 // A library package reports what it does through progress, which costs
 // nothing when no command is listening, and runs work for many targets with
