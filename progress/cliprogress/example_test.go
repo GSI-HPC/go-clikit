@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/GSI-HPC/go-clikit/progress"
@@ -73,4 +74,16 @@ func ExampleThemeFor() {
 	fmt.Println(theme, theme.Colours())
 	// Output:
 	// aurora none
+}
+
+// A command asks before it deletes, and goes on only on a yes.
+func ExampleAsk() {
+	answer, err := cliprogress.Ask(context.Background(), strings.NewReader("y\n"), os.Stdout, "Delete 3 hosts? [y/N] ")
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	fmt.Println(cliprogress.Yes(answer))
+	// Output:
+	// Delete 3 hosts? [y/N] true
 }
