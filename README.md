@@ -47,6 +47,7 @@ command-line code clusterctl and sind each carried
 | `localweb/sse` | a page's live fragments as Server-Sent Events, and the topics they change in |
 | `localweb/localwebtest` | a signed-in client and a reader of event streams, for a test of a local web server |
 | `localweb/launch` | one server per user, and the browser opened on it without the token in a command line |
+| `localweb/assets` | a page's static files at addresses with a hash, cached for good |
 
 ## Install
 
