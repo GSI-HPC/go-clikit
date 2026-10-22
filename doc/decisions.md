@@ -34,7 +34,7 @@ names it.
 | [22](#22-the-kit-may-require-golangorgxsys-in-cliprogress-alone) | The kit may require golang.org/x/sys, in cliprogress alone | accepted, refined by [26](#26-golangorgxsys-also-in-fsutil-and-localweb) |
 | [23](#23-a-span-reports-its-work-sampled-and-a-sink-rolls-it-up) | A span reports its work, sampled, and a sink rolls it up | accepted |
 | [24](#24-the-strict-command-tree-is-the-kits-in-cobratree) | The strict command tree is the kit's, in cobratree | accepted, refined by [29](#29-cobratree-words-flag-values-carries-exit-statuses-and-shows-help-topics) |
-| [25](#25-the-local-web-server-is-the-kits-in-localweb) | The local web server is the kit's, in localweb | accepted |
+| [25](#25-the-local-web-server-is-the-kits-in-localweb) | The local web server is the kit's, in localweb | accepted, refined by [34](#34-localweb-guards-a-local-web-server-keeps-its-sessions-and-streams-its-pages) |
 | [26](#26-golangorgxsys-also-in-fsutil-and-localweb) | golang.org/x/sys also in fsutil and localweb | accepted |
 | [27](#27-progress-over-mcp-is-built-now-in-mcpprogress) | Progress over MCP is built now, in mcpprogress | accepted, refined by [32](#32-mcpprogress-sends-a-line-that-counts-targets-and-stops-on-the-first-failure) and [33](#33-the-kit-reads-its-event-log-back-in-eventlog) |
 | [28](#28-code-of-the-programs-may-move-into-the-kit-under-the-kits-licence) | Code of the programs may move into the kit, under the kit's licence | accepted |
@@ -43,6 +43,7 @@ names it.
 | [31](#31-cliprogress-keeps-a-default-log-picks-colours-and-asks-questions) | cliprogress keeps a default log, picks colours and asks questions | accepted |
 | [32](#32-mcpprogress-sends-a-line-that-counts-targets-and-stops-on-the-first-failure) | mcpprogress sends a line that counts targets, and stops on the first failure | accepted |
 | [33](#33-the-kit-reads-its-event-log-back-in-eventlog) | The kit reads its event log back, in eventlog | accepted |
+| [34](#34-localweb-guards-a-local-web-server-keeps-its-sessions-and-streams-its-pages) | localweb guards a local web server, keeps its sessions and streams its pages | accepted |
 
 ## 1. Apache-2.0, and GSI holds the copyright
 
@@ -1350,7 +1351,7 @@ recorded no requirement for it.
 
 ## 25. The local web server is the kit's, in localweb
 
-Status: accepted
+Status: accepted, refined by [34](#34-localweb-guards-a-local-web-server-keeps-its-sessions-and-streams-its-pages)
 
 ### Context
 
@@ -1770,3 +1771,122 @@ lets the two be tested against each other.
   breaking change.
 - A run whose Bus ran several commands one after the other, as the
   golden log's does, shows the later commands below the first.
+
+## 34. localweb guards a local web server, keeps its sessions and streams its pages
+
+Status: accepted. Refines [25](#25-the-local-web-server-is-the-kits-in-localweb).
+
+### Context
+
+Decision 25 took the web side of sind, brig and sdash into the kit, in two
+releases after `fsutil` and `doctor`. Those two are not built yet, and the
+three servers still drift: brig answers to `Host: localhost`, which a
+browser may resolve to `::1`, where another user can hold the port; sind
+took brig's `Sec-Fetch-Site` check and its queue of pending topics only
+now, as fixes of its own; sdash binds both loopback addresses and Unix
+sockets with full timeouts, which neither of the others has. The guard,
+the session and the stream are what keeps another user and another site
+out, so they come first.
+
+### Decision
+
+- The release after v0.7.x brings `localweb`, `localweb/session`,
+  `localweb/sse` and `localweb/localwebtest`. `localweb/launch`,
+  `localweb/assets`, `localweb/page` and `localweb/htmx` follow in a later
+  release, and so do `fsutil` and `doctor`, in stacks of their own.
+- `localweb` holds the listener and the checks, each a middleware of the
+  type `func(http.Handler) http.Handler`:
+  - `Listen` binds a loopback address and nothing else: a literal, or the
+    name localhost as 127.0.0.1 and `::1` on one port, or a Unix socket
+    that nobody but the user can reach or replace (sdash's rules: the
+    socket is bound under a temporary name, given mode 0600 and renamed
+    into place, in a directory of the user's below directories only the
+    user or the system may change). `CheckAddr` refuses anything else
+    before it is bound. `ListenOptions.AnyPort` binds a free port when the
+    one asked for is taken; without it a port in use is an error.
+  - `Bound.Answers` names the Host header values `Hosts` lets in: each
+    bound address with its port, and localhost only while the server
+    holds the port on both loopback addresses; on a socket, the loopback
+    names under any port, the near end of a forward. `Hosts` refuses the
+    rest with 421 Misdirected Request.
+  - `CrossSite` and `SameOrigin` refuse what a page of another site
+    caused, by the strictest rule of the three servers: `Sec-Fetch-Site`
+    is same-origin or absent, or the request is a navigation of the whole
+    page, a GET or HEAD whose `Sec-Fetch-Mode` is navigate and whose
+    `Sec-Fetch-Dest` is document, which only `Origin.Navigate` lets in, and
+    which lets in "none" too. `Origin` must be the request's own on every
+    request that may change something, and on a GET or HEAD that carries
+    it. `Origin.Others` names more origins, for a development server.
+  - `PeerListener` closes, on Linux, a TCP connection that a process of
+    another user opened, from `/proc/net/tcp` and `tcp6`, trusting only an
+    established socket with an inode. On other systems it returns an error
+    that matches `errors.ErrUnsupported`, and the program decides.
+  - `Headers` sets `Content-Security-Policy` (`ContentSecurityPolicy`
+    unless the program gives its own), `Referrer-Policy: same-origin`,
+    `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY` and the
+    opener and resource policies `same-origin`. `NoStore` sets
+    `Cache-Control: no-store` apart, so that files with a hash in their
+    name can be cached.
+  - `Serve` serves with every timeout set (10 s for the headers, 30 s for
+    the request, a minute for the answer, two idle, 64 KiB of headers),
+    closes the connections without a request at once when it stops, and
+    gives the rest five seconds.
+  - A refusal is a `Refusal`: a status, the message a client reads and a
+    reason for the log. A `Refuser` lets the program write it in its own
+    form, add the line that says where the address is, and log the reason;
+    the kit has no logger.
+- `localweb/session` exchanges the launch token, in the query parameter
+  `token` of a GET or HEAD, for a session cookie and redirects, 303, to
+  the address without it. The cookie holds a random session ID, never the
+  token, is HttpOnly and SameSite=Strict, and is named by the program's
+  prefix and the port of the request's Host. Each session has a CSRF
+  token, which a request that may change something sends in the
+  program's header or in the form field `csrf`; its body is capped at
+  64 KiB and its form parsed. Tokens are 32 random bytes, URL-safe
+  base64.
+- `localweb/sse` holds `Notifier[T]` and `Subscription[T]`: a subscriber
+  keeps the set of topics that changed since it last took them, so a slow
+  one loses no topic and renders no more than changed. The names are
+  `Changed()`, the channel that wakes the subscriber, and `Take()`, which
+  returns the topics in the order of their first change and forgets them:
+  brig's names, which say that taking clears, with sind's ordered slice.
+  `Serve` subscribes, sends every event first, then gathers changes for
+  30 ms, renders what depends on them and sends each event whose data
+  differs from what it last sent under that name. It sends `retry: 2000`
+  and a keep-alive comment every 25 s, no event IDs, a carriage return as
+  `&#13;`, and lifts the write deadline `Serve` of `localweb` sets.
+- `localweb/localwebtest` holds `Login`, a client that signs in with the
+  token and sends requests as the server's own pages do, and `Reader`,
+  which reads the events of a stream.
+- These are interfaces of the kit, as decision 25 asks: the messages of
+  the refusals ("This server answers to its loopback address only.", "The
+  request came from another site.", "This link holds an old or wrong
+  token.", "This browser is not signed in.", "The request lacks this
+  page's CSRF token. Reload the page.", "The form is larger than 64 KiB.",
+  "The form is malformed.") and their statuses; the headers `Headers`
+  sets and the default policy; the parameter `token`, the cookie's name,
+  its attributes and the field `csrf`; the frames `Serve` of `sse` writes,
+  as `Format` writes them. The texts of the errors `Listen` and
+  `PeerListener` return are no interface.
+- The UI convention changes: `Referrer-Policy` is `same-origin`, not
+  `no-referrer`. Under `no-referrer` a browser sends a form's POST, and the
+  POST of htmx, with `Origin: null`, which `SameOrigin` refuses; a request
+  to another site still carries no referrer.
+- What stays in the program: the names of its cookie, header and the
+  line its refusals add; the log; which fragments a page streams, how it
+  reads their parameters, and the timings it tunes; the token printed and
+  the browser opened; its own development origins.
+
+### Costs
+
+- Each program changes on adoption, where its rule was looser: brig no
+  longer answers to localhost on one address; sind and brig refuse a
+  request with `Sec-Fetch-Site: none` unless it is a navigation of a page,
+  and check `Origin` on a GET that carries it; sdash refuses a request to
+  its API that the user typed into the address bar, which is no page.
+- sdash keeps its cookie model, whose value is the token, unless it takes
+  `session`: its pages would then send the CSRF token.
+- The peer check reads `/proc`, so it fails closed on macOS; a program
+  there serves on a Unix socket, or on a machine it has alone.
+- `localweb` is the kit's first package to import `net/http`; depguard
+  keeps `net/http` and `html/template` out of every other package.
