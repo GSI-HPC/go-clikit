@@ -5,7 +5,16 @@
 
 package cliprogress
 
-import "io"
+import (
+	"io"
+	"os"
+)
+
+// IsTerminal reports whether f is open on a terminal, as Options.OnTerminal
+// asks of standard error. On a system that is not Unix it cannot say, and
+// reports none: a program that draws a display there finds out with a
+// library of its own.
+func IsTerminal(*os.File) bool { return false }
 
 // TerminalSize returns how many columns and rows the terminal w is open on
 // has, as Options.Size asks of standard error. On a system that is not

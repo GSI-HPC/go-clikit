@@ -7,6 +7,7 @@ package cliprogress
 
 import (
 	"io"
+	"os"
 	"syscall"
 
 	"golang.org/x/sys/unix"
@@ -55,6 +56,20 @@ func InForeground(w io.Writer) bool {
 	// Getpgid of the process itself fails for no process.
 	own, _ := unix.Getpgid(0)
 	return err != nil || int(uint32(v|v>>32)) == own
+}
+
+// IsTerminal reports whether f is open on a terminal, as Options.OnTerminal
+// asks of standard error, and as a program asks of standard input before
+// it asks a question there: whether the system keeps the settings of a
+// terminal for it. A nil f is none.
+func IsTerminal(f *os.File) bool {
+	if f == nil {
+		return false
+	}
+	return control(f, func(fd int) error {
+		_, err := unix.IoctlGetTermios(fd, ioctlReadTermios)
+		return err
+	}) == nil
 }
 
 // control calls fn with the descriptor w is open on, and returns what fn

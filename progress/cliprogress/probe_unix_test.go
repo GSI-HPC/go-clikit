@@ -16,7 +16,7 @@ import (
 	"github.com/GSI-HPC/go-clikit/progress/cliprogress"
 )
 
-// What is no terminal has no size, and is taken to be in the foreground,
+// What is no terminal is none, has no size, and is taken to be in the foreground,
 // so that a display drawn on it, as a test draws one, is drawn at the
 // width a terminal that does not say has; a pipe or a socket on standard
 // output is what auto draws nothing for.
@@ -66,6 +66,9 @@ func TestWhatIsNoTerminalHasNoSize(t *testing.T) {
 		}
 		if !cliprogress.InForeground(tc.w) {
 			t.Errorf("%s: InForeground = false", tc.name)
+		}
+		if f, ok := tc.w.(*os.File); ok && cliprogress.IsTerminal(f) {
+			t.Errorf("%s: IsTerminal = true", tc.name)
 		}
 	}
 }
