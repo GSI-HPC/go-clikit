@@ -49,6 +49,26 @@ linters:
               desc: only cobratree may import cobra (doc/decisions.md, decisions 3 and 24)
             - pkg: github.com/spf13/pflag
               desc: only cobratree may import pflag; cliprogress is given what a flag holds (doc/decisions.md, decisions 21 and 24)
+        # The web side mirrors the cobra side: library packages import
+        # termtext, progress and fanout too, so the HTTP server and its
+        # templates reach only the packages that serve a page.
+        web-only-in-localweb:
+          files:
+            - $all
+            - "!**/localweb/**"
+          deny:
+            - pkg: net/http
+              desc: only localweb and its packages serve a page (doc/decisions.md, decisions 25 and 34)
+            - pkg: html/template
+              desc: only localweb and its packages render a page (doc/decisions.md, decisions 25 and 34)
+        # A server is no command line: localweb takes nothing of the
+        # command's glue.
+        localweb-without-the-command-line:
+          files:
+            - "**/localweb/**"
+          deny:
+            - pkg: github.com/GSI-HPC/go-clikit/progress/cliprogress
+              desc: localweb imports no command-line glue (doc/decisions.md, decision 25)
         # The ioctls and fcntls cliprogress makes, the file lock of fsutil
         # and the peer check of localweb; every other package leaves the
         # system alone (doc/decisions.md, decisions 22 and 26).
