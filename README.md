@@ -42,6 +42,7 @@ command-line code clusterctl and sind each carried
 | `cliout` | a command's result as a table aligned by display width, and as JSON, escaped |
 | `cobratree` | a strict cobra command tree, usage errors, the build info |
 | `cobratree/cobratreetest` | running a command tree in a test, checking a manual's command lines |
+| `localweb` | the guard of a local web server: its listener, the Host and cross-site checks, the headers |
 
 ## Install
 

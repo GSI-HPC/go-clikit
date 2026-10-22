@@ -17,6 +17,7 @@
 //	github.com/GSI-HPC/go-clikit/cliout                   a command's result as a table and as JSON, escaped for a terminal
 //	github.com/GSI-HPC/go-clikit/cobratree                a strict cobra command tree, usage errors, the build info
 //	github.com/GSI-HPC/go-clikit/cobratree/cobratreetest  running a command tree in a test, checking a manual's command lines
+//	github.com/GSI-HPC/go-clikit/localweb                 the guard of a local web server: listener, Host and cross-site checks, headers
 //
 // A library package reports what it does through progress, which costs
 // nothing when no command is listening, and runs work for many targets with
@@ -26,7 +27,8 @@
 // progress/cliprogress do so from its flags; an MCP server sends a tool
 // call's progress with progress/mcpprogress, and a program reads back the
 // event log it or a child wrote with progress/eventlog. A command built with cobra
-// makes its tree strict about its command line with cobratree. The kit
+// makes its tree strict about its command line with cobratree, and one
+// that serves a page to its user guards the server with localweb. The kit
 // knows no program: a program's name, the noun for its targets and its
 // rule for exit codes are parameters.
 package clikit

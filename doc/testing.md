@@ -172,6 +172,18 @@ pause between batches pass at once. Each pool is also checked with
 `progresstest`, so that what it reports, after a failure, a panic and an
 interrupt too, keeps the contract above.
 
+## The local web server
+
+`localweb`'s checks are tested as tables of requests, each header a
+browser sets against each method, with the status and the message the
+client reads. `Listen` is tested on the machine and through
+`ListenOptions.Bind`, which stands in for a machine without `::1`, with a
+port in use, or that binds an address it was not asked for. The Unix
+socket's rules are tested on directories the test makes, with the owners
+a test gives, so they hold as root and as a user. `PeerListener` reads
+tables in the format of `/proc/net/tcp` and `tcp6`, and a real connection
+of the test's own user.
+
 ## Fuzzing
 
 Seven fuzz targets check what must hold for any text a remote host sends,

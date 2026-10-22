@@ -52,6 +52,7 @@ strict and to read the build info
 | `cliout` | `Table`, a command's result in columns aligned by the columns a terminal gives them, and `WriteJSON`, every cell and string escaped | `termtext` |
 | `cobratree` | `Strict`, which makes a cobra command tree strict about its command line, the usage errors and the words of a flag's value refused, exit statuses carried by errors, help topics, and the build info | cobra, pflag |
 | `cobratree/cobratreetest` | `Run`, which runs a command tree in a test and keeps its standard output and standard error apart, and `CheckCommandLines`, which checks the command lines of a manual against the tree | `cobratree`, cobra, pflag |
+| `localweb` | `Listen`, which binds a loopback address or a private Unix socket, `PeerListener`, which closes another user's connections, the checks `Hosts`, `SameOrigin` and `Headers`, and `Serve`, which serves with every timeout set | none |
 
 Every arrow points down the table: nothing imports `cliprogress`,
 `progresstest`, `mcpprogress`, `eventlog` or `fanout`, only `cliprogress` imports `display`,
@@ -65,7 +66,9 @@ when it picks its displays by a rule of its own, an MCP server
 wrote `eventlog`, `cliout` to write its
 result, and `cobratree` when it is built with cobra; tests import
 `progresstest`, `fanouttest` for a limit, and `cobratreetest` for a
-command tree. `go-nodeset` folds the names of targets into node sets,
+command tree. `localweb` stands apart as `cobratree` does, on the web
+side: it imports no package of the kit but its own, and is the only one
+that imports `net/http` and `html/template`. `go-nodeset` folds the names of targets into node sets,
 `exe[0001-0480]`, in the tree, the tests' trees and the summary of a pool
 that failed.
 [Decision 3](decisions.md#3-what-the-kit-may-require) says what else the kit
@@ -253,6 +256,8 @@ The kit knows no program. What depends on one is a parameter or a hook:
 | How a view of what the program did reads its event log: which log, how often it polls it, how many runs it keeps, and when a run that has not ended is taken for one that was killed | the program, which polls an `eventlog.Tail` on its own time into an `eventlog.Reducer`, keeps `eventlog.Options.Keep` runs, and judges a run by its `Last` event |
 | How the program words its version: the word for a build that is no release, how much of the commit it shows, and a version injected at build time | the program, from the fields of `cobratree.BuildInfo`, which `cobratree.ReadBuildInfo` returns, and `cobratree.Resolve` with what a release build set with -ldflags; `BuildInfo.Short` cuts the commit to the digits the program shows |
 | How the displays look: a theme, in how many colours, or none | `display.TreeOptions.Theme`, `display.CounterOptions.Theme`, `display.PlainOptions.Theme` and `display.Summary.Theme`, one of `display.Themes`, which `display.ParseTheme` reads, drawn in 256 colours, `Colours16` or `NoColours` by `Theme.In`; the zero `Theme` draws in no colour, as before (decisions 19 and 20); `cliprogress.Options.Theme`; `cliprogress.ThemeFor` picks the colours from what the program read of NO_COLOR, TERM and COLORTERM |
+| Where a local web server listens, which user it serves, and how a refusal is written and logged | the address the program passes `localweb.Listen`, the uid it passes `localweb.PeerListener`, and the `localweb.Refuser` of each check; the program prints the address and opens the browser |
+| What a page may load, and which other origins a development server adds | the policy the program passes `localweb.Headers`, `""` for `localweb.ContentSecurityPolicy`, and `localweb.Origin.Others` |
 
 A Bus hands on what it was told: `Bus.Program`, `Bus.PanicLog` and
 `Bus.Classify` answer for the Bus that `progress.BusFrom` finds in a
@@ -280,6 +285,41 @@ event log; a program that picks by a rule of its own uses `display`
 directly. The kit reads no variable, sets nothing process-wide and ends no
 process, so two Buses in one process, one per call of a server, share no
 state.
+
+## The local web server
+
+sind, brig and sdash serve a page to the user who started them, on the
+user's own machine. Such a server acts as the user, so whoever can send it
+a request acts as the user too: another user of the machine, who can reach
+a loopback port; any page in the user's browser, which can send requests
+there; and a page of another site that makes its own name resolve to
+127.0.0.1. `localweb` keeps the three out, each by a check of its own
+(decision 34):
+
+- **The listener.** `Listen` binds a loopback address and nothing else, or
+  a Unix socket that nobody but the user can reach or replace. On TCP,
+  `PeerListener` closes, on Linux, a connection that a process of another
+  user opened, before a request is read.
+- **The Host.** `Hosts` refuses a request whose Host header is not one
+  `Bound.Answers` names, which is how DNS rebinding shows: such a page
+  names its own site. localhost is answered only while the server holds
+  its port on both 127.0.0.1 and `::1`.
+- **The site.** `SameOrigin` refuses what a page of another site caused, by
+  `Sec-Fetch-Site` and `Origin`, which a browser sets and no page can
+  change. Every port of 127.0.0.1 is the same site, so the SameSite
+  attribute of a cookie keeps out none of the pages other programs serve
+  there. A page lets in a navigation from anywhere (`Origin.Navigate`);
+  what a page asks for itself, its fragments, its stream and its forms, is
+  let in only from its own origin.
+- **The headers.** `Headers` sets the policy that lets a page load and
+  contact its own origin alone, and forbids framing, sniffing and the
+  referrer to other sites.
+
+A program chains them, outermost first: `Headers`, `Hosts`, `SameOrigin`,
+and its handler; `Serve` serves the chain with every timeout set. Each
+check answers a refused request through a `Refuser`, which the program may
+give to write it in its own form and log the reason; the messages are an
+interface of the kit.
 
 ## Standard error
 

@@ -33,6 +33,7 @@ still change in a minor release (see Compatibility).
 | `cobratree` | a strict cobra command tree, usage errors, the build info | v0.4.0 |
 | `cliout` | a command's result as a table aligned by display width, and as JSON, escaped | v0.6.0 |
 | `cobratree/cobratreetest` | running a command tree in a test, checking a manual's command lines | v0.6.0 |
+| `localweb` | the guard of a local web server: its listener, the Host and cross-site checks, the headers | v0.8.0 |
 
 ## Layout
 
@@ -86,6 +87,13 @@ still change in a minor release (see Compatibility).
   `Resolve`.
 - `cobratree/cobratreetest/`: `cobratreetest.go`, `Run`,
   `CheckCommandLine` and `CheckCommandLines`.
+- `localweb/`: `localweb.go`, the package comment, `Refusal`, `Refuser`,
+  `Refuse` and `SafeMethod`; `guard.go`, `Headers`, `NoStore`, `Hosts`,
+  `Origin`, `SameOrigin` and `CrossSite`; `listen.go`, `CheckAddr`,
+  `Listen`, `ListenOptions` and `Bound`, with `socket_unix.go`, the
+  Unix socket; `peer_linux.go`, `PeerListener`, with `peer.go`;
+  `serve.go`, `Serve` and `ServeOptions`. `socket_other.go` and
+  `peer_other.go` are for systems that are not Unix, or not Linux.
 - Every package has an `example_test.go`. Failing fuzz inputs go under the
   package's `testdata/fuzz/`.
 - `doc/`: `README.md` maps the documentation; `architecture.md` says how
@@ -134,7 +142,9 @@ go-test-coverage: `go install github.com/vladopajic/go-test-coverage/v2@latest`.
   anything else only with a record. Never the MCP Go SDK, charmbracelet,
   testify or OpenTelemetry. cobra and pflag only in `cobratree` (decision
   24); `termtext`, `cliout`, `progress` and `fanout`, which library
-  packages import too, never import them. depguard enforces this.
+  packages import too, never import them. `net/http` and `html/template`
+  only in `localweb` and its packages (decision 25). depguard enforces
+  this.
 - Test helpers ship as `xxxtest` packages and report through `testing.TB`.
   Tests use the standard library, table-driven, with `t.Errorf`/`t.Fatalf`.
 - Every file stays at 100% statement coverage. A branch no test can reach is
