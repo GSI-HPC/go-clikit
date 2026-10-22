@@ -12,6 +12,7 @@ import (
 
 	"github.com/GSI-HPC/go-clikit/progress"
 	"github.com/GSI-HPC/go-clikit/progress/cliprogress"
+	"github.com/GSI-HPC/go-clikit/progress/display"
 )
 
 // The flag's word is refused where it cannot be had; the variable's shows
@@ -62,4 +63,14 @@ func ExampleStart() {
 	// [0:00] delete cluster › mesh: start
 	// [0:02] delete cluster › mesh: failed in 2.0s
 	// prog: delete cluster: failed in 2.0s
+}
+
+// A program draws the theme its user picked in the colours the terminal
+// can show, as the variables it read say.
+func ExampleThemeFor() {
+	env := map[string]string{"TERM": "xterm-256color", "NO_COLOR": "1"}
+	theme := cliprogress.ThemeFor(display.Aurora, true, func(name string) string { return env[name] })
+	fmt.Println(theme, theme.Colours())
+	// Output:
+	// aurora none
 }
