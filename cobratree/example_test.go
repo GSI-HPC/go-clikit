@@ -87,6 +87,30 @@ func ExampleFlagError() {
 	// true invalid --output value "yaml": want human or json
 }
 
+// A command gives an error the exit status that says what failed, where it
+// knows; main maps the rest.
+func ExampleStatus() {
+	const exitTransport = 3
+	errs := []error{
+		nil,
+		fmt.Errorf("n1: %w", cobratree.Coded(exitTransport, errors.New("connection refused"))),
+		cobratree.Usagef("--count must be at least 1"),
+		errors.New("n2 did not drain"),
+	}
+	for _, err := range errs {
+		status := cobratree.Status(err, 1)
+		if cobratree.IsUsage(err) {
+			status = 2
+		}
+		fmt.Println(status, err)
+	}
+	// Output:
+	// 0 <nil>
+	// 3 n1: connection refused
+	// 2 --count must be at least 1
+	// 1 n2 did not drain
+}
+
 // A program whose release builds inject their version with -ldflags falls
 // back to what the toolchain recorded, and words a build that is no
 // release as it likes.
