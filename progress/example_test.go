@@ -146,6 +146,32 @@ func ExampleParseTraceContext() {
 	// false
 }
 
+// A program that starts its own command line hands the child a new trace in
+// its TRACEPARENT, so that it finds the child's run in the event log by the
+// trace id. The kit sets no environment: the program puts the value in the
+// child's environment itself.
+func ExampleNewTraceContext() {
+	// A program passes crypto/rand.Reader; fixed bytes make the output
+	// the same each time.
+	fixed := bytes.NewReader([]byte{
+		0x4b, 0xf9, 0x2f, 0x35, 0x77, 0xb3, 0x4d, 0xa6, 0xa3, 0xce, 0x92, 0x9d, 0x0e, 0x0e, 0x47, 0x36,
+		0x00, 0xf0, 0x67, 0xaa, 0x0b, 0xa9, 0x02, 0xb7,
+	})
+	tc, err := progress.NewTraceContext(fixed)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	// The program appends the entry to the child's exec.Cmd.Env.
+	fmt.Println("TRACEPARENT=" + tc.Traceparent())
+
+	_, err = progress.NewTraceContext(bytes.NewReader(nil))
+	fmt.Println(err)
+	// Output:
+	// TRACEPARENT=00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01
+	// reading a new trace context: EOF
+}
+
 // exitError is an error that asks a program to exit with a code.
 type exitError struct{ code int }
 

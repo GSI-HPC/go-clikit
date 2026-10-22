@@ -3,7 +3,12 @@
 
 package progress
 
-import "encoding/hex"
+import (
+	"encoding/hex"
+	"errors"
+	"fmt"
+	"io"
+)
 
 // TraceContext says which trace the spans of a Bus belong to and, when
 // another program handed the trace on, where in it they belong: under a
@@ -78,6 +83,52 @@ func ParseTraceContext(traceparent, tracestate string) (tc TraceContext, ok bool
 		tc.State = tracestate
 	}
 	return tc, true
+}
+
+// NewTraceContext makes the trace context of a trace that begins here, to
+// hand to a program this one starts, in its TRACEPARENT: a new trace id and
+// a new parent span id, read from r, 24 bytes in all. A program passes
+// crypto/rand.Reader, and a test bytes of its own. The first 16 bytes are
+// the trace id and the next 8 the span id, most significant byte first, as
+// ParseTraceContext reads one. The sampled flag is set, so Flags is 0x01,
+// because the program that makes a trace context records the run of the
+// program it hands it to; State is empty.
+//
+// A read that fails, or ends before 24 bytes, returns its error, wrapped.
+// So does an id of zeros, which W3C does not allow and only a source that
+// is broken gives: the source is not read again.
+func NewTraceContext(r io.Reader) (TraceContext, error) {
+	var b [24]byte
+	if _, err := io.ReadFull(r, b[:]); err != nil {
+		return TraceContext{}, fmt.Errorf("reading a new trace context: %w", err)
+	}
+	var tc TraceContext
+	copy(tc.Trace[:], b[:16])
+	for _, c := range b[16:] {
+		tc.Parent = tc.Parent<<8 | SpanID(c)
+	}
+	if tc.Trace == (TraceID{}) || tc.Parent == 0 {
+		return TraceContext{}, errors.New("the source of a new trace context gave an id of zeros")
+	}
+	tc.Flags = 0x01
+	return tc, nil
+}
+
+// Traceparent returns the traceparent of tc in the W3C Trace Context
+// format, version 00 and lowercase hexadecimal digits: the trace id, the
+// parent's span id and the trace flags, as in
+// 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01, which
+// ParseTraceContext reads back to the same Trace, Parent and Flags. A
+// program puts it in the TRACEPARENT of a program it starts.
+//
+// It returns "" for a trace context with no trace or no parent, which no
+// traceparent can name. It leaves State out: a program that passes the
+// tracestate on does so itself, in TRACESTATE, from tc.State.
+func (tc TraceContext) Traceparent() string {
+	if tc.Trace == (TraceID{}) || tc.Parent == 0 {
+		return ""
+	}
+	return fmt.Sprintf("00-%s-%s-%02x", tc.Trace, tc.Parent, tc.Flags)
 }
 
 // lowerHex decodes s, which has to be hexadecimal digits in lower case.
