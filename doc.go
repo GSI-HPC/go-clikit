@@ -24,6 +24,7 @@
 //	github.com/GSI-HPC/go-clikit/localweb/launch          one server per user, and the browser opened on it without the token in a command line
 //	github.com/GSI-HPC/go-clikit/localweb/assets          a page's static files at addresses with a hash, cached for good
 //	github.com/GSI-HPC/go-clikit/localweb/page            a page's templates in one set, and the answers to htmx
+//	github.com/GSI-HPC/go-clikit/localweb/htmx            htmx, its SSE extension and idiomorph, checked against their releases
 //
 // A library package reports what it does through progress, which costs
 // nothing when no command is listening, and runs work for many targets with

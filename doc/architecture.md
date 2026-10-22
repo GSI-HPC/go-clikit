@@ -59,6 +59,7 @@ strict and to read the build info
 | `localweb/launch` | `Opener`, which opens the browser on an address through a private file, and `Instance`, the lock and the record that keep one server per user | `localweb`, `golang.org/x/sys` |
 | `localweb/assets` | `Assets`, which serves a page's static files at addresses with a hash of them all | none |
 | `localweb/page` | `Set`, a program's templates in one set, which renders a block before it answers, and `IsHTMX`, `Redirect` and `Retarget` for the requests of htmx | none |
+| `localweb/htmx` | `Files`, the scripts of htmx, its SSE extension and idiomorph, and `Config`, the configuration a page gives htmx | none |
 
 Every arrow points down the table: nothing imports `cliprogress`,
 `progresstest`, `mcpprogress`, `eventlog` or `fanout`, only `cliprogress` imports `display`,

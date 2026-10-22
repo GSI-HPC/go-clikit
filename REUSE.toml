@@ -22,3 +22,23 @@ path = "**/testdata/fuzz/**"
 precedence = "aggregate"
 SPDX-FileCopyrightText = "2026 GSI Helmholtz Centre for Heavy Ion Research GmbH <http://www.gsi.de>"
 SPDX-License-Identifier = "Apache-2.0"
+
+# The scripts of localweb/htmx are the files their projects publish on npm,
+# byte for byte (doc/decisions.md, decision 35).
+[[annotations]]
+path = "localweb/htmx/htmx.min.js"
+precedence = "override"
+SPDX-FileCopyrightText = "Big Sky Software and the htmx contributors <https://github.com/bigskysoftware/htmx>"
+SPDX-License-Identifier = "0BSD"
+
+[[annotations]]
+path = "localweb/htmx/htmx-ext-sse.js"
+precedence = "override"
+SPDX-FileCopyrightText = "2023 Alexander Petros"
+SPDX-License-Identifier = "0BSD"
+
+[[annotations]]
+path = "localweb/htmx/idiomorph-ext.min.js"
+precedence = "override"
+SPDX-FileCopyrightText = "Big Sky Software and the idiomorph contributors <https://github.com/bigskysoftware/idiomorph>"
+SPDX-License-Identifier = "0BSD"
