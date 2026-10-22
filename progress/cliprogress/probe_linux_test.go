@@ -50,6 +50,9 @@ func TestATerminalSaysItsSize(t *testing.T) {
 			t.Errorf("TerminalSize = %d, %d, %v; want %d, %d", cols, rows, err, size.cols, size.rows)
 		}
 	}
+	if !cliprogress.IsTerminal(tty) || !cliprogress.IsTerminal(ptmx) {
+		t.Errorf("IsTerminal of a pseudo-terminal's two ends: %v, %v; want true", cliprogress.IsTerminal(tty), cliprogress.IsTerminal(ptmx))
+	}
 	if cliprogress.IsPipe(tty) || !cliprogress.InForeground(tty) {
 		t.Errorf("a terminal: IsPipe %v, InForeground %v", cliprogress.IsPipe(tty), cliprogress.InForeground(tty))
 	}
