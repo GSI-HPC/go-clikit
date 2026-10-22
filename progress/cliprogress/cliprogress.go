@@ -29,36 +29,39 @@
 // whether standard error is a terminal, and a dumb one, how large the
 // terminal is, whether the process is in its foreground, whether standard
 // output goes into a pipe, whether the locale shows UTF-8, and which Theme
-// to draw in. IsPipe, TerminalSize and InForeground ask the system, and
-// UTF8Locale reads the getenv it is given, for the program to call. Nor
-// does the package set anything process-wide: a program that hands its
-// children no trace context takes TRACEPARENT out of its environment in
-// Options.Trace, which Start calls only once it makes a Bus, and the
-// interrupt is the end of the command's context, not a signal the package
-// catches.
+// to draw in. IsTerminal, IsPipe, TerminalSize and InForeground ask the
+// system, and UTF8Locale and ThemeFor read the getenv they are given, for
+// the program to call. Nor does the package set anything process-wide: a
+// program that hands its children no trace context takes TRACEPARENT out of
+// its environment in Options.Trace, which Start calls only once it makes a
+// Bus, and the interrupt is the end of the command's context, not a signal
+// the package catches.
 //
 // A program calls Start as a command begins and runs the command under
 // Run.Context, in a span of its own. Start writes its notes, picks the
-// display, opens the event log and makes the Bus; it makes none when
-// nothing is shown and no log is written, so that standard error then
-// holds what it would without the kit, byte for byte. While a display is
-// drawn, the program puts its own writers of standard error through
-// Run.Writer, standard output too where it shows on the same terminal, and
-// those of goroutines beside the command, such as a logger's, through
-// Run.Lines. Once the command's span has ended, Run.Finish closes the Bus,
-// takes the display off the terminal, closes the event log and writes the
-// summary; the program then puts its writers back and writes the command's
-// error.
+// display, opens the event log and makes the Bus; it makes none when nothing
+// is shown and no log is written, so that standard error then holds what it
+// would without the kit, byte for byte. While a display is drawn, the
+// program puts its own writers of standard error through Run.Writer,
+// standard output too where it shows on the same terminal, and those of
+// goroutines beside the command, such as a logger's, through Run.Lines. Once
+// the command's span has ended, Run.Finish closes the Bus, takes the display
+// off the terminal, closes the event log and writes the summary; the program
+// then puts its writers back and writes the command's error. A command that
+// asks a question, before it deletes something, say, asks it with Ask, which
+// takes the display off the terminal until the answer comes.
 //
-// The event log is appended to a file this user alone may read, created
-// with mode 0600. A regular file that is there already has to be one this
-// user owns, under no other name, that nobody else can read or write, and a
+// The event log is appended to a file this user alone may read, created with
+// mode 0600. A regular file that is there already has to be one this user
+// owns, under no other name, that nobody else can read or write, and a
 // symbolic link on the way to it, a directory's as well as its own, or a
 // named pipe, has to be this user's or root's; a terminal or another device
 // is opened as it is. /dev/stdout, /dev/stderr, /dev/fd/N and
 // /proc/self/fd/N are written through a duplicate of that descriptor of the
 // process's. Where files have no Unix owner, as on Windows, none of this is
-// checked.
+// checked. A program that keeps a log unasked names it in
+// Options.DefaultLog, which fails no command and writes no note, and which
+// Options.RotateAt keeps from growing without end.
 package cliprogress
 
 import (
