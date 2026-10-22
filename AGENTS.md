@@ -72,7 +72,7 @@ still change in a minor release (see Compatibility).
   `Notifier` and `Options`.
 - `progress/eventlog/`: `eventlog.go`, the package comment, `Line` and
   `Decode`; `tail.go`, `Tail`, `Feed` and `MaxLine`; `forward.go`,
-  `Forward`.
+  `Forward`; `reducer.go`, `Reducer`, `Options`, `Run` and `Span`.
 - `fanout/`: `each.go`, `Each` and the package comment; `map.go`, `Map`,
   `MapOptions`, `Item`, `Outcome`, `Summary` and `Failure`; `batches.go`;
   `recover.go`, `Recovered` and `PanicError`; `keyed.go`, `Keyed`.

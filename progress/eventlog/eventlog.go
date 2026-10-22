@@ -15,7 +15,9 @@
 // progress/cliprogress rotates it, and gives the whole lines it reads to a
 // Feed. Forward is the Feed of a server that runs a command as a child,
 // with the child's log in a file of its own: it gives the child's events
-// to a progress.Sink, such as an mcpprogress.Notifier, once each.
+// to a progress.Sink, such as an mcpprogress.Notifier, once each. A
+// Reducer is the Feed of a view of what a program did, as it does it: it
+// folds the lines into runs, each the tree of the spans of its command.
 //
 // A reader of version 1 leaves out the keys and the values it does not
 // know, as the format asks, so that a log a later release of the kit
