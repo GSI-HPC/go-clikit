@@ -196,7 +196,9 @@ go-test-coverage: `go install github.com/vladopajic/go-test-coverage/v2@latest`.
   (decision 30), the rate, the rule and the line of `mcpprogress`
   (decisions 27 and 32), and the rule of `cliprogress.ThemeFor` and the names and
   texts of decision 31, and the refusals, headers, cookie and frames of
-  `localweb` and its packages (decision 34). Changing any of them is a breaking change; a
+  `localweb` and its packages (decision 34), and the files, record,
+  addresses, htmx headers, `htmx.Config` and script versions of decision
+  35. Changing any of them is a breaking change; a
   new or stricter `Check` rule is one too.
 - The kit reads no environment: whether to draw in colour, NO_COLOR and
   TERM included, is the program's to decide, and a theme is a parameter;
