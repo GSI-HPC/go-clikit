@@ -155,7 +155,13 @@ had. `Forward` gives the events of the lines it reads to a
 `progress.Sink`, each once, by the `seq` of its run, so that a log read
 again gives no event twice: what a server that runs a command as a
 child, with the child's log in a file of its own, sends on as the
-child's progress.
+child's progress. `Reducer` folds the lines into runs, each the tree of
+the spans of its command, the first span of the kind `command`, as a
+view of what a program did draws them; a span whose parent the log does
+not hold is the command's. It keeps `Options.Keep` runs, 100 by default,
+dropping the oldest that has ended first, and `Options.MaxSpans` spans
+of a run, 131072 by default, and tells which runs changed since it was
+last asked.
 
 ## The golden log
 

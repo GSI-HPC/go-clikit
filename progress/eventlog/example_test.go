@@ -5,6 +5,7 @@ package eventlog_test
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -91,4 +92,61 @@ func ExampleForward() {
 	fmt.Println(last)
 	// Output:
 	// 3/3 probe the nodes: 3/3 done
+}
+
+// A view of what a program did follows its event log with a Tail, folds
+// it into runs with a Reducer, and draws the runs that changed. Here a
+// Bus writes the log in the example, and the view polls once.
+func ExampleReducer() {
+	dir, err := os.MkdirTemp("", "view")
+	if err != nil {
+		panic(err)
+	}
+	defer func() { _ = os.RemoveAll(dir) }()
+	path := filepath.Join(dir, "activity.jsonl")
+
+	// A command of the program, which appends to its log.
+	f, err := os.Create(path)
+	if err != nil {
+		panic(err)
+	}
+	log := progress.NewLog(f, progress.LogOptions{Run: "0123456789abcdef", Version: "v1.2.3"})
+	bus := progress.NewBus(progress.BusOptions{Sinks: []progress.Sink{log}, Program: "prog"})
+	ctx, cmd := progress.Start(progress.WithBus(context.Background(), bus), progress.KindCommand, "status")
+	fanout.Map(ctx, []string{"exe1", "exe2"}, fanout.MapOptions[string]{Step: "probe the nodes"},
+		func(_ context.Context, node string) (struct{}, error) {
+			if node == "exe2" {
+				return struct{}{}, errors.New("no route to host")
+			}
+			return struct{}{}, nil
+		})
+	cmd.End(nil)
+	bus.Close()
+	if err := log.Close(); err != nil {
+		panic(err)
+	}
+	_ = f.Close()
+
+	// The view.
+	red := eventlog.NewReducer(eventlog.Options{})
+	tail := eventlog.NewTail(path, red)
+	if _, err := tail.Poll(); err != nil {
+		panic(err)
+	}
+	fmt.Println(red.Changed())
+	for _, run := range red.Runs() {
+		fmt.Println(run.Program, run.Version, run.Root.Name, run.Root.Status)
+		for _, step := range run.Root.Children {
+			fmt.Println(" ", step.Kind, step.Name, step.Status, step.Err)
+			for _, target := range step.Children {
+				fmt.Println("   ", target.Kind, target.Node, target.Status)
+			}
+		}
+	}
+	// Output:
+	// [0123456789abcdef]
+	// prog v1.2.3 status ok
+	//   step probe the nodes failed 1 of 2 failed: exe2
+	//     target exe1 ok
+	//     target exe2 failed
 }
