@@ -28,6 +28,7 @@ still change in a minor release (see Compatibility).
 | `fanout` | bounded worker pools that report their targets as progress | v0.1.0 |
 | `progress/cliprogress` | the words of `--progress`, a command's display and event log, the private log file | v0.3.0 |
 | `cobratree` | a strict cobra command tree, usage errors, the build info | v0.4.0 |
+| `cliout` | a command's result as a table aligned by display width, and as JSON, escaped | v0.6.0 |
 | `cobratree/cobratreetest` | running a command tree in a test, checking a manual's command lines | v0.6.0 |
 | `progress/mcpprogress` | progress over MCP | later, once a second program needs it |
 
@@ -65,6 +66,8 @@ still change in a minor release (see Compatibility).
 - `fanout/`: `each.go`, `Each` and the package comment; `map.go`, `Map`,
   `MapOptions`, `Item`, `Outcome`, `Summary` and `Failure`; `batches.go`;
   `recover.go`, `Recovered` and `PanicError`.
+- `cliout/`: `table.go`, the package comment, `Table` and `Column`;
+  `json.go`, `WriteJSON`.
 - `cobratree/`: `cobratree.go`, the package comment and `Strict`;
   `usage.go`, `Usage`, `Usagef`, `IsUsage`, `InvalidValue` and
   `FlagError`; `status.go`, `Coded` and `Status`; `help.go`,
@@ -119,8 +122,8 @@ go-test-coverage: `go install github.com/vladopajic/go-test-coverage/v2@latest`.
   (decisions 22 and 26), and
   anything else only with a record. Never the MCP Go SDK, charmbracelet,
   testify or OpenTelemetry. cobra and pflag only in `cobratree` (decision
-  24); `termtext`, `progress` and `fanout`, which library packages import
-  too, never import them. depguard enforces this.
+  24); `termtext`, `cliout`, `progress` and `fanout`, which library
+  packages import too, never import them. depguard enforces this.
 - Test helpers ship as `xxxtest` packages and report through `testing.TB`.
   Tests use the standard library, table-driven, with `t.Errorf`/`t.Fatalf`.
 - Every file stays at 100% statement coverage. A branch no test can reach is
@@ -143,7 +146,8 @@ go-test-coverage: `go install github.com/vladopajic/go-test-coverage/v2@latest`.
   notes `cliprogress` returns and writes, the refusals of the log's file
   included (decision 21), and the texts of the errors `cobratree.Strict`'s
   checks return (decision 24), and those `cobratree.InvalidValue` and
-  `cobratree.FlagError` return (decision 29). Changing any of them is a breaking change; a
+  `cobratree.FlagError` return (decision 29), and what `cliout` writes
+  (decision 30). Changing any of them is a breaking change; a
   new or stricter `Check` rule is one too.
 - The kit reads no environment: whether to draw in colour, NO_COLOR and
   TERM included, is the program's to decide, and a theme is a parameter;

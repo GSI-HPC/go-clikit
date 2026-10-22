@@ -11,6 +11,7 @@
 //	github.com/GSI-HPC/go-clikit/progress/cliprogress     the words of --progress, a command's display, summary and event log
 //	github.com/GSI-HPC/go-clikit/progress/progresstest    capturing and checking the events a command reports
 //	github.com/GSI-HPC/go-clikit/fanout                   bounded worker pools that report their targets as progress
+//	github.com/GSI-HPC/go-clikit/cliout                   a command's result as a table and as JSON, escaped for a terminal
 //	github.com/GSI-HPC/go-clikit/cobratree                a strict cobra command tree, usage errors, the build info
 //	github.com/GSI-HPC/go-clikit/cobratree/cobratreetest  running a command tree in a test, checking a manual's command lines
 //

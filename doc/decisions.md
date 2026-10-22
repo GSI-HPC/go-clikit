@@ -39,6 +39,7 @@ names it.
 | [27](#27-progress-over-mcp-is-built-now-in-mcpprogress) | Progress over MCP is built now, in mcpprogress | accepted |
 | [28](#28-code-of-the-programs-may-move-into-the-kit-under-the-kits-licence) | Code of the programs may move into the kit, under the kit's licence | accepted |
 | [29](#29-cobratree-words-flag-values-carries-exit-statuses-and-shows-help-topics) | cobratree words flag values, carries exit statuses and shows help topics | accepted |
+| [30](#30-a-commands-result-is-written-by-cliout-as-a-table-or-as-json-escaped) | A command's result is written by cliout, as a table or as JSON, escaped | accepted |
 
 ## 1. Apache-2.0, and GSI holds the copyright
 
@@ -1556,3 +1557,56 @@ plumbing next to it, each its own way:
 - `Coded` keeps the first status given, so a caller cannot raise it on the
   way up; a program that needs another rule, such as clusterctl's `Worst`
   over the errors of many hosts, keeps it.
+
+## 30. A command's result is written by cliout, as a table or as JSON, escaped
+
+Status: accepted
+
+### Context
+
+clusterctl, sind, brig and sdash each write a command's result as a table
+for a person and as JSON for a program, each its own way. clusterctl's
+writer aligns the columns by the columns a terminal gives their text,
+escapes every cell before it measures it, so that a reason a node gave
+cannot start a row that seems to be another node's, hides the wide
+columns unless `-o wide` asks for them, pads no last column, and writes a
+slice of JSON an element at a time. sind and brig align with
+`text/tabwriter`, which counts bytes, three and two spaces apart, and
+escape nothing in a cell; sdash has `--json` alone. sind writes JSON
+without HTML escapes; the others write `<` as `\u003c`. No program
+escapes the C1 and bidirectional controls that `encoding/json` writes as
+they are.
+
+### Decision
+
+- A package `cliout` holds `Table`, with `Column` and its `Wide` and
+  `Right`, and `WriteJSON`. It imports `termtext` alone, and library
+  packages may import it.
+- The seed is clusterctl's writer: every cell and heading escaped with
+  `termtext.Escape` and the caption with `termtext.EscapeLines` before
+  they are measured, by `termtext.Width`; two spaces between columns; no
+  line ending in a space; the caption after an empty line; no cell cut.
+- `WriteJSON` indents by two spaces, writes `<`, `>` and `&` as they are,
+  as sind does, since the output goes to a terminal or a program and never
+  into HTML, and writes every rune `termtext` escapes and `encoding/json`
+  does not as a JSON escape, `\u009b`, so that the strings decode to what
+  they were and cannot act on the terminal. A slice is written an element
+  at a time, in the bytes of the whole.
+- The package parses no flag. The words of `-o`, which of them is the
+  default, `table` or `human`, and YAML or jq, which only clusterctl
+  writes and the latter of which needs gojq, stay the program's.
+- Interfaces beyond the Go API: the text `Table.Write` writes and the
+  bytes `WriteJSON` writes for a value. Changing either is a breaking
+  change, save that the runes escaped follow `termtext`'s deny-list, which
+  may grow in a minor release (decision 14).
+
+### Costs
+
+- sind and brig change the spacing of their tables, three or two spaces
+  to two, and where a cell holds a wide character; scripts that cut their
+  columns by position see it.
+- clusterctl, brig and sdash change the JSON of a string that holds `<`,
+  `>` or `&`, and every program that of one holding a C1 or bidirectional
+  control: a decoder sees no change, a comparison of the bytes does.
+- A table is built whole in memory before it is written, as clusterctl's
+  was, since its widths need every row.
