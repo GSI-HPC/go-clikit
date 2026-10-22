@@ -113,9 +113,11 @@ readable by its owner alone.
 ## Writing
 
 The log writes from a goroutine of its own, never under the Bus's lock, in
-whole lines: once 64 KiB wait, as the command, a step or a batch ends, and a
-second after a line came at the latest, so that a log followed as it grows,
-or that of a run killed, falls little behind. A write that fails stops the
+whole lines: once 64 KiB wait, as the command, a step or a batch ends, and
+`LogOptions.FlushEvery` after a line came at the latest, a second by default,
+so that a log followed as it grows, or that of a run killed, falls little
+behind. A program whose log a live view of the run follows sets it shorter;
+a negative value writes each line as it comes. An idle log waits for nothing. A write that fails stops the
 log, and so does a writer that falls 8 MiB behind, a pipe whose reader has
 stopped: the log never holds the work up. A log that falls behind still
 writes the lines it had taken, should its writer take them after all, and

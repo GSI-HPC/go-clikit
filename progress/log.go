@@ -28,7 +28,8 @@ const (
 	// logBehind is how much of the event log may wait to be written before
 	// the log stops, a writer that has stopped taking it.
 	logBehind = 8 << 20
-	// logFlushEvery is how long a line waits to be written at most.
+	// logFlushEvery is how long a line waits to be written at most, unless
+	// LogOptions.FlushEvery says otherwise.
 	logFlushEvery = time.Second
 	// logCloseWait is how long Close waits for what is left to be written.
 	logCloseWait = 5 * time.Second
@@ -75,9 +76,10 @@ const (
 // bytes, 4 KiB on Linux, and a file on NFS not at all when several
 // machines append to it, so runs that write there each need a file of
 // their own, or one writer that takes their lines whole. The lines are
-// written once 64 KiB wait, as a step, a batch or the command ends, and a
-// second after a line came at the latest, so that a log followed as it
-// grows, or one of a run killed, falls little behind. A write that fails
+// written once 64 KiB wait, as a step, a batch or the command ends, and
+// LogOptions.FlushEvery, a second by default, after a line came at the
+// latest, so that a log followed as it grows, or one of a run killed, falls
+// little behind. A write that fails
 // stops the log, and so does a writer that falls 8 MiB behind, a pipe
 // whose reader has stopped: the log never holds the work up. A log that
 // falls behind still writes the lines it had taken, and leaves out those
@@ -103,7 +105,10 @@ type Log struct {
 	// starts no write after it.
 	abandoned bool
 
-	wake          chan struct{}
+	// wake asks for the lines kept to be written now; kept says that the
+	// first of them came, which has them written LogOptions.FlushEvery
+	// later.
+	wake, kept    chan struct{}
 	stop, stopped chan struct{}
 }
 
@@ -127,6 +132,11 @@ type LogOptions struct {
 	// left out, and counted in "leftOut". 0 is a second; a negative value
 	// writes every advance the Bus sends.
 	AdvanceEvery time.Duration
+	// FlushEvery is how long a line waits at most before the log writes
+	// it, with the lines that came after it: what a reader that follows
+	// the log as it grows, such as a live view of the run, lags behind. 0
+	// is a second; a negative value writes each line as it comes.
+	FlushEvery time.Duration
 }
 
 // advanceEvery is the least time between two advances of a span the log
@@ -136,6 +146,18 @@ func (o LogOptions) advanceEvery() time.Duration {
 		return time.Second
 	}
 	return o.AdvanceEvery
+}
+
+// flushEvery is how long a line waits at most before the log writes it, as
+// LogOptions.FlushEvery gives it; 0 writes each line as it comes.
+func (o LogOptions) flushEvery() time.Duration {
+	switch {
+	case o.FlushEvery == 0:
+		return logFlushEvery
+	case o.FlushEvery < 0:
+		return 0
+	}
+	return o.FlushEvery
 }
 
 // sampling is what the log keeps of a span's advances to sample them: when
@@ -150,7 +172,8 @@ type sampling struct {
 // writes; Close stops it.
 func NewLog(w io.Writer, o LogOptions) *Log {
 	l := &Log{w: w, run: o.Run, o: o,
-		wake: make(chan struct{}, 1), stop: make(chan struct{}), stopped: make(chan struct{})}
+		wake: make(chan struct{}, 1), kept: make(chan struct{}, 1),
+		stop: make(chan struct{}), stopped: make(chan struct{})}
 	if l.run == "" {
 		var run [8]byte
 		// crypto/rand never fails; it ends the process when it cannot.
@@ -339,7 +362,8 @@ func (l *Log) sample(e Event, line *logEvent) bool {
 }
 
 // write keeps v as a line, whole, for the goroutine that writes, and has it
-// written once 64 KiB wait. l.mu is held.
+// written once 64 KiB wait, or once it has waited LogOptions.FlushEvery.
+// l.mu is held.
 func (l *Log) write(v any) {
 	if l.err != nil || l.closed {
 		return
@@ -355,9 +379,16 @@ func (l *Log) write(v any) {
 		l.err = errBehind
 		return
 	}
+	first := len(l.pending) == 0
 	l.pending = append(l.pending, l.line.Bytes()...)
-	if len(l.pending) >= logBuffer {
+	switch {
+	case len(l.pending) >= logBuffer || l.o.flushEvery() == 0:
 		l.due()
+	case first:
+		select {
+		case l.kept <- struct{}{}:
+		default:
+		}
 	}
 }
 
@@ -369,19 +400,26 @@ func (l *Log) due() {
 	}
 }
 
-// writeOut writes the lines kept as they fall due, until Close.
+// writeOut writes the lines kept as they fall due, until Close: at once
+// when due says so, else LogOptions.FlushEvery after the first of them
+// came. An idle log waits for nothing.
 func (l *Log) writeOut() {
 	defer close(l.stopped)
-	tick := time.NewTicker(logFlushEvery)
-	defer tick.Stop()
+	var flush <-chan time.Time
 	for {
 		select {
 		case <-l.stop:
 			l.drain()
 			return
+		case <-l.kept:
+			if flush == nil {
+				flush = time.After(l.o.flushEvery())
+			}
+			continue
 		case <-l.wake:
-		case <-tick.C:
+		case <-flush:
 		}
+		flush = nil
 		l.drain()
 	}
 }

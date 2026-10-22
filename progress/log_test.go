@@ -599,6 +599,63 @@ func TestTheLogIsWrittenSoonAfterEachLine(t *testing.T) {
 		})
 	})
 
+	t.Run("within FlushEvery", func(t *testing.T) {
+		t.Parallel()
+		synctest.Test(t, func(t *testing.T) {
+			w := &writes{}
+			log := progress.NewLog(w, progress.LogOptions{Run: "0123456789abcdef", FlushEvery: 25 * time.Millisecond})
+			bus := progress.NewBus(progress.BusOptions{Sinks: []progress.Sink{log}})
+			_, cmd := progress.Start(progress.WithBus(context.Background(), bus), progress.KindCommand, "exec")
+			time.Sleep(24 * time.Millisecond)
+			synctest.Wait()
+			if got := written(w); got != "" {
+				t.Fatalf("written before 25 ms were up: %q", got)
+			}
+			time.Sleep(time.Millisecond)
+			synctest.Wait()
+			if got := written(w); !strings.Contains(got, `"kind":"command"`) {
+				t.Fatalf("the command's start was not written within 25 ms: %q", got)
+			}
+			// A line that comes later waits 25 ms from when it came.
+			time.Sleep(time.Second)
+			cmd.Update(progress.Message("ready"))
+			time.Sleep(24 * time.Millisecond)
+			synctest.Wait()
+			if got := written(w); strings.Contains(got, `"type":"update"`) {
+				t.Fatalf("the update was written before 25 ms were up: %q", got)
+			}
+			time.Sleep(time.Millisecond)
+			synctest.Wait()
+			if got := written(w); !strings.Contains(got, `"type":"update"`) {
+				t.Fatalf("the update was not written within 25 ms: %q", got)
+			}
+			cmd.End(nil)
+			bus.Close()
+			if err := log.Close(); err != nil {
+				t.Fatal(err)
+			}
+		})
+	})
+
+	t.Run("at once with a negative FlushEvery", func(t *testing.T) {
+		t.Parallel()
+		synctest.Test(t, func(t *testing.T) {
+			w := &writes{}
+			log := progress.NewLog(w, progress.LogOptions{Run: "0123456789abcdef", FlushEvery: -1})
+			bus := progress.NewBus(progress.BusOptions{Sinks: []progress.Sink{log}})
+			_, cmd := progress.Start(progress.WithBus(context.Background(), bus), progress.KindCommand, "exec")
+			synctest.Wait()
+			if got := written(w); !strings.Contains(got, `"kind":"command"`) {
+				t.Fatalf("the command's start was not written as it came: %q", got)
+			}
+			cmd.End(nil)
+			bus.Close()
+			if err := log.Close(); err != nil {
+				t.Fatal(err)
+			}
+		})
+	})
+
 	t.Run("as a step ends", func(t *testing.T) {
 		t.Parallel()
 		synctest.Test(t, func(t *testing.T) {
