@@ -3,7 +3,7 @@
 
 # Architecture
 
-The kit is eight packages that a command-line program and the library
+The kit is nine packages that a command-line program and the library
 packages it calls share: a library reports what it does, and the command
 decides how that is shown. This document says where the packages came from,
 how they fit together, what runs on which goroutine, what a program fills
@@ -46,20 +46,22 @@ strict and to read the build info
 | `progress/cliprogress` | The words of `--progress` and the rule that picks a display from them, a command's `Run`, which makes and takes down its Bus, display, summary and event log, the private file the log is appended to, and the probes of a command's streams | `progress`, `progress/display`, `termtext`, `golang.org/x/sys` |
 | `progress/progresstest` | `Capture`, `Check`, `Watch` and its `Watcher`, and `Screen`, a terminal for tests | `progress`, `termtext`, `go-nodeset` |
 | `fanout` | `Each`, `Map` and `Batches`, the bounded pools that report their items as targets | `progress`, `go-nodeset` |
+| `cliout` | `Table`, a command's result in columns aligned by the columns a terminal gives them, and `WriteJSON`, every cell and string escaped | `termtext` |
 | `cobratree` | `Strict`, which makes a cobra command tree strict about its command line, the usage errors and the words of a flag's value refused, exit statuses carried by errors, help topics, and the build info | cobra, pflag |
 | `cobratree/cobratreetest` | `Run`, which runs a command tree in a test and keeps its standard output and standard error apart, and `CheckCommandLines`, which checks the command lines of a manual against the tree | `cobratree`, cobra, pflag |
 
 Every arrow points down the table: nothing imports `cliprogress`,
 `progresstest` or `fanout`, only `cliprogress` imports `display`, `progress`
 imports only `termtext`, and `termtext` only `golang.org/x/text`.
-`cobratree` stands apart: it imports no package of the kit, and none
-imports it but `cobratree/cobratreetest`. A library imports `progress`,
-and `fanout` when it works on many items; the command imports
-`cliprogress`, or `display` when it picks its displays by a rule of its
-own, and `cobratree` when it is built with cobra; tests import
-`progresstest`, and `cobratreetest` for a command tree. `go-nodeset` folds the names of
-targets into node sets, `exe[0001-0480]`, in the tree, the tests' trees and
-the summary of a pool that failed.
+`cliout` imports only `termtext`. `cobratree` stands apart: it imports no
+package of the kit, and none imports it but `cobratree/cobratreetest`. A
+library imports `progress`, and `fanout` when it works on many items; the
+command imports `cliprogress`, or `display` when it picks its displays by
+a rule of its own, `cliout` to write its result, and `cobratree` when it
+is built with cobra; tests import `progresstest`, and `cobratreetest` for
+a command tree. `go-nodeset` folds the names of targets into node sets,
+`exe[0001-0480]`, in the tree, the tests' trees and the summary of a pool
+that failed.
 [Decision 3](decisions.md#3-what-the-kit-may-require) says what else the kit
 may require, which is nothing without a record;
 [decision 22](decisions.md#22-the-kit-may-require-golangorgxsys-in-cliprogress-alone)
