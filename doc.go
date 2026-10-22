@@ -11,6 +11,7 @@
 //	github.com/GSI-HPC/go-clikit/progress/cliprogress     the words of --progress, a command's display, summary and event log
 //	github.com/GSI-HPC/go-clikit/progress/progresstest    capturing and checking the events a command reports
 //	github.com/GSI-HPC/go-clikit/progress/mcpprogress     a tool call's progress as MCP progress notifications
+//	github.com/GSI-HPC/go-clikit/progress/eventlog        reading back the event log a program or its child wrote
 //	github.com/GSI-HPC/go-clikit/fanout                   bounded worker pools that report their targets as progress
 //	github.com/GSI-HPC/go-clikit/fanout/fanouttest        counting the calls a fake is in the middle of, to prove a limit
 //	github.com/GSI-HPC/go-clikit/cliout                   a command's result as a table and as JSON, escaped for a terminal
@@ -23,7 +24,8 @@
 // progress.Bus, attaches a display from progress/display and, if asked, an
 // event log, and passes the Bus down in its context.Context, or has
 // progress/cliprogress do so from its flags; an MCP server sends a tool
-// call's progress with progress/mcpprogress. A command built with cobra
+// call's progress with progress/mcpprogress, and a program reads back the
+// event log it or a child wrote with progress/eventlog. A command built with cobra
 // makes its tree strict about its command line with cobratree. The kit
 // knows no program: a program's name, the noun for its targets and its
 // rule for exit codes are parameters.

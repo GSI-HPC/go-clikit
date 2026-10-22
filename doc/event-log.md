@@ -128,6 +128,23 @@ it has given up waiting, the log starts no write; one already under way
 cannot be stopped, so `Close` says so, and `Done` is closed once that write
 has returned, after which the writer may be closed.
 
+## Reading
+
+`progress/eventlog` reads the log back, as the rules above ask of a
+reader. `Decode` turns a line into the first line of a run, or into one
+of its events as a `progress.Event`, the one the Bus sent the log but for
+the text of a line of output, which the log never held. It leaves out a
+key it does not know, a value it does not know of a key whose values are
+the kit's, and a key whose value is of the wrong type; it refuses a line
+of another version, of a type it does not know, or an event without a
+time or, but for a `suspend` or `resume`, without its span. It sanitises
+every text as a Bus does, cut to the same bounds, so that a log another
+program wrote, or one changed by hand, reaches a terminal or a page no
+less safe than one the kit wrote. A test reads the golden log, writes it
+again with `progress.Log` and compares the two, line for line, so the
+reader and the writer cannot drift apart; a fuzz target holds the same
+for any line the reader takes.
+
 ## The golden log
 
 `progress/testdata/log-v1.jsonl` is a run that has every key this document
