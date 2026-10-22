@@ -39,3 +39,27 @@ func TestALogThatStopsShortSaysSoOnce(t *testing.T) {
 		t.Errorf("the terminal shows\n%s", got)
 	}
 }
+
+// The default log says nothing when it stops short: the user did not ask
+// for it.
+func TestADefaultLogThatStopsShortSaysNothing(t *testing.T) {
+	rd, wr, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer wr.Close()
+	_ = rd.Close()
+	screen := &progresstest.Screen{Width: 80}
+	c := newClock()
+	o := terminal(screen, c)
+	o.DefaultLog = fmt.Sprintf("/dev/fd/%d", wr.Fd())
+	r, err := cliprogress.Start(context.Background(), o)
+	if err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+	command(r, c, nil)
+	r.Finish(false)
+	if got := screen.String(); strings.Contains(got, "stops short") {
+		t.Errorf("the terminal shows\n%s", got)
+	}
+}

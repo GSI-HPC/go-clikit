@@ -167,6 +167,26 @@ type Options struct {
 	// and the environment name it; with neither naming one, or with an
 	// empty name, no log is written.
 	Log Setting
+	// DefaultLog is the file the event log is appended to when the flag of
+	// Log is not given and its variable names no file: a log the program
+	// keeps unasked, such as $XDG_STATE_HOME/prog/activity.jsonl in a
+	// directory of this user's alone, which a view of what the program did
+	// reads. A program whose variable, set to nothing, asks for no log
+	// passes no DefaultLog then, since the package cannot tell a variable
+	// set to nothing from one not set. The default log is a convenience: one
+	// that cannot be opened is left out, and one that cannot be written
+	// stops short, without a note either way, so that a home that cannot be
+	// written makes no command complain.
+	DefaultLog string
+	// RotateAt moves the default log aside before Start appends to it, once
+	// it is a regular file larger than RotateAt bytes: to its name with
+	// ".1" after it, in place of the copy there, so that the log takes up
+	// about twice RotateAt at most. Of commands that start at once, one
+	// moves it, and the others append to whichever file they open; one that
+	// has the log open goes on writing to the copy. A log that cannot be
+	// moved is appended to as it is. 0 never moves it, nor a log the flag or
+	// the variable names, which is the user's.
+	RotateAt int64
 	// LogOptions configure the event log, as progress.NewLog has them: the
 	// program's version, above all. An empty LogOptions.Program takes
 	// Program, through the Bus.

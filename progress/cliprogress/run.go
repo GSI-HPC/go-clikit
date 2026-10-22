@@ -19,17 +19,20 @@ import (
 // them. Its methods are not safe for concurrent use, but for the writers
 // they return, which are.
 type Run struct {
-	ctx      context.Context
-	mode     Mode
-	prefix   string
-	stderr   io.Writer
-	notes    io.Writer
-	bus      *progress.Bus
-	term     *display.Terminal
-	shown    shown
-	summary  *display.Summary
-	log      *progress.Log
-	logFile  *os.File
+	ctx     context.Context
+	mode    Mode
+	prefix  string
+	stderr  io.Writer
+	notes   io.Writer
+	bus     *progress.Bus
+	term    *display.Terminal
+	shown   shown
+	summary *display.Summary
+	log     *progress.Log
+	logFile *os.File
+	// quietLog says the log is the default log, which says nothing when it
+	// stops short.
+	quietLog bool
 	finished bool
 }
 
@@ -55,7 +58,8 @@ type shown interface {
 // An error is the command line's, as Choose's is: a word the flag gives
 // that names no Mode, a display the terminal cannot show, or a log the
 // flag names that cannot be used, which the error wraps. Nothing is
-// written or created then. What the variables ask for fails no command.
+// written or created then. What the variables ask for fails no command,
+// and the default log, Options.DefaultLog, fails none and writes no note.
 //
 // The display is drawn on o.Stderr, and the tree stops drawing what runs,
 // and says the command was interrupted, once ctx is done.
@@ -68,7 +72,7 @@ func Start(ctx context.Context, o Options) (*Run, error) {
 	if err != nil {
 		return nil, err
 	}
-	logFile, logNote, err := openLog(o)
+	logFile, quietLog, logNote, err := openLog(o)
 	if err != nil {
 		return nil, err
 	}
@@ -91,7 +95,7 @@ func Start(ctx context.Context, o Options) (*Run, error) {
 		return r, nil
 	}
 
-	r.prefix, r.stderr, r.notes, r.logFile = o.prefix(), stderr, notes, logFile
+	r.prefix, r.stderr, r.notes, r.logFile, r.quietLog = o.prefix(), stderr, notes, logFile, quietLog
 	panicLog := o.PanicLog
 	if panicLog == nil {
 		panicLog = stderr
@@ -145,23 +149,31 @@ func newDisplay(mode Mode, term *display.Terminal, o Options, interrupted <-chan
 	return display.NewPlain(term, display.PlainOptions{Now: o.Now, ASCII: o.ASCII, Theme: o.Theme, Noun: o.Noun})
 }
 
-// openLog opens the event log o.Log names, to append to; nil when it
-// names none. A log the flag names that cannot be used is an error; the
-// variable's fails no command, and the note returned says no log is
-// written.
-func openLog(o Options) (f *os.File, note string, err error) {
+// openLog opens the event log o.Log names, to append to, or else the
+// default log, which quiet says; nil when there is none. A log the flag
+// names that cannot be used is an error; the variable's fails no command,
+// and the note returned says no log is written; the default log's is left
+// out without one.
+func openLog(o Options) (f *os.File, quiet bool, note string, err error) {
 	path, from, ambient := o.Log.value()
+	if path == "" && ambient && o.DefaultLog != "" {
+		if o.RotateAt > 0 {
+			rotate(o.DefaultLog, o.RotateAt)
+		}
+		f, err = appendPrivate(o.DefaultLog, os.Geteuid())
+		return f, err == nil, "", nil
+	}
 	if path == "" {
-		return nil, "", nil
+		return nil, false, "", nil
 	}
 	f, err = appendPrivate(path, os.Geteuid())
 	switch {
 	case err == nil:
-		return f, "", nil
+		return f, false, "", nil
 	case ambient:
-		return nil, fmt.Sprintf("%s%s names a progress log that cannot be used: %v; no log is written", o.prefix(), from, err), nil
+		return nil, false, fmt.Sprintf("%s%s names a progress log that cannot be used: %v; no log is written", o.prefix(), from, err), nil
 	}
-	return nil, "", fmt.Errorf("%s names a progress log that cannot be used: %w", from, err)
+	return nil, false, "", fmt.Errorf("%s names a progress log that cannot be used: %w", from, err)
 }
 
 // logWriter returns what the event log is written through: its file,
@@ -232,7 +244,7 @@ func (r *Run) Draw() {
 // command a display showed for a second or longer. A program that leaves
 // the summary only after a command that failed passes whether it did. A log
 // that could not be written fails nothing: a note says once that it stops
-// short.
+// short, unless it is the default log.
 //
 // The writers the Run returned pass their bytes through from then on. The
 // program puts its own writers back, and then writes the command's error.
@@ -251,9 +263,11 @@ func (r *Run) Finish(summary bool) {
 		if closeErr := r.logFile.Close(); err == nil {
 			err = closeErr
 		}
-		if err != nil {
+		if err != nil && !r.quietLog {
 			// The log is a record of the work, not part of it: a log
-			// that cannot be written fails nothing, and is reported once.
+			// that cannot be written fails nothing, and is reported once,
+			// unless it is the default log, which the user did not ask
+			// for.
 			_, _ = fmt.Fprintln(r.notes, termtext.Escape(fmt.Sprintf(
 				"%sthe progress log %s stops short: %v", r.prefix, r.logFile.Name(), err)))
 		}
