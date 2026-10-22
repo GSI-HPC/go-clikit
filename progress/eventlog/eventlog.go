@@ -82,23 +82,23 @@ type line struct {
 	Flags      []string `json:"flags"`
 	State      string   `json:"state"`
 
-	Node       string  `json:"node"`
-	Host       string  `json:"host"`
-	Role       string  `json:"role"`
-	Total      int     `json:"total"`
-	Limit      int     `json:"limit"`
-	Batch      string  `json:"batch"`
-	Message    string  `json:"message"`
-	Method     string  `json:"method"`
-	Path       string  `json:"path"`
-	HTTPStatus int     `json:"httpStatus"`
-	Cache      string  `json:"cache"`
-	Source     string  `json:"source"`
-	Timeout    float64 `json:"timeout"`
-	Exit       *int    `json:"exit"`
-	Amount     int64   `json:"amount"`
-	Size       int64   `json:"size"`
-	Unit       string  `json:"unit"`
+	Node       string          `json:"node"`
+	Host       string          `json:"host"`
+	Role       string          `json:"role"`
+	Total      int             `json:"total"`
+	Limit      int             `json:"limit"`
+	Batch      string          `json:"batch"`
+	Message    string          `json:"message"`
+	Method     string          `json:"method"`
+	Path       string          `json:"path"`
+	HTTPStatus int             `json:"httpStatus"`
+	Cache      string          `json:"cache"`
+	Source     string          `json:"source"`
+	Timeout    float64         `json:"timeout"`
+	Exit       json.RawMessage `json:"exit"`
+	Amount     int64           `json:"amount"`
+	Size       int64           `json:"size"`
+	Unit       string          `json:"unit"`
 
 	Status  string `json:"status"`
 	Class   string `json:"class"`
@@ -203,12 +203,22 @@ func (l *line) event() (progress.Event, error) {
 		Cache:      progress.Sanitize(l.Cache, progress.MaxField),
 		Source:     progress.Sanitize(l.Source, progress.MaxField),
 		Timeout:    seconds(l.Timeout),
-		Exit:       l.Exit,
+		Exit:       exitStatus(l.Exit),
 		Amount:     max(l.Amount, 0),
 		Size:       max(l.Size, 0),
 	}
 	e.Unit = units[l.Unit]
 	return e, nil
+}
+
+// exitStatus is the exit status of the log, none when the key is absent,
+// null or not a whole number: a wrong-typed value must not read as exit 0.
+func exitStatus(raw json.RawMessage) *int {
+	n, err := strconv.Atoi(string(raw))
+	if err != nil {
+		return nil
+	}
+	return &n
 }
 
 // seconds is a timeout of the log as a duration: none below zero, and at
