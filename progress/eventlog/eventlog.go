@@ -11,6 +11,12 @@
 // text sanitised as a Bus sanitises it, so that a log something else
 // wrote cannot act on a terminal or a page either.
 //
+// A Tail reads a log as it grows, polled, and follows it as
+// progress/cliprogress rotates it, and gives the whole lines it reads to a
+// Feed. Forward is the Feed of a server that runs a command as a child,
+// with the child's log in a file of its own: it gives the child's events
+// to a progress.Sink, such as an mcpprogress.Notifier, once each.
+//
 // A reader of version 1 leaves out the keys and the values it does not
 // know, as the format asks, so that a log a later release of the kit
 // writes, with a key or a value added, still reads: a key Decode does not
