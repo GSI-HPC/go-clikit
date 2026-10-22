@@ -40,6 +40,7 @@ names it.
 | [28](#28-code-of-the-programs-may-move-into-the-kit-under-the-kits-licence) | Code of the programs may move into the kit, under the kit's licence | accepted |
 | [29](#29-cobratree-words-flag-values-carries-exit-statuses-and-shows-help-topics) | cobratree words flag values, carries exit statuses and shows help topics | accepted |
 | [30](#30-a-commands-result-is-written-by-cliout-as-a-table-or-as-json-escaped) | A command's result is written by cliout, as a table or as JSON, escaped | accepted |
+| [31](#31-cliprogress-keeps-a-default-log-picks-colours-and-asks-questions) | cliprogress keeps a default log, picks colours and asks questions | accepted |
 
 ## 1. Apache-2.0, and GSI holds the copyright
 
@@ -915,7 +916,7 @@ told at a glance from a display that has stopped drawing.
 
 ## 19. The displays draw in themes the program picks
 
-Status: accepted
+Status: accepted, refined by [31](#31-cliprogress-keeps-a-default-log-picks-colours-and-asks-questions)
 
 ### Context
 
@@ -1019,7 +1020,7 @@ try, and holding them to the rule for text would freeze them.
 
 ## 21. The command line's glue for progress is the kit's
 
-Status: accepted
+Status: accepted, refined by [31](#31-cliprogress-keeps-a-default-log-picks-colours-and-asks-questions)
 
 ### Context
 
@@ -1118,7 +1119,7 @@ terminal can show one, was the program's to decide (`architecture.md`).
 
 ## 22. The kit may require golang.org/x/sys, in cliprogress alone
 
-Status: accepted, refined by [26](#26-golangorgxsys-also-in-fsutil-and-localweb)
+Status: accepted, refined by [26](#26-golangorgxsys-also-in-fsutil-and-localweb) and [31](#31-cliprogress-keeps-a-default-log-picks-colours-and-asks-questions)
 
 ### Context
 
@@ -1610,3 +1611,64 @@ they are.
   control: a decoder sees no change, a comparison of the bytes does.
 - A table is built whole in memory before it is written, as clusterctl's
   was, since its widths need every row.
+
+## 31. cliprogress keeps a default log, picks colours and asks questions
+
+Status: accepted
+
+### Context
+
+Beside the glue decision 21 moved into `cliprogress`, each program kept
+more of the same. sind and brig keep an event log unasked, in their state
+directory, which a view of what they did reads. brig moves it aside to
+its name with ".1" after it once it is larger than 8 MiB, under a lock
+so that one of the commands that start at once moves it, and sind's view
+reads that copy too. Both pass the log to `cliprogress` as though a
+variable had named it, and sind drops the notes written about it by
+matching their text, since the user did not ask for the log. brig turns
+NO_COLOR, TERM and COLORTERM into a theme's colours by a rule that
+clusterctl and sind each word their own way. clusterctl and brig ask
+before they act, each with a reader of its own that suspends the
+displays while it waits, and each asks whether standard input is a
+terminal with a library of its own, which decision 22 left to the
+program.
+
+### Decision
+
+- `Options.DefaultLog` names the log a program keeps unasked. It is used
+  when the flag is not given and the variable names no file, and it fails
+  no command: one that cannot be opened is left out, and one that stops
+  short says nothing, unlike a log the flag or the variable names.
+- `Options.RotateAt` moves the default log, and only it, to its name with
+  ".1" after it before `Start` appends, once it is a regular file larger
+  than that many bytes. Where the system has flock, a lock on its name
+  with ".lock" after it lets one of the commands that start at once move
+  it; the others append to the file they open. A log the user named is
+  never moved. The names ".1" and ".lock" are interfaces.
+- `ThemeFor` turns a theme into the colours a terminal can show, from a
+  getenv the program passes: no colour off a terminal or on TERM=dumb,
+  the art alone for NO_COLOR set to anything, 256 colours for COLORTERM
+  or a TERM that names 256 colours, and the terminal's 16 otherwise. The
+  kit still reads no environment; the program may use its own rule.
+- `IsTerminal` tells whether a file is a terminal, through
+  golang.org/x/sys/unix, which `cliprogress` requires already; it is false
+  on systems that are not Unix. This reverses the part of decision 22
+  that left the question to the program.
+- `Ask` writes a prompt and reads a line, a byte at a time, so that what
+  follows is left for the next reader, with the Bus's displays suspended
+  until it returns; the end of the context ends the question at once. An
+  answer longer than 4,096 bytes is refused, with the error "the answer is
+  longer than 4096 bytes". `Yes` reads "y" and "yes", in any case. Whether
+  to ask where standard input is no terminal, and what no answer means,
+  stay the program's.
+- Interfaces beyond the Go API: the rule of `ThemeFor`, the names the
+  rotation uses, the error of a long answer and the words `Yes` takes.
+
+### Costs
+
+- sind's notes about a default log that cannot be opened go away, which
+  was the point; a user who wants to know names the log with the flag.
+- Commands that start at once on a log over the limit may each write to
+  a different file for that run; none of their lines is lost.
+- `Ask` leaves a goroutine reading standard input once its context ends,
+  since a read cannot be stopped; the next read of that input races it.

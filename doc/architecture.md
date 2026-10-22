@@ -43,7 +43,7 @@ strict and to read the build info
 | `termtext` | Escaping untrusted text for a terminal, as a string or as a stream, the columns text takes there, and filling text to a number of them | `golang.org/x/text/width` |
 | `progress` | Spans carried in a `context.Context`, the `Bus` that orders their events, `Tally`, `Meter`, `Sanitize`, the JSONL event log and the W3C trace context | `termtext` |
 | `progress/display` | The `Terminal` a display shares with the command, the live `Tree`, the `Counter`, `Plain` lines and the `Summary` | `progress`, `termtext`, `go-nodeset` |
-| `progress/cliprogress` | The words of `--progress` and the rule that picks a display from them, a command's `Run`, which makes and takes down its Bus, display, summary and event log, the private file the log is appended to, and the probes of a command's streams | `progress`, `progress/display`, `termtext`, `golang.org/x/sys` |
+| `progress/cliprogress` | The words of `--progress` and the rule that picks a display from them, a command's `Run`, which makes and takes down its Bus, display, summary and event log, the private file the log is appended to, a default log kept unasked and moved aside, the colours a terminal shows, a question asked with the display off, and the probes of a command's streams | `progress`, `progress/display`, `termtext`, `golang.org/x/sys` |
 | `progress/progresstest` | `Capture`, `Check`, `Watch` and its `Watcher`, and `Screen`, a terminal for tests | `progress`, `termtext`, `go-nodeset` |
 | `fanout` | `Each`, `Map` and `Batches`, the bounded pools that report their items as targets, and `Keyed`, which bounds the work under way on each key, such as a host | `progress`, `go-nodeset` |
 | `fanout/fanouttest` | `InFlight`, which counts the calls a test's fake is in the middle of, and holds them to prove a limit | none |
@@ -228,7 +228,9 @@ The kit knows no program. What depends on one is a parameter or a hook:
 | The trace a program hands a child it starts, such as its own command line run from a page of its web UI, and whether it passes one on at all | the program, which puts `TraceContext.Traceparent` of `progress.NewTraceContext`, read from `crypto/rand.Reader`, in the child's environment |
 | Where a panic's stack goes | the `PanicLog` options |
 | How the command line and the environment ask for a display and an event log: the names of the flag and of the variable that stands in for it, and what each holds | `cliprogress.Options.Mode` and `cliprogress.Options.Log`, a `cliprogress.Setting` each |
-| Whether standard error is a terminal, and a dumb one, and whether standard output goes into a pipe | `cliprogress.Options.OnTerminal`, `.Dumb` and `.IntoPipe`; `cliprogress.IsPipe` tells the last |
+| Whether standard error is a terminal, and a dumb one, and whether standard output goes into a pipe | `cliprogress.Options.OnTerminal`, `.Dumb` and `.IntoPipe`; `cliprogress.IsTerminal` tells the first and `cliprogress.IsPipe` the last |
+| An event log the program keeps unasked, and how large it grows | `cliprogress.Options.DefaultLog` and `.RotateAt` (decision 31) |
+| Whether a command asks before it acts, where standard input is no terminal, and what an answer means | the program, which asks with `cliprogress.Ask`, tells a terminal with `cliprogress.IsTerminal` and reads a yes with `cliprogress.Yes` |
 | Where the notes go, and the display and the summary | `cliprogress.Options.Notes`, `cliprogress.Options.Stderr` |
 | Which of the program's writers, and its logger's, go through the display's Terminal | the writers of `cliprogress.Run.Writer` and `cliprogress.Run.Lines`, which the program puts in place of its own and puts back once `cliprogress.Run.Finish` has returned |
 | Whether a command that succeeded leaves the summary | the argument of `cliprogress.Run.Finish` |
@@ -237,7 +239,7 @@ The kit knows no program. What depends on one is a parameter or a hook:
 | The topics help shows beside the commands, and their texts | the function the program passes `cobratree.HelpTopics`, and the `Short` and `Long` of the help command it returns |
 | The commands a program dropped, and what replaced them | the `moved` argument of `cobratree.Strict` |
 | How the program words its version: the word for a build that is no release, how much of the commit it shows, and a version injected at build time | the program, from the fields of `cobratree.BuildInfo`, which `cobratree.ReadBuildInfo` returns, and `cobratree.Resolve` with what a release build set with -ldflags; `BuildInfo.Short` cuts the commit to the digits the program shows |
-| How the displays look: a theme, in how many colours, or none | `display.TreeOptions.Theme`, `display.CounterOptions.Theme`, `display.PlainOptions.Theme` and `display.Summary.Theme`, one of `display.Themes`, which `display.ParseTheme` reads, drawn in 256 colours, `Colours16` or `NoColours` by `Theme.In`; the zero `Theme` draws in no colour, as before (decisions 19 and 20); `cliprogress.Options.Theme` |
+| How the displays look: a theme, in how many colours, or none | `display.TreeOptions.Theme`, `display.CounterOptions.Theme`, `display.PlainOptions.Theme` and `display.Summary.Theme`, one of `display.Themes`, which `display.ParseTheme` reads, drawn in 256 colours, `Colours16` or `NoColours` by `Theme.In`; the zero `Theme` draws in no colour, as before (decisions 19 and 20); `cliprogress.Options.Theme`; `cliprogress.ThemeFor` picks the colours from what the program read of NO_COLOR, TERM and COLORTERM |
 
 A Bus hands on what it was told: `Bus.Program`, `Bus.PanicLog` and
 `Bus.Classify` answer for the Bus that `progress.BusFrom` finds in a

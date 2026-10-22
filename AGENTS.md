@@ -27,7 +27,7 @@ still change in a minor release (see Compatibility).
 | `progress/progresstest` | capturing and checking the events a command reports | v0.1.0 |
 | `fanout` | bounded worker pools that report their targets as progress | v0.1.0 |
 | `fanout/fanouttest` | counting the calls a fake is in the middle of, to prove a limit | v0.6.0 |
-| `progress/cliprogress` | the words of `--progress`, a command's display and event log, the private log file | v0.3.0 |
+| `progress/cliprogress` | the words of `--progress`, a command's display and event log, the private log file, colours, questions | v0.3.0 |
 | `cobratree` | a strict cobra command tree, usage errors, the build info | v0.4.0 |
 | `cliout` | a command's result as a table aligned by display width, and as JSON, escaped | v0.6.0 |
 | `cobratree/cobratreetest` | running a command tree in a test, checking a manual's command lines | v0.6.0 |
@@ -60,10 +60,13 @@ still change in a minor release (see Compatibility).
   colours a theme draws when its `Styles` is set.
 - `progress/cliprogress/`: `cliprogress.go`, the package comment, `Mode`,
   `Setting`, `Options`, `Choose` and `UTF8Locale`; `run.go`, `Start` and
-  `Run`; `probe.go` and `probe_unix.go`, `IsPipe`, `TerminalSize` and
-  `InForeground`; `appendprivate.go`, the private file of the event log.
-  `probe_other.go` and `appendprivate_other.go` are for systems that are
-  not Unix.
+  `Run`; `probe.go` and `probe_unix.go`, `IsTerminal`, `IsPipe`,
+  `TerminalSize` and `InForeground`, with `termios_bsd.go` and
+  `termios_other.go`; `appendprivate.go`, the private file of the event
+  log; `rotate.go` and `rotate_flock.go`, moving the default log aside;
+  `ask.go`, `Ask` and `Yes`. `probe_other.go`, `appendprivate_other.go`
+  and `rotate_other.go` are for systems that are not Unix, or have no
+  flock.
 - `fanout/`: `each.go`, `Each` and the package comment; `map.go`, `Map`,
   `MapOptions`, `Item`, `Outcome`, `Summary` and `Failure`; `batches.go`;
   `recover.go`, `Recovered` and `PanicError`; `keyed.go`, `Keyed`.
@@ -149,7 +152,8 @@ go-test-coverage: `go install github.com/vladopajic/go-test-coverage/v2@latest`.
   included (decision 21), and the texts of the errors `cobratree.Strict`'s
   checks return (decision 24), and those `cobratree.InvalidValue` and
   `cobratree.FlagError` return (decision 29), and what `cliout` writes
-  (decision 30). Changing any of them is a breaking change; a
+  (decision 30), and the rule of `cliprogress.ThemeFor` and the names and
+  texts of decision 31. Changing any of them is a breaking change; a
   new or stricter `Check` rule is one too.
 - The kit reads no environment: whether to draw in colour, NO_COLOR and
   TERM included, is the program's to decide, and a theme is a parameter;
