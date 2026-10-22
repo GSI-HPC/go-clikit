@@ -5,13 +5,14 @@
 // share. It holds no API: each part of the kit is a package of its own,
 // imported by its path:
 //
-//	github.com/GSI-HPC/go-clikit/termtext               escaping untrusted text for a terminal, and display width
-//	github.com/GSI-HPC/go-clikit/progress               spans carried in a context.Context, the JSONL event log, TRACEPARENT
-//	github.com/GSI-HPC/go-clikit/progress/display       the live tree, the counter, plain lines for CI, the summary
-//	github.com/GSI-HPC/go-clikit/progress/cliprogress   the words of --progress, a command's display, summary and event log
-//	github.com/GSI-HPC/go-clikit/progress/progresstest  capturing and checking the events a command reports
-//	github.com/GSI-HPC/go-clikit/fanout                 bounded worker pools that report their targets as progress
-//	github.com/GSI-HPC/go-clikit/cobratree              a strict cobra command tree, usage errors, the build info
+//	github.com/GSI-HPC/go-clikit/termtext                 escaping untrusted text for a terminal, and display width
+//	github.com/GSI-HPC/go-clikit/progress                 spans carried in a context.Context, the JSONL event log, TRACEPARENT
+//	github.com/GSI-HPC/go-clikit/progress/display         the live tree, the counter, plain lines for CI, the summary
+//	github.com/GSI-HPC/go-clikit/progress/cliprogress     the words of --progress, a command's display, summary and event log
+//	github.com/GSI-HPC/go-clikit/progress/progresstest    capturing and checking the events a command reports
+//	github.com/GSI-HPC/go-clikit/fanout                   bounded worker pools that report their targets as progress
+//	github.com/GSI-HPC/go-clikit/cobratree                a strict cobra command tree, usage errors, the build info
+//	github.com/GSI-HPC/go-clikit/cobratree/cobratreetest  running a command tree in a test, checking a manual's command lines
 //
 // A library package reports what it does through progress, which costs
 // nothing when no command is listening, and runs work for many targets with

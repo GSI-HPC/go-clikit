@@ -28,6 +28,7 @@ still change in a minor release (see Compatibility).
 | `fanout` | bounded worker pools that report their targets as progress | v0.1.0 |
 | `progress/cliprogress` | the words of `--progress`, a command's display and event log, the private log file | v0.3.0 |
 | `cobratree` | a strict cobra command tree, usage errors, the build info | v0.4.0 |
+| `cobratree/cobratreetest` | running a command tree in a test, checking a manual's command lines | v0.6.0 |
 | `progress/mcpprogress` | progress over MCP | later, once a second program needs it |
 
 ## Layout
@@ -68,6 +69,8 @@ still change in a minor release (see Compatibility).
   `FlagError`; `status.go`, `Coded` and `Status`; `help.go`,
   `HelpTopics`; `buildinfo.go`, `BuildInfo`, `ReadBuildInfo` and
   `Resolve`.
+- `cobratree/cobratreetest/`: `cobratreetest.go`, `Run`,
+  `CheckCommandLine` and `CheckCommandLines`.
 - Every package has an `example_test.go`. Failing fuzz inputs go under the
   package's `testdata/fuzz/`.
 - `doc/`: `README.md` maps the documentation; `architecture.md` says how
