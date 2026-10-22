@@ -48,6 +48,7 @@ command-line code clusterctl and sind each carried
 | `localweb/localwebtest` | a signed-in client and a reader of event streams, for a test of a local web server |
 | `localweb/launch` | one server per user, and the browser opened on it without the token in a command line |
 | `localweb/assets` | a page's static files at addresses with a hash, cached for good |
+| `localweb/page` | a page's templates in one set, and the answers to htmx |
 
 ## Install
 
