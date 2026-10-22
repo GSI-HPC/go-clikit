@@ -3,7 +3,10 @@
 
 package cobratree
 
-import "runtime/debug"
+import (
+	"runtime/debug"
+	"strings"
+)
 
 // BuildInfo is what the Go toolchain recorded in the running binary about
 // the source it was built from. A field it recorded nothing for is empty.
@@ -58,4 +61,50 @@ func fromBuildInfo(bi *debug.BuildInfo) BuildInfo {
 		info.Version = bi.Main.Version
 	}
 	return info
+}
+
+// Resolve returns the build info of the running binary, as ReadBuildInfo
+// reads it, with the version and the commit a build set with -ldflags in
+// place of the toolchain's: a release build that sets them wins. An empty
+// value sets nothing, so a program declares the variables it sets that way
+// empty, rather than holding a word such as "dev", and words a build that
+// is no release itself, where Version is empty.
+//
+// A commit set that is not the one the toolchain recorded, nor the start of
+// it, is another commit than the checkout's, and the time and the changes
+// recorded are then left out, as they are not that commit's.
+func Resolve(version, commit string) BuildInfo {
+	return ReadBuildInfo().resolve(version, commit)
+}
+
+// resolve returns b with the version and commit set, as Resolve says.
+func (b BuildInfo) resolve(version, commit string) BuildInfo {
+	if version != "" {
+		b.Version = version
+	}
+	if commit != "" {
+		if !strings.HasPrefix(b.Commit, commit) {
+			b.Time, b.Dirty = "", false
+		}
+		b.Commit = commit
+	}
+	return b
+}
+
+// Short returns the commit cut to its first n characters, as a version line
+// prints it, with "-dirty" after it for a checkout that held changes not
+// committed: "ebed487-dirty" for 7. It is "" without a commit, and n of 0
+// or less, or more than the commit has, keeps it whole.
+func (b BuildInfo) Short(n int) string {
+	if b.Commit == "" {
+		return ""
+	}
+	rev := b.Commit
+	if n > 0 && n < len(rev) {
+		rev = rev[:n]
+	}
+	if b.Dirty {
+		rev += "-dirty"
+	}
+	return rev
 }
