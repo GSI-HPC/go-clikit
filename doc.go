@@ -19,6 +19,8 @@
 //	github.com/GSI-HPC/go-clikit/cobratree/cobratreetest  running a command tree in a test, checking a manual's command lines
 //	github.com/GSI-HPC/go-clikit/localweb                 the guard of a local web server: listener, Host and cross-site checks, headers
 //	github.com/GSI-HPC/go-clikit/localweb/session         the launch token exchanged for a session cookie, and the CSRF token
+//	github.com/GSI-HPC/go-clikit/localweb/sse             a page's live fragments as Server-Sent Events, and the topics they change in
+//	github.com/GSI-HPC/go-clikit/localweb/localwebtest    a signed-in client and a reader of event streams, for a test of a local server
 //
 // A library package reports what it does through progress, which costs
 // nothing when no command is listening, and runs work for many targets with

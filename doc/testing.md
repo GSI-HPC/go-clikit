@@ -184,11 +184,19 @@ a test gives, so they hold as root and as a user. `PeerListener` reads
 tables in the format of `/proc/net/tcp` and `tcp6`, and a real connection
 of the test's own user.
 
+`localweb/localwebtest` is how a program tests its server, and how the
+kit tests `session` and `sse`: `Login` signs in with the launch token as
+the user's browser does, and the client sends each request with the
+headers of a page of the server's own origin; `Reader` reads the events
+of a stream, which the tests of `sse` hold to the baseline, the
+coalescing and the deduplication.
+
 ## Fuzzing
 
-Seven fuzz targets check what must hold for any text a remote host sends,
-for the rows a display draws in colour, for the work a span reports, and
-for a line of an event log another program wrote:
+Eight fuzz targets check what must hold for any text a remote host sends,
+for the rows a display draws in colour, for the work a span reports, for
+a line of an event log another program wrote, and for a fragment a page
+streams:
 
 - `termtext.FuzzEscape`: neither escaper leaves a rune its policy names, and
   escaping twice changes nothing;
@@ -212,7 +220,10 @@ for a line of an event log another program wrote:
 - `display.FuzzCut`: a row cut to its columns shows what `termtext.Truncate`
   keeps of its text, with every colour sequence whole and none after the
   cut, and a row holding an escape that was shortened ends by setting the
-  colours back.
+  colours back;
+- `sse.FuzzFormat`: whatever HTML a fragment holds, a reader of the
+  stream reads back one event, with its name and its HTML, so no fragment
+  ends its event early or starts another.
 
 `make fuzz` runs each for `FUZZTIME`, 60 s unless told otherwise, and
 `FUZZ=progress:FuzzSanitize` runs one. CI runs each for a minute on every
