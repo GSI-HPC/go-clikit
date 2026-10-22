@@ -18,6 +18,7 @@
 //	github.com/GSI-HPC/go-clikit/cobratree                a strict cobra command tree, usage errors, the build info
 //	github.com/GSI-HPC/go-clikit/cobratree/cobratreetest  running a command tree in a test, checking a manual's command lines
 //	github.com/GSI-HPC/go-clikit/localweb                 the guard of a local web server: listener, Host and cross-site checks, headers
+//	github.com/GSI-HPC/go-clikit/localweb/session         the launch token exchanged for a session cookie, and the CSRF token
 //
 // A library package reports what it does through progress, which costs
 // nothing when no command is listening, and runs work for many targets with

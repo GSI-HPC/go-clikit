@@ -43,6 +43,7 @@ command-line code clusterctl and sind each carried
 | `cobratree` | a strict cobra command tree, usage errors, the build info |
 | `cobratree/cobratreetest` | running a command tree in a test, checking a manual's command lines |
 | `localweb` | the guard of a local web server: its listener, the Host and cross-site checks, the headers |
+| `localweb/session` | the launch token exchanged for a session cookie, and the CSRF token |
 
 ## Install
 

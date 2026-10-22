@@ -34,6 +34,7 @@ still change in a minor release (see Compatibility).
 | `cliout` | a command's result as a table aligned by display width, and as JSON, escaped | v0.6.0 |
 | `cobratree/cobratreetest` | running a command tree in a test, checking a manual's command lines | v0.6.0 |
 | `localweb` | the guard of a local web server: its listener, the Host and cross-site checks, the headers | v0.8.0 |
+| `localweb/session` | the launch token exchanged for a session cookie, and the CSRF token | v0.8.0 |
 
 ## Layout
 
@@ -94,6 +95,8 @@ still change in a minor release (see Compatibility).
   Unix socket; `peer_linux.go`, `PeerListener`, with `peer.go`;
   `serve.go`, `Serve` and `ServeOptions`. `socket_other.go` and
   `peer_other.go` are for systems that are not Unix, or not Linux.
+- `localweb/session/`: `session.go`, the package comment, `NewToken`,
+  `Options`, `Sessions`, `New`, `Middleware` and `CSRF`.
 - Every package has an `example_test.go`. Failing fuzz inputs go under the
   package's `testdata/fuzz/`.
 - `doc/`: `README.md` maps the documentation; `architecture.md` says how
