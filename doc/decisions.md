@@ -36,12 +36,13 @@ names it.
 | [24](#24-the-strict-command-tree-is-the-kits-in-cobratree) | The strict command tree is the kit's, in cobratree | accepted, refined by [29](#29-cobratree-words-flag-values-carries-exit-statuses-and-shows-help-topics) |
 | [25](#25-the-local-web-server-is-the-kits-in-localweb) | The local web server is the kit's, in localweb | accepted |
 | [26](#26-golangorgxsys-also-in-fsutil-and-localweb) | golang.org/x/sys also in fsutil and localweb | accepted |
-| [27](#27-progress-over-mcp-is-built-now-in-mcpprogress) | Progress over MCP is built now, in mcpprogress | accepted, refined by [32](#32-mcpprogress-sends-a-line-that-counts-targets-and-stops-on-the-first-failure) |
+| [27](#27-progress-over-mcp-is-built-now-in-mcpprogress) | Progress over MCP is built now, in mcpprogress | accepted, refined by [32](#32-mcpprogress-sends-a-line-that-counts-targets-and-stops-on-the-first-failure) and [33](#33-the-kit-reads-its-event-log-back-in-eventlog) |
 | [28](#28-code-of-the-programs-may-move-into-the-kit-under-the-kits-licence) | Code of the programs may move into the kit, under the kit's licence | accepted |
 | [29](#29-cobratree-words-flag-values-carries-exit-statuses-and-shows-help-topics) | cobratree words flag values, carries exit statuses and shows help topics | accepted |
 | [30](#30-a-commands-result-is-written-by-cliout-as-a-table-or-as-json-escaped) | A command's result is written by cliout, as a table or as JSON, escaped | accepted |
 | [31](#31-cliprogress-keeps-a-default-log-picks-colours-and-asks-questions) | cliprogress keeps a default log, picks colours and asks questions | accepted |
 | [32](#32-mcpprogress-sends-a-line-that-counts-targets-and-stops-on-the-first-failure) | mcpprogress sends a line that counts targets, and stops on the first failure | accepted |
+| [33](#33-the-kit-reads-its-event-log-back-in-eventlog) | The kit reads its event log back, in eventlog | accepted |
 
 ## 1. Apache-2.0, and GSI holds the copyright
 
@@ -1438,7 +1439,7 @@ without libc, which Apple does not support (decision 22). Without
 
 ## 27. Progress over MCP is built now, in mcpprogress
 
-Status: accepted, refined by [32](#32-mcpprogress-sends-a-line-that-counts-targets-and-stops-on-the-first-failure)
+Status: accepted, refined by [32](#32-mcpprogress-sends-a-line-that-counts-targets-and-stops-on-the-first-failure) and [33](#33-the-kit-reads-its-event-log-back-in-eventlog)
 
 ### Context
 
@@ -1713,3 +1714,59 @@ wrote the stack of a panic under its own name.
   progress; the call and its result are not touched.
 - The line counts in English words a client may show as they are; a
   change of them is a breaking change.
+
+## 33. The kit reads its event log back, in eventlog
+
+Status: accepted
+
+### Context
+
+The kit writes the event log, version 1, and holds the writer to a
+golden log. sind and brig each read it back with a parser of their own,
+for the view of their runs that their local web UI draws: sind about 600
+lines, which follow a log as cliprogress rotates it, bound the spans of a
+run and tell which runs changed, and brig 311 lines, an older fork of
+them. A third reader was due: sind's MCP tools run sind again as a child,
+in a process group of its own, so the server has no Bus for the child's
+work, and to send the child's progress with mcpprogress (decision 27) it
+must read the child's log back into events. A reader beside the writer
+lets the two be tested against each other.
+
+### Decision
+
+- A package `progress/eventlog` reads the log. It imports `progress`
+  alone, and nothing of the kit imports it.
+- `Decode` turns a line into a `Line`: the first line of a run, with its
+  trace context, program and version, or one of its events as a
+  `progress.Event`. It leaves out the keys and the values it does not
+  know, as the format asks of a reader, refuses a line it cannot read,
+  and sanitises every text as a Bus does. The texts of its errors are no
+  interface.
+- `Tail` reads a log as it grows, a `Poll` at a time, whole lines into a
+  `Feed`, and follows the rotation of decision 31: a log moved to its
+  ".1" copy is read to its end there, without a reset, and a log cut
+  short or made again resets the Feed and is read again. It starts no
+  goroutine; the program polls it on its own time.
+- `Forward` is the Feed of a server that runs a command as a child with
+  the child's log in a file of its own: it gives each event to a
+  `progress.Sink`, such as an `mcpprogress.Notifier`, once, by its run's
+  `seq`.
+- `Reducer` is the Feed of a view: it folds the lines into `Run` values,
+  each the tree of the spans of its command, with typed values, not the
+  log's strings. `Options.Keep`, 100 by default, and `Options.MaxSpans`,
+  131072 by default, bound what it holds.
+- The loop that polls, its timing, the rule that takes a run that has
+  not ended for a killed one, and the questions a page asks of a run,
+  such as counting its targets or grouping its failures, stay in the
+  programs: each has one user.
+- Seeds: sind's `internal/ui/activity`, with brig's handling of a log
+  moved to its copy.
+
+### Costs
+
+- A reader that follows the log polls it; a view that wants to be told
+  of a change at once still polls, as sind and brig do today.
+- The defaults of `Options` and `MaxLine` are API: changing them is a
+  breaking change.
+- A run whose Bus ran several commands one after the other, as the
+  golden log's does, shows the later commands below the first.
