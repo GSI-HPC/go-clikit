@@ -97,6 +97,7 @@ still change in a minor release (see Compatibility).
   Unix socket; `peer_linux.go`, `PeerListener`, with `peer.go`;
   `serve.go`, `Serve` and `ServeOptions`. `socket_other.go` and
   `peer_other.go` are for systems that are not Unix, or not Linux.
+  `peer_linux.go` holds `ListenerOwner` too.
 - `localweb/session/`: `session.go`, the package comment, `NewToken`,
   `Options`, `Sessions`, `New`, `Middleware` and `CSRF`.
 - `localweb/sse/`: `sse.go`, the package comment, `Serve`, `Options`,

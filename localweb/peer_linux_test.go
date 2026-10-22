@@ -141,7 +141,7 @@ func TestSocketOwner(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			uid, err := socketOwner(strings.NewReader(tt.in), client, server)
+			uid, err := socketOwner(strings.NewReader(tt.in), tcpEstablished, client, server)
 
 			if tt.err != "" {
 				if err == nil || !strings.Contains(err.Error(), tt.err) {
@@ -161,10 +161,81 @@ func TestSocketOwner(t *testing.T) {
 		boom := errors.New("boom")
 		r := io.MultiReader(strings.NewReader(procHeader), iotest.ErrReader(boom))
 
-		if _, err := socketOwner(r, client, server); !errors.Is(err, boom) {
+		if _, err := socketOwner(r, tcpEstablished, client, server); !errors.Is(err, boom) {
 			t.Errorf("socketOwner = %v, want boom", err)
 		}
 	})
+}
+
+func TestSocketOwnerOfAListener(t *testing.T) {
+	t.Parallel()
+
+	addr := netip.MustParseAddrPort("127.0.0.1:7374")
+	a := procAddr(addr, false)
+	anyRemote := procAddr(netip.MustParseAddrPort("0.0.0.0:0"), false)
+	tests := []struct {
+		name string
+		in   string
+		uid  int
+		err  string
+	}{
+		{name: "the listener", in: procHeader + procRow(a, anyRemote, "0A", 1000, "111"), uid: 1000},
+		{name: "after a connection to it", in: procHeader + procRow(a, procAddr(netip.MustParseAddrPort("127.0.0.1:50000"), false), "01", 1001, "222") +
+			procRow(a, anyRemote, "0A", 1000, "111"), uid: 1000},
+		{name: "on another port", in: procHeader + procRow(procAddr(netip.MustParseAddrPort("127.0.0.1:7375"), false), anyRemote, "0A", 1000, "111"),
+			err: "no such socket"},
+		{name: "on the any address", in: procHeader + procRow(procAddr(netip.MustParseAddrPort("0.0.0.0:7374"), false), anyRemote, "0A", 1000, "111"),
+			err: "no such socket"},
+		{name: "no inode", in: procHeader + procRow(a, anyRemote, "0A", 1000, "0"), err: "no such socket"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			uid, err := socketOwner(strings.NewReader(tt.in), tcpListen, addr, netip.AddrPort{})
+
+			if tt.err != "" {
+				if err == nil || !strings.Contains(err.Error(), tt.err) {
+					t.Errorf("socketOwner = %d, %v, want an error with %q", uid, err, tt.err)
+				}
+				return
+			}
+			if err != nil || uid != tt.uid {
+				t.Errorf("socketOwner = %d, %v, want %d", uid, err, tt.uid)
+			}
+		})
+	}
+}
+
+func TestListenerOwner(t *testing.T) {
+	t.Parallel()
+
+	for _, network := range []string{"tcp4", "tcp6"} {
+		t.Run(network, func(t *testing.T) {
+			t.Parallel()
+
+			host := "127.0.0.1"
+			if network == "tcp6" {
+				host = "[::1]"
+			}
+			l, err := net.Listen(network, host+":0")
+			if err != nil {
+				t.Skip(err)
+			}
+			defer func() { _ = l.Close() }()
+			addr := l.Addr().(*net.TCPAddr).AddrPort()
+
+			uid, err := ListenerOwner(addr)
+			if err != nil || uid != os.Getuid() {
+				t.Errorf("ListenerOwner(%s) = %d, %v, want %d", addr, uid, err, os.Getuid())
+			}
+
+			_ = l.Close()
+			if uid, err := ListenerOwner(addr); err == nil {
+				t.Errorf("ListenerOwner(%s) after Close = %d, want an error", addr, uid)
+			}
+		})
+	}
 }
 
 // writeTable writes the table net/<name> below root.
@@ -188,17 +259,17 @@ func TestTableOwner(t *testing.T) {
 	writeTable(t, root, "tcp", procHeader+procRow(procAddr(client, false), procAddr(server, false), "01", 1234, "5"))
 	path := filepath.Join(root, "net", "tcp")
 
-	uid, err := tableOwner(path, client, server)
+	uid, err := tableOwner(path, tcpEstablished, client, server)
 	if err != nil || uid != 1234 {
 		t.Errorf("tableOwner = %d, %v, want 1234", uid, err)
 	}
 
-	_, err = tableOwner(path, server, client)
+	_, err = tableOwner(path, tcpEstablished, server, client)
 	if err == nil || !strings.HasPrefix(err.Error(), path+": no such socket") {
 		t.Errorf("tableOwner of another socket = %v", err)
 	}
 
-	_, err = tableOwner(filepath.Join(root, "net", "missing"), client, server)
+	_, err = tableOwner(filepath.Join(root, "net", "missing"), tcpEstablished, client, server)
 	if !errors.Is(err, os.ErrNotExist) {
 		t.Errorf("tableOwner of a missing table = %v", err)
 	}
@@ -244,7 +315,7 @@ func TestProcOwner(t *testing.T) {
 				writeTable(t, root, "tcp6", *tt.tcp6)
 			}
 
-			uid, err := procOwner(root)(tt.local, tt.remote)
+			uid, err := procOwner(root, tcpEstablished)(tt.local, tt.remote)
 
 			if tt.err != "" {
 				if err == nil || !strings.Contains(err.Error(), tt.err) {

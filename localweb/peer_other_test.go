@@ -8,6 +8,7 @@ package localweb
 import (
 	"errors"
 	"net"
+	"net/netip"
 	"testing"
 )
 
@@ -24,5 +25,13 @@ func TestPeerListenerIsUnsupported(t *testing.T) {
 
 	if pl != nil || !errors.Is(err, errors.ErrUnsupported) {
 		t.Errorf("PeerListener = %v, %v, want errors.ErrUnsupported", pl, err)
+	}
+}
+
+func TestListenerOwnerIsUnsupported(t *testing.T) {
+	t.Parallel()
+
+	if _, err := ListenerOwner(netip.MustParseAddrPort("127.0.0.1:7374")); !errors.Is(err, errors.ErrUnsupported) {
+		t.Errorf("ListenerOwner = %v, want errors.ErrUnsupported", err)
 	}
 }
