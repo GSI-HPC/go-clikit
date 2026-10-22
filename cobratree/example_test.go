@@ -59,6 +59,34 @@ func ExampleUsagef() {
 	// false
 }
 
+// A program words the values its flags cannot parse, and those it refuses
+// itself, in one form.
+func ExampleFlagError() {
+	root := &cobra.Command{
+		Use:           "prog",
+		SilenceErrors: true,
+		SilenceUsage:  true,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			if output, _ := cmd.Flags().GetString("output"); output != "human" && output != "json" {
+				return cobratree.InvalidValue("output", output, "human or json")
+			}
+			return nil
+		},
+	}
+	root.Flags().IntP("count", "c", 1, "how many")
+	root.Flags().StringP("output", "o", "human", "human or json")
+	root.SetFlagErrorFunc(cobratree.FlagError)
+
+	for _, args := range [][]string{{"-c", "many"}, {"-o", "yaml"}} {
+		root.SetArgs(args)
+		err := root.Execute()
+		fmt.Println(cobratree.IsUsage(err), err)
+	}
+	// Output:
+	// true invalid --count value "many": want a whole number
+	// true invalid --output value "yaml": want human or json
+}
+
 // A program whose release builds inject their version with -ldflags falls
 // back to what the toolchain recorded, and words a build that is no
 // release as it likes.
