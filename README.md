@@ -37,6 +37,7 @@ command-line code clusterctl and sind each carried
 | `progress/progresstest` | capturing and checking the events a command reports |
 | `fanout` | bounded worker pools that report their targets as progress |
 | `cobratree` | a strict cobra command tree, usage errors, the build info |
+| `cobratree/cobratreetest` | running a command tree in a test, checking a manual's command lines |
 
 ## Install
 
