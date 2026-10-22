@@ -49,6 +49,7 @@ command-line code clusterctl and sind each carried
 | `localweb/launch` | one server per user, and the browser opened on it without the token in a command line |
 | `localweb/assets` | a page's static files at addresses with a hash, cached for good |
 | `localweb/page` | a page's templates in one set, and the answers to htmx |
+| `localweb/htmx` | htmx, its SSE extension and idiomorph, checked against their releases |
 
 ## Install
 
