@@ -35,7 +35,8 @@ still change in a minor release (see Compatibility).
 
 - `doc.go`: the package comment of `clikit`, which lists the packages.
 - `termtext/`: `escape.go`, the escaper and its policy (`doc.go`);
-  `width.go`, display widths and `Truncate`.
+  `width.go`, display widths and `Truncate`; `wrap.go`, `Wrap`;
+  `writer.go`, `NewEscapeWriter`.
 - `progress/`: `progress.go`, the vocabulary (kinds, states, classes, units,
   flags, `Fields`, `Event`, the sink interfaces and the options); `bus.go`,
   the `Bus`, spans and `Suspend`; `classify.go`, `Classify`, `ErrSkipped`

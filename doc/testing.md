@@ -174,7 +174,7 @@ interrupt too, keeps the contract above.
 
 ## Fuzzing
 
-Five fuzz targets check what must hold for any text a remote host sends,
+Six fuzz targets check what must hold for any text a remote host sends,
 for the rows a display draws in colour, and for the work a span reports:
 
 - `termtext.FuzzEscape`: neither escaper leaves a rune its policy names, and
@@ -183,6 +183,9 @@ for the rows a display draws in colour, and for the work a span reports:
   that fits its columns and is the longest that does, text that fits
   already is left as it is, and `Width` keeps to the bounds the widths of
   the runes set;
+- `termtext.FuzzWrap`: filled text keeps its words in their order, every
+  line starts with its indent, and a line wider than its columns holds one
+  word alone;
 - `progress.FuzzSanitize`: what comes out is UTF-8, holds nothing a terminal
   would act on, keeps to its bound and is the same when sanitised again;
 - `progress.FuzzMeter`: whatever events of spans that start, run, report

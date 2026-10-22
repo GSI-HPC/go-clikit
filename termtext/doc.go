@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // Package termtext makes untrusted text safe to write to a terminal, and
-// measures how many columns text takes there.
+// measures how many columns text takes there and fills text to a number of
+// them.
 //
 // Text from elsewhere, such as the output of a program on a remote host or
 // in a container, an error it returned, or a value a service reported, is
@@ -12,7 +13,8 @@
 // than it has. Escape and EscapeLines show such characters as visible
 // escapes instead. A program that escapes everything with this package, and
 // nothing with anything else, has one place to fix when a character turns
-// out to need escaping too.
+// out to need escaping too. NewEscapeWriter escapes a stream, such as the
+// output of a child program, line by line as it arrives.
 //
 // # Escape policy
 //
@@ -78,7 +80,8 @@
 // up to version 18.0: a wide character assigned later is counted as one
 // column, and a terminal that draws U+FE0F narrow shows less than Width
 // counts. Truncate shortens text to a number of columns with the same
-// widths. Both expect text that is already escaped: a control character or
-// an escape sequence is counted as the columns of its runes, not as what it
-// does to the terminal.
+// widths, and Wrap fills text into lines of that many columns, indents
+// included. All three expect text that is already escaped: a control
+// character or an escape sequence is counted as the columns of its runes,
+// not as what it does to the terminal.
 package termtext

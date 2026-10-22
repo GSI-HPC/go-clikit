@@ -89,6 +89,7 @@ jobs:
         include:
           - {package: termtext, target: FuzzEscape}
           - {package: termtext, target: FuzzTruncate}
+          - {package: termtext, target: FuzzWrap}
           - {package: progress, target: FuzzSanitize}
           - {package: progress, target: FuzzMeter}
           - {package: progress/display, target: FuzzCut}
