@@ -64,8 +64,10 @@ still change in a minor release (see Compatibility).
   `MapOptions`, `Item`, `Outcome`, `Summary` and `Failure`; `batches.go`;
   `recover.go`, `Recovered` and `PanicError`.
 - `cobratree/`: `cobratree.go`, the package comment and `Strict`;
-  `usage.go`, `Usage`, `Usagef` and `IsUsage`; `buildinfo.go`,
-  `BuildInfo` and `ReadBuildInfo`.
+  `usage.go`, `Usage`, `Usagef`, `IsUsage`, `InvalidValue` and
+  `FlagError`; `status.go`, `Coded` and `Status`; `help.go`,
+  `HelpTopics`; `buildinfo.go`, `BuildInfo`, `ReadBuildInfo` and
+  `Resolve`.
 - Every package has an `example_test.go`. Failing fuzz inputs go under the
   package's `testdata/fuzz/`.
 - `doc/`: `README.md` maps the documentation; `architecture.md` says how
@@ -136,7 +138,8 @@ go-test-coverage: `go install github.com/vladopajic/go-test-coverage/v2@latest`.
   `cliprogress.Modes` names, in their order, and the texts of the errors and
   notes `cliprogress` returns and writes, the refusals of the log's file
   included (decision 21), and the texts of the errors `cobratree.Strict`'s
-  checks return (decision 24). Changing any of them is a breaking change; a
+  checks return (decision 24), and those `cobratree.InvalidValue` and
+  `cobratree.FlagError` return (decision 29). Changing any of them is a breaking change; a
   new or stricter `Check` rule is one too.
 - The kit reads no environment: whether to draw in colour, NO_COLOR and
   TERM included, is the program's to decide, and a theme is a parameter;

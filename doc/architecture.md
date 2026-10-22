@@ -46,7 +46,7 @@ strict and to read the build info
 | `progress/cliprogress` | The words of `--progress` and the rule that picks a display from them, a command's `Run`, which makes and takes down its Bus, display, summary and event log, the private file the log is appended to, and the probes of a command's streams | `progress`, `progress/display`, `termtext`, `golang.org/x/sys` |
 | `progress/progresstest` | `Capture`, `Check`, `Watch` and its `Watcher`, and `Screen`, a terminal for tests | `progress`, `termtext`, `go-nodeset` |
 | `fanout` | `Each`, `Map` and `Batches`, the bounded pools that report their items as targets | `progress`, `go-nodeset` |
-| `cobratree` | `Strict`, which makes a cobra command tree strict about its command line, the usage errors, and the build info | cobra, pflag |
+| `cobratree` | `Strict`, which makes a cobra command tree strict about its command line, the usage errors and the words of a flag's value refused, exit statuses carried by errors, help topics, and the build info | cobra, pflag |
 
 Every arrow points down the table: nothing imports `cliprogress`,
 `progresstest` or `fanout`, only `cliprogress` imports `display`, `progress`
@@ -225,9 +225,11 @@ The kit knows no program. What depends on one is a parameter or a hook:
 | Where the notes go, and the display and the summary | `cliprogress.Options.Notes`, `cliprogress.Options.Stderr` |
 | Which of the program's writers, and its logger's, go through the display's Terminal | the writers of `cliprogress.Run.Writer` and `cliprogress.Run.Lines`, which the program puts in place of its own and puts back once `cliprogress.Run.Finish` has returned |
 | Whether a command that succeeded leaves the summary | the argument of `cliprogress.Run.Finish` |
-| How an error of the command line is reported | the program marks the errors `cliprogress.Choose` and `cliprogress.Start` return as its usage errors, with `cobratree.Usage` when it is built with cobra; `cobratree.Strict` marks those of its tree's argument checks, and `cobratree.IsUsage` tells them, and pflag's, from other errors, for the program's exit code |
+| How an error of the command line is reported | the program marks the errors `cliprogress.Choose` and `cliprogress.Start` return as its usage errors, with `cobratree.Usage` when it is built with cobra; `cobratree.Strict` marks those of its tree's argument checks, and `cobratree.IsUsage` tells them, and pflag's, from other errors, for the program's exit code; `cobratree.FlagError`, set as the tree's `FlagErrorFunc`, and `cobratree.InvalidValue` word a flag's value refused |
+| The exit status of an error that is no usage error, such as that of a host that could not be reached | the program's numbers, given where the cause is known with `cobratree.Coded` and read in main with `cobratree.Status` |
+| The topics help shows beside the commands, and their texts | the function the program passes `cobratree.HelpTopics`, and the `Short` and `Long` of the help command it returns |
 | The commands a program dropped, and what replaced them | the `moved` argument of `cobratree.Strict` |
-| How the program words its version: the word for a build that is no release, how much of the commit it shows, and a version injected at build time | the program, from the fields of `cobratree.BuildInfo`, which `cobratree.ReadBuildInfo` returns |
+| How the program words its version: the word for a build that is no release, how much of the commit it shows, and a version injected at build time | the program, from the fields of `cobratree.BuildInfo`, which `cobratree.ReadBuildInfo` returns, and `cobratree.Resolve` with what a release build set with -ldflags; `BuildInfo.Short` cuts the commit to the digits the program shows |
 | How the displays look: a theme, in how many colours, or none | `display.TreeOptions.Theme`, `display.CounterOptions.Theme`, `display.PlainOptions.Theme` and `display.Summary.Theme`, one of `display.Themes`, which `display.ParseTheme` reads, drawn in 256 colours, `Colours16` or `NoColours` by `Theme.In`; the zero `Theme` draws in no colour, as before (decisions 19 and 20); `cliprogress.Options.Theme` |
 
 A Bus hands on what it was told: `Bus.Program`, `Bus.PanicLog` and
