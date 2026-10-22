@@ -182,7 +182,7 @@ port in use, or that binds an address it was not asked for. The Unix
 socket's rules are tested on directories the test makes, with the owners
 a test gives, so they hold as root and as a user. `PeerListener` reads
 tables in the format of `/proc/net/tcp` and `tcp6`, and a real connection
-of the test's own user.
+of the test's own user; `ListenerOwner` a real listener of it.
 
 `localweb/localwebtest` is how a program tests its server, and how the
 kit tests `session` and `sse`: `Login` signs in with the launch token as

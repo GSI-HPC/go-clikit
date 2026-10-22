@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"net/netip"
 )
 
 // PeerListener returns a listener that accepts from l only the TCP
@@ -25,4 +26,17 @@ import (
 // told is closed.
 func PeerListener(net.Listener, int, func(error)) (net.Listener, error) {
 	return nil, fmt.Errorf("the owner of a TCP connection cannot be told on this system: %w", errors.ErrUnsupported)
+}
+
+// ListenerOwner returns the user ID of the TCP socket that listens at
+// addr, such as the one a program recorded when it started: before a
+// program hands a browser the address and token of a server it did not
+// start, it checks that the server is the user's own, as another user can
+// listen on a port that was given up.
+//
+// On Linux, ListenerOwner reads it from /proc/net/tcp and /proc/net/tcp6,
+// and trusts only a socket that a process holds, bound to addr itself. On
+// other systems it returns an error that matches errors.ErrUnsupported.
+func ListenerOwner(netip.AddrPort) (int, error) {
+	return 0, fmt.Errorf("the owner of a TCP socket cannot be told on this system: %w", errors.ErrUnsupported)
 }

@@ -31,24 +31,40 @@ import (
 // socket (Listen), or refuse to start. A connection whose owner cannot be
 // told is closed.
 func PeerListener(l net.Listener, uid int, refused func(error)) (net.Listener, error) {
-	return &peerListener{Listener: l, uid: uid, owner: procOwner("/proc"), refused: refused}, nil
+	return &peerListener{Listener: l, uid: uid, owner: procOwner("/proc", tcpEstablished), refused: refused}, nil
 }
 
-// tcpEstablished is the state of an established socket in /proc/net/tcp.
-const tcpEstablished = "01"
+// ListenerOwner returns the user ID of the TCP socket that listens at
+// addr, such as the one a program recorded when it started: before a
+// program hands a browser the address and token of a server it did not
+// start, it checks that the server is the user's own, as another user can
+// listen on a port that was given up.
+//
+// On Linux, ListenerOwner reads it from /proc/net/tcp and /proc/net/tcp6,
+// and trusts only a socket that a process holds, bound to addr itself. On
+// other systems it returns an error that matches errors.ErrUnsupported.
+func ListenerOwner(addr netip.AddrPort) (int, error) {
+	return procOwner("/proc", tcpListen)(addr, netip.AddrPort{})
+}
 
-// procOwner returns a lookup of the owner of a socket in the tables
-// net/tcp and net/tcp6 below procRoot, which is /proc on a host. An IPv4
-// connection is in net/tcp, or in net/tcp6 when its client used a socket
-// of both families; an IPv6 one is in net/tcp6.
-func procOwner(procRoot string) func(local, remote netip.AddrPort) (int, error) {
+// The states of a socket in /proc/net/tcp.
+const (
+	tcpEstablished = "01"
+	tcpListen      = "0A"
+)
+
+// procOwner returns a lookup of the owner of a socket in state in the
+// tables net/tcp and net/tcp6 below procRoot, which is /proc on a host. An
+// IPv4 socket is in net/tcp, or in net/tcp6 when it is one of both
+// families; an IPv6 one is in net/tcp6.
+func procOwner(procRoot, state string) func(local, remote netip.AddrPort) (int, error) {
 	return func(local, remote netip.AddrPort) (int, error) {
 		var errs []error
 		for _, table := range []string{"tcp", "tcp6"} {
 			if table == "tcp" && !local.Addr().Is4() {
 				continue
 			}
-			uid, err := tableOwner(filepath.Join(procRoot, "net", table), local, remote)
+			uid, err := tableOwner(filepath.Join(procRoot, "net", table), state, local, remote)
 			if err == nil {
 				return uid, nil
 			}
@@ -58,15 +74,15 @@ func procOwner(procRoot string) func(local, remote netip.AddrPort) (int, error) 
 	}
 }
 
-// tableOwner returns the owner of the socket at local connected to remote
-// in the table at path.
-func tableOwner(path string, local, remote netip.AddrPort) (int, error) {
+// tableOwner returns the owner of the socket in state at local connected
+// to remote in the table at path.
+func tableOwner(path, state string, local, remote netip.AddrPort) (int, error) {
 	f, err := os.Open(path)
 	if err != nil {
 		return 0, err
 	}
 	defer func() { _ = f.Close() }()
-	uid, err := socketOwner(f, local, remote)
+	uid, err := socketOwner(f, state, local, remote)
 	if err != nil {
 		return 0, fmt.Errorf("%s: %w", path, err)
 	}
@@ -74,21 +90,22 @@ func tableOwner(path string, local, remote netip.AddrPort) (int, error) {
 }
 
 // socketOwner reads a table in the format of /proc/net/tcp or tcp6 and
-// returns the uid of the established socket that is bound to local and
-// connected to remote. Only a socket with an inode counts: one in
+// returns the uid of the socket in state that is bound to local and
+// connected to remote; a listening socket is connected to nothing, and
+// remote is not looked at. Only a socket with an inode counts: one in
 // TIME_WAIT, or one that no process has accepted yet, has none, and its uid
 // is not that of a process.
-func socketOwner(r io.Reader, local, remote netip.AddrPort) (int, error) {
+func socketOwner(r io.Reader, state string, local, remote netip.AddrPort) (int, error) {
 	sc := bufio.NewScanner(r)
 	sc.Scan() // the header
 	for sc.Scan() {
 		f := strings.Fields(sc.Text())
-		if len(f) < 10 || f[3] != tcpEstablished || f[9] == "0" {
+		if len(f) < 10 || f[3] != state || f[9] == "0" {
 			continue
 		}
 		l, err1 := parseProcAddr(f[1])
 		r, err2 := parseProcAddr(f[2])
-		if err1 != nil || err2 != nil || l != local || r != remote {
+		if err1 != nil || err2 != nil || l != local || state != tcpListen && r != remote {
 			continue
 		}
 		return strconv.Atoi(f[7])
