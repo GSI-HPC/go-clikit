@@ -174,8 +174,9 @@ interrupt too, keeps the contract above.
 
 ## Fuzzing
 
-Six fuzz targets check what must hold for any text a remote host sends,
-for the rows a display draws in colour, and for the work a span reports:
+Seven fuzz targets check what must hold for any text a remote host sends,
+for the rows a display draws in colour, for the work a span reports, and
+for a line of an event log another program wrote:
 
 - `termtext.FuzzEscape`: neither escaper leaves a rune its policy names, and
   escaping twice changes nothing;
@@ -193,6 +194,9 @@ for the rows a display draws in colour, and for the work a span reports:
   amount as its own and that of every span below it in its unit, those
   that ended included, gives a span with work of its own a reading in its
   unit, and holds every share to 0 to 1;
+- `eventlog.FuzzDecode`: a line `Decode` reads, written again by
+  `progress.Log` and read again, is what it read, so the reader and the
+  writer agree on every line either takes;
 - `display.FuzzCut`: a row cut to its columns shows what `termtext.Truncate`
   keeps of its text, with every colour sequence whole and none after the
   cut, and a row holding an escape that was shortened ends by setting the

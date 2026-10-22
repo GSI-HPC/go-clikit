@@ -26,6 +26,7 @@ still change in a minor release (see Compatibility).
 | `progress/display` | the live tree, the counter, plain lines, the summary | v0.1.0 |
 | `progress/progresstest` | capturing and checking the events a command reports | v0.1.0 |
 | `progress/mcpprogress` | a tool call's progress as MCP progress notifications | v0.6.0 |
+| `progress/eventlog` | reading back the event log a program or its child wrote | v0.7.0 |
 | `fanout` | bounded worker pools that report their targets as progress | v0.1.0 |
 | `fanout/fanouttest` | counting the calls a fake is in the middle of, to prove a limit | v0.6.0 |
 | `progress/cliprogress` | the words of `--progress`, a command's display and event log, the private log file, colours, questions | v0.3.0 |
@@ -69,6 +70,8 @@ still change in a minor release (see Compatibility).
   flock.
 - `progress/mcpprogress/`: `mcpprogress.go`, the package comment,
   `Notifier` and `Options`.
+- `progress/eventlog/`: `eventlog.go`, the package comment, `Line` and
+  `Decode`.
 - `fanout/`: `each.go`, `Each` and the package comment; `map.go`, `Map`,
   `MapOptions`, `Item`, `Outcome`, `Summary` and `Failure`; `batches.go`;
   `recover.go`, `Recovered` and `PanicError`; `keyed.go`, `Keyed`.
