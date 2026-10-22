@@ -71,7 +71,8 @@ still change in a minor release (see Compatibility).
 - `progress/mcpprogress/`: `mcpprogress.go`, the package comment,
   `Notifier` and `Options`.
 - `progress/eventlog/`: `eventlog.go`, the package comment, `Line` and
-  `Decode`.
+  `Decode`; `tail.go`, `Tail`, `Feed` and `MaxLine`; `forward.go`,
+  `Forward`.
 - `fanout/`: `each.go`, `Each` and the package comment; `map.go`, `Map`,
   `MapOptions`, `Item`, `Outcome`, `Summary` and `Failure`; `batches.go`;
   `recover.go`, `Recovered` and `PanicError`; `keyed.go`, `Keyed`.

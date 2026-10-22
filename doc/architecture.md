@@ -46,7 +46,7 @@ strict and to read the build info
 | `progress/cliprogress` | The words of `--progress` and the rule that picks a display from them, a command's `Run`, which makes and takes down its Bus, display, summary and event log, the private file the log is appended to, a default log kept unasked and moved aside, the colours a terminal shows, a question asked with the display off, and the probes of a command's streams | `progress`, `progress/display`, `termtext`, `golang.org/x/sys` |
 | `progress/progresstest` | `Capture`, `Check`, `Watch` and its `Watcher`, and `Screen`, a terminal for tests | `progress`, `termtext`, `go-nodeset` |
 | `progress/mcpprogress` | `Notifier`, a sink that sends a tool call's progress as MCP progress notifications, through a `Send` the server gives it | `progress` |
-| `progress/eventlog` | `Decode`, which reads a line of the event log back into the first line of a run or one of its events, as a `progress.Event` | `progress` |
+| `progress/eventlog` | `Decode`, which reads a line of the event log back into the first line of a run or one of its events, as a `progress.Event`; `Tail`, which reads a log as it grows and is rotated; and `Forward`, which gives the events a child logged to a sink | `progress` |
 | `fanout` | `Each`, `Map` and `Batches`, the bounded pools that report their items as targets, and `Keyed`, which bounds the work under way on each key, such as a host | `progress`, `go-nodeset` |
 | `fanout/fanouttest` | `InFlight`, which counts the calls a test's fake is in the middle of, and holds them to prove a limit | none |
 | `cliout` | `Table`, a command's result in columns aligned by the columns a terminal gives them, and `WriteJSON`, every cell and string escaped | `termtext` |
@@ -170,6 +170,9 @@ counts the advances it leaves out in `leftOut`; they are the only gaps in
   most every 500 ms and at once as a step or a batch ends; its `Close`,
   after the Bus's, sends what is left, so that nothing follows the
   answer to the call.
+  `eventlog.Tail` starts no goroutine: the program polls it from one of
+  its own, and the Feed it gives the lines to, and a sink behind
+  `eventlog.Forward`, are called there, under no lock of the kit's.
 - **The terminal is lent.** `progress.Suspend` calls every sink that is a
   `Suspender` outside the lock, and returns once each display is off the
   terminal, so that a question can be asked there; the function it returns
@@ -246,7 +249,7 @@ The kit knows no program. What depends on one is a parameter or a hook:
 | The exit status of an error that is no usage error, such as that of a host that could not be reached | the program's numbers, given where the cause is known with `cobratree.Coded` and read in main with `cobratree.Status` |
 | The topics help shows beside the commands, and their texts | the function the program passes `cobratree.HelpTopics`, and the `Short` and `Long` of the help command it returns |
 | The commands a program dropped, and what replaced them | the `moved` argument of `cobratree.Strict` |
-| Whether a tool call's progress is sent over MCP, and on which session, with which token | the server, which gives a call that came with a progress token a Bus of its own with an `mcpprogress.Notifier` among its sinks, and puts the token in what the `Send` of `mcpprogress.Options` sends |
+| Whether a tool call's progress is sent over MCP, and on which session, with which token | the server, which gives a call that came with a progress token a Bus of its own with an `mcpprogress.Notifier` among its sinks, and puts the token in what the `Send` of `mcpprogress.Options` sends; a server that runs the call as a child gives the child an event log of its own and polls it with `eventlog.Tail`, through `eventlog.Forward` to the Notifier, while the child runs and once after |
 | How the program words its version: the word for a build that is no release, how much of the commit it shows, and a version injected at build time | the program, from the fields of `cobratree.BuildInfo`, which `cobratree.ReadBuildInfo` returns, and `cobratree.Resolve` with what a release build set with -ldflags; `BuildInfo.Short` cuts the commit to the digits the program shows |
 | How the displays look: a theme, in how many colours, or none | `display.TreeOptions.Theme`, `display.CounterOptions.Theme`, `display.PlainOptions.Theme` and `display.Summary.Theme`, one of `display.Themes`, which `display.ParseTheme` reads, drawn in 256 colours, `Colours16` or `NoColours` by `Theme.In`; the zero `Theme` draws in no colour, as before (decisions 19 and 20); `cliprogress.Options.Theme`; `cliprogress.ThemeFor` picks the colours from what the program read of NO_COLOR, TERM and COLORTERM |
 

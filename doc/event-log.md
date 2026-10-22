@@ -145,6 +145,18 @@ again with `progress.Log` and compares the two, line for line, so the
 reader and the writer cannot drift apart; a fuzz target holds the same
 for any line the reader takes.
 
+`Tail` reads a log as it grows, a poll at a time, whole lines only, and
+leaves out a line longer than `MaxLine`, 1 MiB. It follows the rotation
+of `progress/cliprogress`: the copy with ".1" after the log's name is
+read first, and read on while a command that had the log open when it
+was moved still writes there. A log cut short, or made again, is read
+again from its start, and the reader it feeds is told to forget what it
+had. `Forward` gives the events of the lines it reads to a
+`progress.Sink`, each once, by the `seq` of its run, so that a log read
+again gives no event twice: what a server that runs a command as a
+child, with the child's log in a file of its own, sends on as the
+child's progress.
+
 ## The golden log
 
 `progress/testdata/log-v1.jsonl` is a run that has every key this document
