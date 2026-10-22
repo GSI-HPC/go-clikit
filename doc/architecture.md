@@ -3,7 +3,7 @@
 
 # Architecture
 
-The kit is ten packages that a command-line program and the library
+The kit is eleven packages that a command-line program and the library
 packages it calls share: a library reports what it does, and the command
 decides how that is shown. This document says where the packages came from,
 how they fit together, what runs on which goroutine, what a program fills
@@ -45,6 +45,7 @@ strict and to read the build info
 | `progress/display` | The `Terminal` a display shares with the command, the live `Tree`, the `Counter`, `Plain` lines and the `Summary` | `progress`, `termtext`, `go-nodeset` |
 | `progress/cliprogress` | The words of `--progress` and the rule that picks a display from them, a command's `Run`, which makes and takes down its Bus, display, summary and event log, the private file the log is appended to, a default log kept unasked and moved aside, the colours a terminal shows, a question asked with the display off, and the probes of a command's streams | `progress`, `progress/display`, `termtext`, `golang.org/x/sys` |
 | `progress/progresstest` | `Capture`, `Check`, `Watch` and its `Watcher`, and `Screen`, a terminal for tests | `progress`, `termtext`, `go-nodeset` |
+| `progress/mcpprogress` | `Notifier`, a sink that sends a tool call's progress as MCP progress notifications, through a `Send` the server gives it | `progress` |
 | `fanout` | `Each`, `Map` and `Batches`, the bounded pools that report their items as targets, and `Keyed`, which bounds the work under way on each key, such as a host | `progress`, `go-nodeset` |
 | `fanout/fanouttest` | `InFlight`, which counts the calls a test's fake is in the middle of, and holds them to prove a limit | none |
 | `cliout` | `Table`, a command's result in columns aligned by the columns a terminal gives them, and `WriteJSON`, every cell and string escaped | `termtext` |
@@ -52,13 +53,14 @@ strict and to read the build info
 | `cobratree/cobratreetest` | `Run`, which runs a command tree in a test and keeps its standard output and standard error apart, and `CheckCommandLines`, which checks the command lines of a manual against the tree | `cobratree`, cobra, pflag |
 
 Every arrow points down the table: nothing imports `cliprogress`,
-`progresstest` or `fanout`, only `cliprogress` imports `display`,
+`progresstest`, `mcpprogress` or `fanout`, only `cliprogress` imports `display`,
 `progress` imports only `termtext`, and `termtext` only
 `golang.org/x/text`. `cliout` imports only `termtext`. `cobratree` stands
 apart: it imports no package of the kit, and none imports it but
 `cobratree/cobratreetest`. A library imports `progress`, and `fanout` when
 it works on many items; the command imports `cliprogress`, or `display`
-when it picks its displays by a rule of its own, `cliout` to write its
+when it picks its displays by a rule of its own, an MCP server
+`mcpprogress`, `cliout` to write its
 result, and `cobratree` when it is built with cobra; tests import
 `progresstest`, `fanouttest` for a limit, and `cobratreetest` for a
 command tree. `go-nodeset` folds the names of targets into node sets,
@@ -162,6 +164,10 @@ counts the advances it leaves out in `leftOut`; they are the only gaps in
   the counter; a test calls `Draw` instead, on a clock it moves. The event
   log writes from a goroutine of its own too, in whole lines, and stops,
   rather than hold the work up, when its writer falls 8 MiB behind.
+  `mcpprogress.Notifier` sends from a goroutine of its own as well, at
+  most every 500 ms and at once as a step or a batch ends; its `Close`,
+  after the Bus's, sends what is left, so that nothing follows the
+  answer to the call.
 - **The terminal is lent.** `progress.Suspend` calls every sink that is a
   `Suspender` outside the lock, and returns once each display is off the
   terminal, so that a question can be asked there; the function it returns
@@ -238,6 +244,7 @@ The kit knows no program. What depends on one is a parameter or a hook:
 | The exit status of an error that is no usage error, such as that of a host that could not be reached | the program's numbers, given where the cause is known with `cobratree.Coded` and read in main with `cobratree.Status` |
 | The topics help shows beside the commands, and their texts | the function the program passes `cobratree.HelpTopics`, and the `Short` and `Long` of the help command it returns |
 | The commands a program dropped, and what replaced them | the `moved` argument of `cobratree.Strict` |
+| Whether a tool call's progress is sent over MCP, and on which session, with which token | the server, which gives a call that came with a progress token a Bus of its own with an `mcpprogress.Notifier` among its sinks, and puts the token in what the `Send` of `mcpprogress.Options` sends |
 | How the program words its version: the word for a build that is no release, how much of the commit it shows, and a version injected at build time | the program, from the fields of `cobratree.BuildInfo`, which `cobratree.ReadBuildInfo` returns, and `cobratree.Resolve` with what a release build set with -ldflags; `BuildInfo.Short` cuts the commit to the digits the program shows |
 | How the displays look: a theme, in how many colours, or none | `display.TreeOptions.Theme`, `display.CounterOptions.Theme`, `display.PlainOptions.Theme` and `display.Summary.Theme`, one of `display.Themes`, which `display.ParseTheme` reads, drawn in 256 colours, `Colours16` or `NoColours` by `Theme.In`; the zero `Theme` draws in no colour, as before (decisions 19 and 20); `cliprogress.Options.Theme`; `cliprogress.ThemeFor` picks the colours from what the program read of NO_COLOR, TERM and COLORTERM |
 
