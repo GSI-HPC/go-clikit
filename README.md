@@ -35,6 +35,7 @@ command-line code clusterctl and sind each carried
 | `progress/display` | the live tree, the counter, plain lines, the summary |
 | `progress/cliprogress` | the words of `--progress`, a command's display and event log, the private log file |
 | `progress/progresstest` | capturing and checking the events a command reports |
+| `progress/mcpprogress` | a tool call's progress as MCP progress notifications |
 | `fanout` | bounded worker pools that report their targets as progress |
 | `fanout/fanouttest` | counting the calls a fake is in the middle of, to prove a limit |
 | `cliout` | a command's result as a table aligned by display width, and as JSON, escaped |
