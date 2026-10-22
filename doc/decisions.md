@@ -36,11 +36,12 @@ names it.
 | [24](#24-the-strict-command-tree-is-the-kits-in-cobratree) | The strict command tree is the kit's, in cobratree | accepted, refined by [29](#29-cobratree-words-flag-values-carries-exit-statuses-and-shows-help-topics) |
 | [25](#25-the-local-web-server-is-the-kits-in-localweb) | The local web server is the kit's, in localweb | accepted |
 | [26](#26-golangorgxsys-also-in-fsutil-and-localweb) | golang.org/x/sys also in fsutil and localweb | accepted |
-| [27](#27-progress-over-mcp-is-built-now-in-mcpprogress) | Progress over MCP is built now, in mcpprogress | accepted |
+| [27](#27-progress-over-mcp-is-built-now-in-mcpprogress) | Progress over MCP is built now, in mcpprogress | accepted, refined by [32](#32-mcpprogress-sends-a-line-that-counts-targets-and-stops-on-the-first-failure) |
 | [28](#28-code-of-the-programs-may-move-into-the-kit-under-the-kits-licence) | Code of the programs may move into the kit, under the kit's licence | accepted |
 | [29](#29-cobratree-words-flag-values-carries-exit-statuses-and-shows-help-topics) | cobratree words flag values, carries exit statuses and shows help topics | accepted |
 | [30](#30-a-commands-result-is-written-by-cliout-as-a-table-or-as-json-escaped) | A command's result is written by cliout, as a table or as JSON, escaped | accepted |
 | [31](#31-cliprogress-keeps-a-default-log-picks-colours-and-asks-questions) | cliprogress keeps a default log, picks colours and asks questions | accepted |
+| [32](#32-mcpprogress-sends-a-line-that-counts-targets-and-stops-on-the-first-failure) | mcpprogress sends a line that counts targets, and stops on the first failure | accepted |
 
 ## 1. Apache-2.0, and GSI holds the copyright
 
@@ -1437,7 +1438,7 @@ without libc, which Apple does not support (decision 22). Without
 
 ## 27. Progress over MCP is built now, in mcpprogress
 
-Status: accepted
+Status: accepted, refined by [32](#32-mcpprogress-sends-a-line-that-counts-targets-and-stops-on-the-first-failure)
 
 ### Context
 
@@ -1672,3 +1673,43 @@ program.
   a different file for that run; none of their lines is lost.
 - `Ask` leaves a goroutine reading standard input once its context ends,
   since a read cannot be stopped; the next read of that input races it.
+
+## 32. mcpprogress sends a line that counts targets, and stops on the first failure
+
+Status: accepted
+
+### Context
+
+Decision 27 moved clusterctl's notifier into the kit and made its rate
+and its rule that progress only grows interfaces. It left open what the
+package's API is, what the line of a notification says, and what a
+notification that cannot be sent does. clusterctl's notifier took the
+SDK's notification as its argument, ignored the error of a send, and
+wrote the stack of a panic under its own name.
+
+### Decision
+
+- `Notifier` is a `progress.Sink` made by `New(Options)`, which starts the
+  goroutine it sends from; `Close`, called after the Bus's, stops it and
+  sends what is left. `Options.Send` takes the progress, the total and
+  the line as plain values, so the package imports no MCP SDK; the
+  server puts the progress token in what it sends.
+- The progress and the total count targets, as decision 27 and the
+  package comment say. The line is clusterctl's: the root that started
+  last, "name: 3/16 done", with "batch i/n" first where it runs in
+  batches and "1 failed", "1 canceled" and "1 skipped" after, and "; 6/12
+  in all" where the numbers count more than that root.
+- A `Send` that returns an error stops the Notifier, since the session
+  that cannot take one notification takes none after it. A `Send` that
+  panics stops it too, with "prog: progress notifications stopped:" and
+  the stack in `Options.PanicLog`, standard error when nil, as a Bus
+  does for a sink.
+- Interfaces beyond the Go API: `Interval`, the rule that progress only
+  grows, and the words of the line.
+
+### Costs
+
+- A send that fails once, for a reason that would pass, ends the call's
+  progress; the call and its result are not touched.
+- The line counts in English words a client may show as they are; a
+  change of them is a breaking change.
