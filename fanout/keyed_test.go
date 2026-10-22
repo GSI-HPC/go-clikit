@@ -7,27 +7,15 @@ import (
 	"context"
 	"errors"
 	"sync"
-	"sync/atomic"
 	"testing"
 	"testing/synctest"
 	"time"
 
 	"github.com/GSI-HPC/go-clikit/fanout"
+	"github.com/GSI-HPC/go-clikit/fanout/fanouttest"
 	"github.com/GSI-HPC/go-clikit/progress"
 	"github.com/GSI-HPC/go-clikit/progress/progresstest"
 )
-
-// gauge counts the calls under way and the most there were at once.
-type gauge struct{ now, peak atomic.Int32 }
-
-// enter counts a call in, and returns the function that counts it out.
-func (g *gauge) enter() (leave func()) {
-	n := g.now.Add(1)
-	for p := g.peak.Load(); n > p && !g.peak.CompareAndSwap(p, n); {
-		p = g.peak.Load()
-	}
-	return func() { g.now.Add(-1) }
-}
 
 // Each key is bounded on its own: work on one key waits for a place there,
 // and work on another is not held up by it. Each holder waits a second of
@@ -52,8 +40,8 @@ func TestKeyedBoundsEachKeyOnItsOwn(t *testing.T) {
 			t.Parallel()
 			synctest.Test(t, func(t *testing.T) {
 				keys := &fanout.Keyed{Limit: tc.limit}
-				on := map[string]*gauge{"gw1.example.org": {}, "gw2.example.org": {}}
-				var both gauge
+				on := map[string]*fanouttest.InFlight{"gw1.example.org": {}, "gw2.example.org": {}}
+				var both fanouttest.InFlight
 				var wg sync.WaitGroup
 				for key, calls := range on {
 					for range 10 {
@@ -64,19 +52,19 @@ func TestKeyedBoundsEachKeyOnItsOwn(t *testing.T) {
 								return
 							}
 							defer release()
-							defer calls.enter()()
-							defer both.enter()()
+							defer calls.Enter()()
+							defer both.Enter()()
 							time.Sleep(time.Second)
 						})
 					}
 				}
 				wg.Wait()
 				for key, calls := range on {
-					if got := int(calls.peak.Load()); got != tc.want {
+					if got := calls.Peak(); got != tc.want {
 						t.Errorf("%s: %d were under way at once, want %d", key, got, tc.want)
 					}
 				}
-				if got := int(both.peak.Load()); got != 2*tc.want {
+				if got := both.Peak(); got != 2*tc.want {
 					t.Errorf("%d were under way on both keys at once, want %d: one key held up the other", got, 2*tc.want)
 				}
 			})
@@ -245,7 +233,7 @@ func TestKeyedBoundsPoolsSideBySide(t *testing.T) {
 
 	synctest.Test(t, func(t *testing.T) {
 		keys := &fanout.Keyed{Limit: 2}
-		var calls gauge
+		var calls fanouttest.InFlight
 		var wg sync.WaitGroup
 		for range 2 {
 			wg.Go(func() {
@@ -256,13 +244,13 @@ func TestKeyedBoundsPoolsSideBySide(t *testing.T) {
 						return
 					}
 					defer release()
-					defer calls.enter()()
+					defer calls.Enter()()
 					time.Sleep(time.Second)
 				})
 			})
 		}
 		wg.Wait()
-		if got := calls.peak.Load(); got != 2 {
+		if got := calls.Peak(); got != 2 {
 			t.Errorf("%d were under way at once through one key, want 2", got)
 		}
 	})
@@ -278,7 +266,7 @@ func TestKeyedAsWhatMapAcquires(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		ctx, w := progresstest.Watch(context.Background(), t)
 		keys := &fanout.Keyed{Limit: 4}
-		var calls gauge
+		var calls fanouttest.InFlight
 		refused := errors.New("no place for exe2")
 		outcomes, _ := fanout.Map(ctx, nodes(8), fanout.MapOptions[string]{
 			Step:  "check",
@@ -295,14 +283,14 @@ func TestKeyedAsWhatMapAcquires(t *testing.T) {
 				return keys.Acquire(ctx, "gw.example.org")
 			},
 		}, func(context.Context, string) (struct{}, error) {
-			defer calls.enter()()
+			defer calls.Enter()()
 			time.Sleep(time.Second)
 			return struct{}{}, nil
 		})
 		if o := outcomes[1]; o.Started || !errors.Is(o.Err, refused) {
 			t.Errorf("the outcome of exe2 is %+v, want it never started, with the refusal", o)
 		}
-		if got := calls.peak.Load(); got != 4 {
+		if got := calls.Peak(); got != 4 {
 			t.Errorf("%d items were under way at once through one key, want 4", got)
 		}
 		want := `step check total=8 limit=8 [fold]: failed (target): 1 of 8 failed: exe2
