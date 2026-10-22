@@ -42,3 +42,11 @@ func TestUsage(t *testing.T) {
 		t.Errorf("errors.Is(%v, fs.ErrInvalid) = false, want true", err)
 	}
 }
+
+func TestInvalidValue(t *testing.T) {
+	err := cobratree.InvalidValue("output", "ya\nml", "human or json")
+	want := `invalid --output value "ya\nml": want human or json`
+	if err.Error() != want || !cobratree.IsUsage(err) {
+		t.Errorf("InvalidValue = %v, want the usage error %q", err, want)
+	}
+}
