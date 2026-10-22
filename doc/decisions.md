@@ -33,11 +33,12 @@ names it.
 | [21](#21-the-command-lines-glue-for-progress-is-the-kits) | The command line's glue for progress is the kit's | accepted |
 | [22](#22-the-kit-may-require-golangorgxsys-in-cliprogress-alone) | The kit may require golang.org/x/sys, in cliprogress alone | accepted, refined by [26](#26-golangorgxsys-also-in-fsutil-and-localweb) |
 | [23](#23-a-span-reports-its-work-sampled-and-a-sink-rolls-it-up) | A span reports its work, sampled, and a sink rolls it up | accepted |
-| [24](#24-the-strict-command-tree-is-the-kits-in-cobratree) | The strict command tree is the kit's, in cobratree | accepted |
+| [24](#24-the-strict-command-tree-is-the-kits-in-cobratree) | The strict command tree is the kit's, in cobratree | accepted, refined by [29](#29-cobratree-words-flag-values-carries-exit-statuses-and-shows-help-topics) |
 | [25](#25-the-local-web-server-is-the-kits-in-localweb) | The local web server is the kit's, in localweb | accepted |
 | [26](#26-golangorgxsys-also-in-fsutil-and-localweb) | golang.org/x/sys also in fsutil and localweb | accepted |
 | [27](#27-progress-over-mcp-is-built-now-in-mcpprogress) | Progress over MCP is built now, in mcpprogress | accepted |
 | [28](#28-code-of-the-programs-may-move-into-the-kit-under-the-kits-licence) | Code of the programs may move into the kit, under the kit's licence | accepted |
+| [29](#29-cobratree-words-flag-values-carries-exit-statuses-and-shows-help-topics) | cobratree words flag values, carries exit statuses and shows help topics | accepted |
 
 ## 1. Apache-2.0, and GSI holds the copyright
 
@@ -1240,7 +1241,7 @@ each copy something showed its share done only as targets ended.
 
 ## 24. The strict command tree is the kit's, in cobratree
 
-Status: accepted
+Status: accepted, refined by [29](#29-cobratree-words-flag-values-carries-exit-statuses-and-shows-help-topics)
 
 ### Context
 
@@ -1495,3 +1496,63 @@ the kit's copyright.
 - The statement is a record of the maintainer's decision. It is not legal
   advice, and it does not cover a contribution that someone else made to
   one of the repositories.
+
+## 29. cobratree words flag values, carries exit statuses and shows help topics
+
+Status: accepted. Refines [24](#24-the-strict-command-tree-is-the-kits-in-cobratree).
+
+### Context
+
+Once `cobratree` held the strict tree, the programs still carried the
+plumbing next to it, each its own way:
+
+- sind words a flag's value that pflag cannot parse, and one it refuses
+  itself, in one form, `invalid --output value "yaml": want human or
+  json`, through a `FlagErrorFunc`; clusterctl sets a `FlagErrorFunc` of
+  its own, and brig and sdash print pflag's text, which quotes Go's
+  parser: `invalid argument "x" for "-c, --count" flag: strconv.ParseInt:
+  parsing "x": invalid syntax`.
+- clusterctl's `internal/exitcode` gives an error the exit status the code
+  nearer its cause knows, such as 3 for a host it could not reach, and
+  keeps one that is there; sdash copies it, cut down, and sind carries the
+  status of a child that ended.
+- sind wraps the help command after `Strict` so that `sind help realm`
+  shows a concept of its manual; brig hides subcommands for the same end.
+- sind and clusterctl prefer a version and commit injected with -ldflags
+  to the build info, and cut the commit, sind to 7 digits with `-dirty`,
+  clusterctl to 12.
+
+### Decision
+
+- `cobratree` adds `InvalidValue(name, value, want)`, the usage error
+  `invalid --NAME value "VALUE": want WANT`, and `FlagError`, a
+  `FlagErrorFunc` a program sets itself, which words pflag's errors for a
+  value of a bool, a duration, a count or a number of any size so, and
+  keeps every other error as it is. It is not part of `Strict`, whose
+  texts decision 24 froze.
+- `Coded(status, err)` gives an error an exit status, and `Status(err,
+  def)` returns it; an error that carries one keeps it. The kit still
+  names no number: decision 24's rule holds, and `IsUsage` is asked
+  apart.
+- `HelpTopics(root, topic)` lets help show a topic that is one word and
+  names no command; a command of that name wins, and the rest is refused
+  as `Strict` refuses it. The kit names no topic, not even a list of them:
+  the program answers a word of its choice with one.
+- `Resolve(version, commit)` puts the values a release build set with
+  -ldflags in place of the toolchain's, leaving out the time and the
+  changes when the commit set is another, and `BuildInfo.Short(n)` cuts the
+  commit, with `-dirty`. The word for a build that is no release stays the
+  program's.
+- Interfaces beyond the Go API: the texts `InvalidValue` and `FlagError`
+  return, the words each of pflag's types wants among them. Changing one is
+  a breaking change.
+
+### Costs
+
+- clusterctl, brig and sdash change the text of a flag value refused when
+  they set `FlagError`; scripts that matched pflag's text see sind's.
+- A value a number of 64 bits cannot hold reads as one that is no whole
+  number, "want a whole number", where pflag said it is out of range.
+- `Coded` keeps the first status given, so a caller cannot raise it on the
+  way up; a program that needs another rule, such as clusterctl's `Worst`
+  over the errors of many hosts, keeps it.

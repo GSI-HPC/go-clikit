@@ -22,13 +22,21 @@
 // error pflag returns for a flag it cannot parse, wherever cobra parsed
 // it: IsUsage tells them from the errors of a command that ran and failed.
 // The package names no exit code: a program maps a usage error to its own,
-// commonly 2.
+// commonly 2. FlagError, which a program sets as the tree's FlagErrorFunc,
+// words a flag's value that pflag cannot parse as InvalidValue words one the
+// program refuses itself, invalid --count value "x": want a whole number.
+// Coded gives an error the exit status the code nearer its cause knows,
+// such as that of a host that could not be reached, and Status returns it.
+//
+// HelpTopics lets help show topics that are no command, such as the
+// concepts of a program's manual, beside the commands.
 //
 // ReadBuildInfo returns the module version, the revision and the time of
 // the commit, and whether the checkout was modified, as the toolchain
-// recorded them. How a program shows them, the word it uses for a build
-// that is no release and how much of the revision it prints, is the
-// program's.
+// recorded them, and Resolve puts the version and commit a release build
+// set with -ldflags in their place. How a program shows them, the word it
+// uses for a build that is no release and how much of the revision it
+// prints, BuildInfo.Short, is the program's.
 //
 // The package knows no program: the names in its errors are those of the
 // commands in the tree, and the commands a program renamed are its data.
