@@ -13,8 +13,8 @@ import (
 
 // Theme is how a display looks: the colours it draws in, and the marks,
 // spinner, bar, separators and guides it draws with. A Theme is a value:
-// compare it with ==, and pass it in the options of a display and in
-// Summary.Theme.
+// compare it with ==, and pass it in the options of a display, those of
+// NewSummary included.
 //
 // The zero Theme is none: a display draws as it always has, plain text with
 // no escape code, which is the text a program's tests compare. The five
