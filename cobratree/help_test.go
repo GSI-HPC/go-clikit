@@ -155,3 +155,19 @@ var errWrite = errors.New("write failed")
 type failingWriter struct{}
 
 func (failingWriter) Write([]byte) (int, error) { return 0, errWrite }
+
+// A program of one command has no help command, and HelpTopics refuses to
+// take its root over.
+func TestHelpTopicsOnALoneCommand(t *testing.T) {
+	root := &cobra.Command{Use: "prog NAME", Args: cobra.ExactArgs(1), RunE: run}
+	defer func() {
+		want := `cobratree: help topics need a help command, and "prog" has no subcommands`
+		if r := recover(); r != want {
+			t.Errorf("panic %v, want %q", r, want)
+		}
+		if root.RunE == nil || root.Name() != "prog" {
+			t.Error("HelpTopics changed the root")
+		}
+	}()
+	cobratree.HelpTopics(root, topics)
+}
