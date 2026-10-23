@@ -56,7 +56,7 @@ func ExampleServe() {
 			return es, nil
 		}, sse.Options{Done: ctx.Done()})
 	}
-	srv := httptest.NewServer(localweb.SameOrigin(localweb.Origin{})(http.HandlerFunc(stream)))
+	srv := httptest.NewServer(localweb.SameOrigin(localweb.OriginPolicy{})(http.HandlerFunc(stream)))
 	defer srv.Close()
 
 	resp, err := http.Get(srv.URL)

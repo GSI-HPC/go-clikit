@@ -97,8 +97,8 @@ func Hosts(answers func(host string) bool, o HostsOptions) func(http.Handler) ht
 	}
 }
 
-// Origin says which requests SameOrigin and CrossSite let in.
-type Origin struct {
+// OriginPolicy says which requests SameOrigin and CrossSite let in.
+type OriginPolicy struct {
 	// Navigate lets in a navigation of the whole page from anywhere, as
 	// when the user follows a link or opens a bookmark: a GET or HEAD
 	// whose Sec-Fetch-Mode is navigate and whose Sec-Fetch-Dest is
@@ -111,13 +111,20 @@ type Origin struct {
 	// development server that proxies to this one. Each weakens the check
 	// and is for a developer's machine only.
 	Others []string
-	// Refuse answers a refused request; nil is Refuse.
+	// Refuse answers a request that SameOrigin refuses; nil is Refuse.
+	// CrossSite ignores it.
 	Refuse Refuser
 }
 
+// Origin is the former name of OriginPolicy.
+//
+// Deprecated: Use OriginPolicy; the type is a policy, not an origin
+// (decision 36).
+type Origin = OriginPolicy
+
 // SameOrigin returns middleware that refuses, with 403 Forbidden, every
 // request that CrossSite says came from another site.
-func SameOrigin(o Origin) func(http.Handler) http.Handler {
+func SameOrigin(o OriginPolicy) func(http.Handler) http.Handler {
 	refuse := refuser(o.Refuse)
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -150,7 +157,7 @@ func SameOrigin(o Origin) func(http.Handler) http.Handler {
 //   - Origin must be the request's own origin, "http://" and its Host, or
 //     one of o.Others. A request that may change something must carry it;
 //     a GET or HEAD may leave it out, as a browser does for a navigation.
-func CrossSite(r *http.Request, o Origin) string {
+func CrossSite(r *http.Request, o OriginPolicy) string {
 	switch site := r.Header.Get("Sec-Fetch-Site"); site {
 	case "", "same-origin":
 	default:
