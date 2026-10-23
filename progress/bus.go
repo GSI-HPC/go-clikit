@@ -51,6 +51,10 @@ type BusOptions struct {
 // Bus hands the events of one command's spans to its sinks. It is safe for
 // concurrent use: every event is numbered and delivered under one lock, so
 // each sink sees the same order.
+//
+// Every method of a nil *Bus, which BusFrom returns for a context that
+// carries none, is safe to call: it returns the zero value, or the default
+// its doc names, and Close does nothing (decision 36).
 type Bus struct {
 	// suspending keeps one caller's Suspend or Resume calls to the sinks
 	// from interleaving with another's, and guards holds.
@@ -131,8 +135,13 @@ func NewBus(o BusOptions) *Bus {
 }
 
 // TraceID returns the trace the Bus's spans belong to, the ID of its
-// TraceContext.
-func (b *Bus) TraceID() TraceID { return b.trace.ID }
+// TraceContext, or the zero TraceID for a nil Bus.
+func (b *Bus) TraceID() TraceID {
+	if b == nil {
+		return TraceID{}
+	}
+	return b.trace.ID
+}
 
 // Trace returns the trace the Bus's spans belong to, as TraceID does.
 //
@@ -141,8 +150,13 @@ func (b *Bus) TraceID() TraceID { return b.trace.ID }
 func (b *Bus) Trace() TraceID { return b.TraceID() }
 
 // TraceContext returns the trace the Bus's spans belong to, and where it
-// came from.
-func (b *Bus) TraceContext() TraceContext { return b.trace }
+// came from, or the zero TraceContext for a nil Bus.
+func (b *Bus) TraceContext() TraceContext {
+	if b == nil {
+		return TraceContext{}
+	}
+	return b.trace
+}
 
 // Program returns the program's name the Bus was given in
 // BusOptions.Program, or "" for a nil Bus, so that a pool or a library
@@ -191,8 +205,11 @@ func (b *Bus) begin() {
 // innermost first, and resumes a display still suspended, one taken off
 // the Bus for panicking since too. Nothing is sent after Close; the sinks
 // are not closed, which is for whoever made them to do once Close has
-// returned. Closing a closed Bus does nothing.
+// returned. Closing a closed Bus, or a nil one, does nothing.
 func (b *Bus) Close() {
+	if b == nil {
+		return
+	}
 	b.suspending.Lock()
 	defer b.suspending.Unlock()
 	resumes, ok := b.close()

@@ -1217,6 +1217,24 @@ func TestUpdateSetsEveryField(t *testing.T) {
 	}
 }
 
+// Every method of a nil Bus, which BusFrom returns for a context that
+// carries none, returns a zero value or does nothing.
+func TestANilBusIsSafe(t *testing.T) {
+	t.Parallel()
+
+	var bus *progress.Bus
+	if got := bus.TraceID(); got != (progress.TraceID{}) {
+		t.Errorf("TraceID() = %s, want zeros", got)
+	}
+	if got := bus.Trace(); got != (progress.TraceID{}) {
+		t.Errorf("Trace() = %s, want zeros", got)
+	}
+	if got := bus.TraceContext(); got != (progress.TraceContext{}) {
+		t.Errorf("TraceContext() = %+v, want the zero one", got)
+	}
+	bus.Close()
+}
+
 // The Bus hands on what it was told of the program, so that a pool or a
 // library that reports to it names the program, writes its panics and
 // classes its errors as the Bus does; a nil Bus, which is what BusFrom
