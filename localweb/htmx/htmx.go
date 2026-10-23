@@ -39,11 +39,26 @@ const (
 	Morph = "idiomorph-ext.min.js"
 )
 
-// The versions of the files in Files.
+// The versions of the files in Files, one for each name above.
 const (
-	Version          = "2.0.11"
-	SSEVersion       = "2.2.4"
-	IdiomorphVersion = "0.7.4"
+	// ScriptVersion is the version of htmx, the file Script.
+	ScriptVersion = "2.0.11"
+	// SSEVersion is the version of the extension "sse", the file SSE.
+	SSEVersion = "2.2.4"
+	// MorphVersion is the version of idiomorph, the file Morph.
+	MorphVersion = "0.7.4"
+)
+
+// The former names of the versions.
+const (
+	// Version is the former name of ScriptVersion.
+	//
+	// Deprecated: Use ScriptVersion, which pairs with Script (decision 36).
+	Version = ScriptVersion
+	// IdiomorphVersion is the former name of MorphVersion.
+	//
+	// Deprecated: Use MorphVersion, which pairs with Morph (decision 36).
+	IdiomorphVersion = MorphVersion
 )
 
 // Config is the configuration of htmx a page sets in its meta element
