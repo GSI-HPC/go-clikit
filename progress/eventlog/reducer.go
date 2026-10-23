@@ -13,22 +13,22 @@ import (
 )
 
 const (
-	// defaultKeep is how many runs a Reducer keeps unless
+	// DefaultKeepRuns is how many runs a Reducer keeps unless
 	// Options.Keep says otherwise.
-	defaultKeep = 100
-	// defaultMaxSpans is how many spans of a run a Reducer keeps unless
+	DefaultKeepRuns = 100
+	// DefaultMaxSpans is how many spans of a run a Reducer keeps unless
 	// Options.MaxSpans says otherwise.
-	defaultMaxSpans = 1 << 17
+	DefaultMaxSpans = 1 << 17
 )
 
 // Options configure a Reducer.
 type Options struct {
 	// Keep is how many runs the Reducer keeps: the newest, and of the
-	// older ones those that have not ended. 0 is 100.
+	// older ones those that have not ended. 0 is DefaultKeepRuns.
 	Keep int
 	// MaxSpans is how many spans of a run the Reducer keeps; the spans
 	// that start after them are left out, and so are their events. 0 is
-	// 131072.
+	// DefaultMaxSpans.
 	MaxSpans int
 }
 
@@ -132,8 +132,8 @@ type run struct {
 // NewReducer returns a Reducer that holds no run.
 func NewReducer(o Options) *Reducer {
 	return &Reducer{
-		keep:     cmp.Or(max(o.Keep, 0), defaultKeep),
-		maxSpans: cmp.Or(max(o.MaxSpans, 0), defaultMaxSpans),
+		keep:     cmp.Or(max(o.Keep, 0), DefaultKeepRuns),
+		maxSpans: cmp.Or(max(o.MaxSpans, 0), DefaultMaxSpans),
 		runs:     map[string]*run{},
 		gone:     map[string]struct{}{},
 		changed:  map[string]int{},

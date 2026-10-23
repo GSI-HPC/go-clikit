@@ -8,45 +8,67 @@ import (
 	"io"
 )
 
-// CountWriter returns a writer that writes to w and advances the innermost
-// span in ctx by the bytes w took, from each call, a short write included.
-// It is meant for a span given Work(UnitBytes, ...), so that its amount is
-// bytes; a span given no Work counts UnitItems, as Advance does. The writer
-// advances nothing once the span has ended, and a write returns what w
-// returned. It returns w itself when ctx carries no span, which costs
-// nothing.
-func CountWriter(ctx context.Context, w io.Writer) io.Writer {
+// AdvanceWriter returns a writer that writes to w and advances the
+// innermost span in ctx by the bytes w took, from each call, a short write
+// included. It is meant for a span given Work(UnitBytes, ...), so that its
+// amount is bytes; a span given no Work counts UnitItems, as Advance does.
+// The writer advances nothing once the span has ended, and a write returns
+// what w returned. It returns w itself when ctx carries no span, which
+// costs nothing.
+//
+// The writer has Write alone, so io.Copy into it reads and writes through
+// a buffer: the io.ReaderFrom of w, such as the sendfile and splice of an
+// *os.File or a net.Conn, is not used. A path that delegated to it would
+// report the amount only once, at the end. Where the fast path matters
+// more than the progress, copy to w itself and advance the span after.
+func AdvanceWriter(ctx context.Context, w io.Writer) io.Writer {
 	s := SpanFrom(ctx)
 	if s == nil {
 		return w
 	}
-	return &countWriter{w: w, span: s}
+	return &advanceWriter{w: w, span: s}
 }
 
-// CountReader returns a reader that reads from r and advances the innermost
-// span in ctx by the bytes each read gave, a read that also returns an
-// error included. It is meant for a span given Work(UnitBytes, ...), so
-// that its amount is bytes; a span given no Work counts UnitItems, as
-// Advance does. The reader advances nothing once the span has ended, and a
-// read returns what r returned. It returns r itself when ctx carries no
-// span, which costs nothing.
-func CountReader(ctx context.Context, r io.Reader) io.Reader {
+// AdvanceReader returns a reader that reads from r and advances the
+// innermost span in ctx by the bytes each read gave, a read that also
+// returns an error included. It is meant for a span given Work(UnitBytes,
+// ...), so that its amount is bytes; a span given no Work counts
+// UnitItems, as Advance does. The reader advances nothing once the span has
+// ended, and a read returns what r returned. It returns r itself when ctx
+// carries no span, which costs nothing.
+//
+// The reader has Read alone, so io.Copy from it does not use the
+// io.WriterTo of r, as AdvanceWriter's doc says of io.ReaderFrom.
+func AdvanceReader(ctx context.Context, r io.Reader) io.Reader {
 	s := SpanFrom(ctx)
 	if s == nil {
 		return r
 	}
-	return &countReader{r: r, span: s}
+	return &advanceReader{r: r, span: s}
 }
 
-// countWriter is the writer CountWriter returns.
-type countWriter struct {
+// CountWriter returns a writer that writes to w and advances the innermost
+// span in ctx, as AdvanceWriter does.
+//
+// Deprecated: Use AdvanceWriter, whose name says what it does to the span;
+// CountWriter suggested the unrelated type Count (decision 36).
+func CountWriter(ctx context.Context, w io.Writer) io.Writer { return AdvanceWriter(ctx, w) }
+
+// CountReader returns a reader that reads from r and advances the
+// innermost span in ctx, as AdvanceReader does.
+//
+// Deprecated: Use AdvanceReader (decision 36).
+func CountReader(ctx context.Context, r io.Reader) io.Reader { return AdvanceReader(ctx, r) }
+
+// advanceWriter is the writer AdvanceWriter returns.
+type advanceWriter struct {
 	w    io.Writer
 	span *Span
 }
 
 // Write writes p to the writer it wraps, and advances the span by what that
 // took.
-func (c *countWriter) Write(p []byte) (int, error) {
+func (c *advanceWriter) Write(p []byte) (int, error) {
 	n, err := c.w.Write(p)
 	if n > 0 {
 		c.span.Advance(int64(n))
@@ -54,15 +76,15 @@ func (c *countWriter) Write(p []byte) (int, error) {
 	return n, err
 }
 
-// countReader is the reader CountReader returns.
-type countReader struct {
+// advanceReader is the reader AdvanceReader returns.
+type advanceReader struct {
 	r    io.Reader
 	span *Span
 }
 
 // Read reads into p from the reader it wraps, and advances the span by what
 // that gave.
-func (c *countReader) Read(p []byte) (int, error) {
+func (c *advanceReader) Read(p []byte) (int, error) {
 	n, err := c.r.Read(p)
 	if n > 0 {
 		c.span.Advance(int64(n))

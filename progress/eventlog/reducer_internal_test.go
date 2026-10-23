@@ -9,8 +9,8 @@ import "testing"
 // as many would take seconds to show.
 func TestReducerMaxSpansDefault(t *testing.T) {
 	for _, o := range []Options{{}, {MaxSpans: -1}} {
-		if got := NewReducer(o).maxSpans; got != 1<<17 {
-			t.Errorf("%+v keeps %d spans of a run, want %d", o, got, 1<<17)
+		if got := NewReducer(o).maxSpans; got != DefaultMaxSpans {
+			t.Errorf("%+v keeps %d spans of a run, want %d", o, got, DefaultMaxSpans)
 		}
 	}
 }

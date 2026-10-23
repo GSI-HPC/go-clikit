@@ -334,7 +334,7 @@ func ExampleCountWriter() {
 	ctx, call := progress.Start(ctx, progress.KindCall, "copy", progress.Work(progress.UnitBytes, 4<<20))
 	image := bytes.NewReader(make([]byte, 4<<20))
 	var dst bytes.Buffer
-	n, err := io.Copy(progress.CountWriter(ctx, &dst), image)
+	n, err := io.Copy(progress.AdvanceWriter(ctx, &dst), image)
 	call.End(err)
 	step.End(err)
 	bus.Close()

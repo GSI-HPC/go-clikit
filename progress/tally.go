@@ -20,7 +20,14 @@ package progress
 //
 // A Tally is given every event of a Bus in order, as a sink is, and forgets
 // a span once it has ended. It is not safe for concurrent use; a sink
-// feeds it from Handle, under the Bus lock.
+// feeds it from Handle, under the Bus lock. The zero Tally is ready to use.
+//
+// A Meter takes the same events through Add, but reads differently on
+// purpose. A count changes only with an event, so Count takes a span
+// alone, where Meter.Read takes the time too, for a rate and a time left
+// that change while no event comes; and Roots lists the spans that count
+// with none above them, which a counter and mcpprogress show, where the
+// share of a Meter is read for the span a display draws.
 type Tally struct {
 	spans map[SpanID]*tallied
 	// roots are the open roots, in the order they started.
@@ -37,8 +44,8 @@ type Count struct {
 	// Total is the span's Total, the targets it expects.
 	Total int
 	// Done counts the targets that ended below, however they ended, and
-	// the Total of every batch or FlagFold step below that was left out, each
-	// target once.
+	// the Total of every batch or FlagFold step below that was left out,
+	// each target once.
 	// Failed, Canceled and Skipped count those that ended so.
 	Done, Failed, Canceled, Skipped int
 	// Running counts the targets below that are running. Queued counts

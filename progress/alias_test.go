@@ -5,6 +5,7 @@ package progress_test
 
 import (
 	"io"
+	"strings"
 	"testing"
 
 	"github.com/GSI-HPC/go-clikit/progress"
@@ -63,5 +64,21 @@ func TestOldRunNames(t *testing.T) {
 	defer bus.Close()
 	if bus.Trace() != bus.TraceID() || bus.TraceID() != bus.TraceContext().ID {
 		t.Errorf("Trace = %v, TraceID = %v, want both %v", bus.Trace(), bus.TraceID(), bus.TraceContext().ID)
+	}
+}
+
+// The old names of AdvanceWriter and AdvanceReader stay for one minor
+// release (decision 36), and advance the span as the new ones do.
+func TestOldAdvanceNames(t *testing.T) {
+	ctx, bus, capture := watched(t, progress.BusOptions{})
+	ctx, call := progress.Start(ctx, progress.KindCall, "copy", progress.Work(progress.UnitBytes, 8))
+	var out strings.Builder
+	if _, err := io.Copy(progress.CountWriter(ctx, &out), progress.CountReader(ctx, strings.NewReader("abcd"))); err != nil {
+		t.Fatal(err)
+	}
+	call.End(nil)
+	bus.Close()
+	if end := capture.Events()[len(capture.Events())-1]; end.Amount != 8 || out.String() != "abcd" {
+		t.Errorf("the copy ended with %d bytes and wrote %q, want 8 and abcd", end.Amount, out.String())
 	}
 }

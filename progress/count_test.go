@@ -52,7 +52,7 @@ func TestCountWriterAdvancesTheSpanByWhatEachWriteTook(t *testing.T) {
 			clock := newClock()
 			ctx, _, capture := watched(t, progress.BusOptions{Now: clock.Now})
 			ctx, call := progress.Start(ctx, progress.KindCall, "copy", progress.Work(progress.UnitBytes, 100))
-			w := progress.CountWriter(ctx, tc.w)
+			w := progress.AdvanceWriter(ctx, tc.w)
 			var failed bool
 			for i, p := range tc.writes {
 				clock.Add(100 * time.Millisecond)
@@ -95,7 +95,7 @@ func TestCountReaderAdvancesTheSpanByWhatEachReadGave(t *testing.T) {
 			clock := newClock()
 			ctx, _, capture := watched(t, progress.BusOptions{Now: clock.Now})
 			ctx, call := progress.Start(ctx, progress.KindCall, "read", progress.Work(progress.UnitBytes, 100))
-			r := progress.CountReader(ctx, tc.r)
+			r := progress.AdvanceReader(ctx, tc.r)
 			buf := make([]byte, tc.size)
 			for {
 				clock.Add(100 * time.Millisecond)
@@ -120,11 +120,11 @@ func TestCountReturnsWhatItWrapsReturned(t *testing.T) {
 	ctx, _, _ := watched(t, progress.BusOptions{})
 	ctx, call := progress.Start(ctx, progress.KindCall, "copy", progress.Work(progress.UnitBytes, 100))
 	buf := make([]byte, 8)
-	n, err := progress.CountReader(ctx, &eofReader{"abc"}).Read(buf)
+	n, err := progress.AdvanceReader(ctx, &eofReader{"abc"}).Read(buf)
 	if n != 3 || !errors.Is(err, io.EOF) || string(buf[:n]) != "abc" {
 		t.Errorf("read gave %d bytes %q and %v, want 3 bytes abc and io.EOF", n, buf[:n], err)
 	}
-	n, err = progress.CountWriter(ctx, failing{}).Write([]byte("0123"))
+	n, err = progress.AdvanceWriter(ctx, failing{}).Write([]byte("0123"))
 	if n != 2 || err == nil {
 		t.Errorf("write gave %d bytes and %v, want 2 bytes and an error", n, err)
 	}
@@ -139,7 +139,7 @@ func TestCountAdvancesTheInnermostSpanOnly(t *testing.T) {
 	ctx, _, capture := watched(t, progress.BusOptions{Now: clock.Now})
 	ctx, step := progress.Start(ctx, progress.KindStep, "copying the image", progress.Work(progress.UnitBytes, 100))
 	ctx, call := progress.Start(ctx, progress.KindCall, "copy", progress.Work(progress.UnitBytes, 100))
-	w := progress.CountWriter(ctx, &bytes.Buffer{})
+	w := progress.AdvanceWriter(ctx, &bytes.Buffer{})
 	clock.Add(100 * time.Millisecond)
 	if _, err := w.Write([]byte("0123456789")); err != nil {
 		t.Fatalf("write: %v", err)
@@ -165,7 +165,7 @@ func TestCountCountsOnlyWhileTheSpanRuns(t *testing.T) {
 	ctx, _, capture := watched(t, progress.BusOptions{Now: clock.Now})
 	ctx, target := progress.Start(ctx, progress.KindTarget, "exe0001", progress.Queued(),
 		progress.Work(progress.UnitBytes, 100))
-	w := progress.CountWriter(ctx, &bytes.Buffer{})
+	w := progress.AdvanceWriter(ctx, &bytes.Buffer{})
 	if _, err := w.Write([]byte("0123")); err != nil {
 		t.Fatalf("write: %v", err)
 	}
@@ -206,11 +206,11 @@ func TestCountReturnsTheWriterAndReaderItselfWithoutASpan(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			w := &bytes.Buffer{}
-			if got := progress.CountWriter(tc.ctx, w); got != io.Writer(w) {
+			if got := progress.AdvanceWriter(tc.ctx, w); got != io.Writer(w) {
 				t.Errorf("CountWriter returned %T, want the writer itself", got)
 			}
 			r := strings.NewReader("abc")
-			if got := progress.CountReader(tc.ctx, r); got != io.Reader(r) {
+			if got := progress.AdvanceReader(tc.ctx, r); got != io.Reader(r) {
 				t.Errorf("CountReader returned %T, want the reader itself", got)
 			}
 		})
@@ -223,8 +223,8 @@ func TestCountWithoutASpanAllocatesNothing(t *testing.T) {
 	w := &bytes.Buffer{}
 	r := strings.NewReader("abc")
 	allocs := testing.AllocsPerRun(100, func() {
-		_ = progress.CountWriter(ctx, w)
-		_ = progress.CountReader(ctx, r)
+		_ = progress.AdvanceWriter(ctx, w)
+		_ = progress.AdvanceReader(ctx, r)
 	})
 	if allocs != 0 {
 		t.Errorf("CountWriter and CountReader without a span allocate %v times, want 0", allocs)
@@ -239,7 +239,7 @@ func TestACopyThroughCountEndsWithItsBytes(t *testing.T) {
 	ctx, _, capture := watched(t, progress.BusOptions{Now: clock.Now})
 	ctx, call := progress.Start(ctx, progress.KindCall, "copy", progress.Work(progress.UnitBytes, 26))
 	var dst bytes.Buffer
-	n, err := io.Copy(progress.CountWriter(ctx, &dst), strings.NewReader("abcdefghijklmnopqrstuvwxyz"))
+	n, err := io.Copy(progress.AdvanceWriter(ctx, &dst), strings.NewReader("abcdefghijklmnopqrstuvwxyz"))
 	call.End(err)
 	if err != nil || n != 26 {
 		t.Fatalf("copy moved %d bytes, %v, want 26", n, err)
