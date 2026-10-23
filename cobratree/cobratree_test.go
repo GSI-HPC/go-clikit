@@ -221,6 +221,22 @@ func TestStrictLeavesWhatNamesACommand(t *testing.T) {
 	}
 }
 
+// A group becomes runnable, to refuse a word, and its usage gains the
+// line of a command that runs.
+func TestStrictMakesAGroupRunnable(t *testing.T) {
+	get, _, err := tree().Find([]string{"get"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !get.Runnable() {
+		t.Error("get is not runnable")
+	}
+	want := "Usage:\n  prog get [flags]\n  prog get [command]\n"
+	if usage := get.UsageString(); !strings.HasPrefix(usage, want) {
+		t.Errorf("usage %q, want it to start with %q", usage, want)
+	}
+}
+
 // Strict adds the completion command now, so the root's output when Strict
 // is called is where its scripts go.
 func TestStrictWritesCompletionToTheOutputItWasGiven(t *testing.T) {
