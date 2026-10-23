@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"html/template"
 	"io"
 	"net"
 	"net/http"
@@ -28,6 +29,13 @@ import (
 const (
 	token  = "LAUNCHTOKEN"
 	header = "X-Prog-CSRF"
+)
+
+// The pages of server, which hold the CSRF token as a program's pages do.
+var (
+	form = template.Must(template.New("form").Parse(
+		`<form method="post"><input data-x='a>b' type=hidden NAME="csrf" value="{{.}}"></form>`))
+	meta = template.Must(template.New("meta").Parse(`<head><META content="{{.}}" name='x-csrf'></head>`))
 )
 
 // fakeTB is a testing.TB that keeps what a helper reports; Fatalf ends the
@@ -68,8 +76,10 @@ func fails(t *testing.T, fn func(tb testing.TB)) []string {
 	return f.fatals
 }
 
-// server serves a page that writes its CSRF token, a POST that echoes its
-// form, and an event stream, behind the checks of localweb and a session.
+// server serves a page that holds its CSRF token in a form, another that
+// holds it in a meta element, a page without it, a page cut short, a POST
+// that echoes its form, and an event stream, behind the checks of
+// localweb and a session.
 func server(t *testing.T) *httptest.Server {
 	t.Helper()
 	sessions, err := session.New(session.Options{Token: token, CookiePrefix: "prog_ui_", CSRFHeader: header})
@@ -79,7 +89,17 @@ func server(t *testing.T) *httptest.Server {
 	var n sse.Notifier[string]
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /{$}", func(w http.ResponseWriter, r *http.Request) {
-		_, _ = io.WriteString(w, session.CSRF(r.Context()))
+		_ = form.Execute(w, session.CSRF(r.Context()))
+	})
+	mux.HandleFunc("GET /meta", func(w http.ResponseWriter, r *http.Request) {
+		_ = meta.Execute(w, session.CSRF(r.Context()))
+	})
+	mux.HandleFunc("GET /none", func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = io.WriteString(w, `<input name="other" value="x"><meta name="csrf"><input name=csrf value="">`)
+	})
+	mux.HandleFunc("GET /short", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Length", "100")
+		_, _ = io.WriteString(w, "<html>")
 	})
 	mux.HandleFunc("POST /echo", func(w http.ResponseWriter, r *http.Request) {
 		_, _ = io.WriteString(w, r.PostForm.Encode())
@@ -104,19 +124,21 @@ func TestAClientSignsInAndActsAsAPage(t *testing.T) {
 
 	srv := server(t)
 	c := localwebtest.Login(t, srv.URL, token)
-	resp := c.Get(t, "/")
-	csrf, _ := io.ReadAll(resp.Body)
-	_ = resp.Body.Close()
-	if resp.StatusCode != http.StatusOK || len(csrf) == 0 {
-		t.Fatalf("GET /: %s %q", resp.Status, csrf)
+	csrf := c.CSRF(t, "/")
+	if csrf == "" {
+		t.Fatal("CSRF of / is empty")
+	}
+	c.CSRFField = "x-csrf"
+	if got := c.CSRF(t, "/meta"); got != csrf {
+		t.Errorf("CSRF of /meta = %q, want %q", got, csrf)
 	}
 
-	resp = c.PostForm(t, "/echo", url.Values{"a": {"1"}})
+	resp := c.PostForm(t, "/echo", url.Values{"a": {"1"}})
 	_ = resp.Body.Close()
 	if resp.StatusCode != http.StatusForbidden {
 		t.Errorf("a POST without the CSRF token: %s, want 403", resp.Status)
 	}
-	c.Header.Set(header, string(csrf))
+	c.Header.Set(header, csrf)
 	resp = c.PostForm(t, "/echo", url.Values{"a": {"1"}})
 	body, _ := io.ReadAll(resp.Body)
 	_ = resp.Body.Close()
@@ -138,6 +160,17 @@ func TestTheHelpersFailTheTest(t *testing.T) {
 	srv := server(t)
 	down := httptest.NewServer(nil)
 	down.Close()
+	sessions, err := session.New(session.Options{Token: token, CookiePrefix: "prog_ui_", CSRFHeader: header})
+	if err != nil {
+		t.Fatal(err)
+	}
+	nopage := httptest.NewServer(sessions.Middleware(http.NewServeMux()))
+	defer nopage.Close()
+	nowhere := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		http.SetCookie(w, &http.Cookie{Name: "prog_ui_1", Value: "x"})
+		w.WriteHeader(http.StatusSeeOther)
+	}))
+	defer nowhere.Close()
 	tests := []struct {
 		name string
 		fn   func(tb testing.TB)
@@ -157,6 +190,19 @@ func TestTheHelpersFailTheTest(t *testing.T) {
 		{"no stream", func(tb testing.TB) {
 			localwebtest.Login(t, srv.URL, token).Events(tb, "/")
 		}, `localwebtest: events /: got 200 OK, "text/plain; charset=utf-8"`},
+		{"no page behind the redirect", func(tb testing.TB) { localwebtest.Login(tb, nopage.URL, token) },
+			"localwebtest: login: the redirect to " + nopage.URL + "/ got 404 Not Found, want 2xx"},
+		{"no Location", func(tb testing.TB) { localwebtest.Login(tb, nowhere.URL, token) },
+			"localwebtest: login: http: no Location header in response"},
+		{"no CSRF token", func(tb testing.TB) {
+			localwebtest.Login(t, srv.URL, token).CSRF(tb, "/none")
+		}, `localwebtest: CSRF of /none: the page holds no input or meta named "csrf"`},
+		{"no page for the CSRF token", func(tb testing.TB) {
+			localwebtest.Login(t, srv.URL, token).CSRF(tb, "/missing")
+		}, "localwebtest: CSRF of /missing: got 404 Not Found, want 200 OK"},
+		{"a page cut short", func(tb testing.TB) {
+			localwebtest.Login(t, srv.URL, token).CSRF(tb, "/short")
+		}, "localwebtest: CSRF of /short: unexpected EOF"},
 	}
 	for _, tt := range tests {
 		got := fails(t, tt.fn)

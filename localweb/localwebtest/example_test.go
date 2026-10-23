@@ -5,7 +5,6 @@ package localwebtest_test
 
 import (
 	"fmt"
-	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -16,17 +15,15 @@ import (
 )
 
 // A test signs in with the launch token, reads the CSRF token from a page,
-// and sends a form as the page would.
+// and sends a form as the page would. The page holds the token in the
+// hidden field of its form, <input type="hidden" name="csrf" value="…">.
 func ExampleLogin() {
 	_ = func(t *testing.T, handler http.Handler, token string) {
 		srv := httptest.NewServer(handler)
 		defer srv.Close()
 		c := localwebtest.Login(t, srv.URL, token)
-		resp := c.Get(t, "/csrf")
-		csrf, _ := io.ReadAll(resp.Body)
-		_ = resp.Body.Close()
-		c.Header.Set("X-Prog-CSRF", string(csrf))
-		resp = c.PostForm(t, "/runs/1/stop", url.Values{"signal": {"INT"}})
+		c.Header.Set("X-Prog-CSRF", c.CSRF(t, "/"))
+		resp := c.PostForm(t, "/runs/1/stop", url.Values{"signal": {"INT"}})
 		_ = resp.Body.Close()
 		if resp.StatusCode != http.StatusSeeOther {
 			t.Errorf("stop: %s, want 303 See Other", resp.Status)

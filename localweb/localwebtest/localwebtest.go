@@ -8,7 +8,7 @@
 //
 //	srv := httptest.NewServer(handler)
 //	c := localwebtest.Login(t, srv.URL, token)
-//	c.Header.Set("X-Prog-CSRF", csrfFromThePage)
+//	c.Header.Set("X-Prog-CSRF", c.CSRF(t, "/"))
 //	resp := c.PostForm(t, "/actions/stop", url.Values{"id": {"1"}})
 //
 // A server behind localweb.Hosts answers only to the address it bound, so
@@ -18,10 +18,13 @@ package localwebtest
 
 import (
 	"bufio"
+	"cmp"
+	"html"
 	"io"
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -36,13 +39,18 @@ type Client struct {
 	Base string
 	// Header is set on every request, such as the session's CSRF token.
 	Header http.Header
-	hc     *http.Client
+	// CSRFField is the name under which a page holds the CSRF token, as
+	// session.Options.CSRFField names it; "" is session.DefaultCSRFField.
+	// CSRF reads it.
+	CSRFField string
+	hc        *http.Client
 }
 
 // Login opens base with the launch token, as the user's browser opens the
-// address a program prints, and returns a Client that holds the session
-// cookie. It fails the test unless the server answers with a redirect
-// that sets a cookie and leads to a page it serves.
+// address a program prints, follows the redirect to the page, and returns
+// a Client that holds the session cookie. It fails the test unless the
+// server answers with a redirect that sets a cookie, and the page it
+// leads to answers 2xx.
 func Login(tb testing.TB, base, token string) *Client {
 	tb.Helper()
 	jar, _ := cookiejar.New(nil) // New returns no error
@@ -52,8 +60,27 @@ func Login(tb testing.TB, base, token string) *Client {
 			return http.ErrUseLastResponse
 		},
 	}}
-	req, err := http.NewRequestWithContext(tb.Context(), http.MethodGet,
-		base+"/?"+url.Values{session.TokenParam: {token}}.Encode(), nil)
+	resp := c.navigate(tb, base+"/?"+url.Values{session.TokenParam: {token}}.Encode())
+	if resp.StatusCode != http.StatusSeeOther || len(resp.Cookies()) == 0 {
+		tb.Fatalf("localwebtest: login: got %s with %d cookies, want 303 See Other with the session cookie",
+			resp.Status, len(resp.Cookies()))
+	}
+	to, err := resp.Location()
+	if err != nil {
+		tb.Fatalf("localwebtest: login: %v", err)
+	}
+	resp = c.navigate(tb, to.String())
+	if resp.StatusCode < 200 || resp.StatusCode > 299 {
+		tb.Fatalf("localwebtest: login: the redirect to %s got %s, want 2xx", to, resp.Status)
+	}
+	return c
+}
+
+// navigate opens target as the user does who types the address, and
+// returns the answer, whose body is closed.
+func (c *Client) navigate(tb testing.TB, target string) *http.Response {
+	tb.Helper()
+	req, err := http.NewRequestWithContext(tb.Context(), http.MethodGet, target, nil)
 	if err != nil {
 		tb.Fatalf("localwebtest: login: %v", err)
 	}
@@ -65,12 +92,52 @@ func Login(tb testing.TB, base, token string) *Client {
 		tb.Fatalf("localwebtest: login: %v", err)
 	}
 	_ = resp.Body.Close()
-	if resp.StatusCode != http.StatusSeeOther || len(resp.Cookies()) == 0 {
-		tb.Fatalf("localwebtest: login: got %s with %d cookies, want 303 See Other with the session cookie",
-			resp.Status, len(resp.Cookies()))
-	}
-	return c
+	return resp
 }
+
+// CSRF gets the page at path and returns the CSRF token it holds, in the
+// value of an input element or the content of a meta element whose name
+// is CSRFField:
+//
+//	<input type="hidden" name="csrf" value="{{.CSRF}}">
+//	<meta name="csrf" content="{{.CSRF}}">
+//
+// It fails the test unless the page answers 200 with such an element.
+func (c *Client) CSRF(tb testing.TB, path string) string {
+	tb.Helper()
+	resp := c.Get(tb, path)
+	page, err := io.ReadAll(resp.Body)
+	_ = resp.Body.Close()
+	if err != nil {
+		tb.Fatalf("localwebtest: CSRF of %s: %v", path, err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		tb.Fatalf("localwebtest: CSRF of %s: got %s, want 200 OK", path, resp.Status)
+	}
+	field := cmp.Or(c.CSRFField, session.DefaultCSRFField)
+	for _, tag := range tagRE.FindAllStringSubmatch(string(page), -1) {
+		attrs := map[string]string{}
+		for _, a := range attrRE.FindAllStringSubmatch(tag[2], -1) {
+			attrs[strings.ToLower(a[1])] = html.UnescapeString(a[2] + a[3] + a[4])
+		}
+		value := attrs["value"]
+		if strings.EqualFold(tag[1], "meta") {
+			value = attrs["content"]
+		}
+		if attrs["name"] == field && value != "" {
+			return value
+		}
+	}
+	tb.Fatalf("localwebtest: CSRF of %s: the page holds no input or meta named %q", path, field)
+	return ""
+}
+
+// tagRE matches an input or a meta element, and attrRE an attribute of
+// it, as html/template writes them.
+var (
+	tagRE  = regexp.MustCompile(`(?i)<(input|meta)\b((?:[^>"']|"[^"]*"|'[^']*')*)>`)
+	attrRE = regexp.MustCompile(`([^\s"'>/=]+)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>` + "`" + `]+))`)
+)
 
 // Do sends req as a page of the server's origin does, with Origin and
 // Sec-Fetch-Site set, and with Header, and returns the answer, whose body
