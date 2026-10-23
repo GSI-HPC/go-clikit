@@ -28,9 +28,6 @@ const (
 	// logBehind is how much of the event log may wait to be written before
 	// the log stops, a writer that has stopped taking it.
 	logBehind = 8 << 20
-	// logFlushEvery is how long a line waits to be written at most, unless
-	// LogOptions.FlushEvery says otherwise.
-	logFlushEvery = time.Second
 	// logCloseWait is how long Close waits for what is left to be written.
 	logCloseWait = 5 * time.Second
 	// logTime is the time of a line, in UTC and always as long, so that the
@@ -112,6 +109,15 @@ type Log struct {
 	stop, stopped chan struct{}
 }
 
+const (
+	// DefaultAdvanceEvery is the least time between two advances of a span
+	// that a Log writes, unless LogOptions.AdvanceEvery says otherwise.
+	DefaultAdvanceEvery = time.Second
+	// DefaultFlushEvery is how long a line waits to be written at most,
+	// unless LogOptions.FlushEvery says otherwise.
+	DefaultFlushEvery = time.Second
+)
+
 // errBehind stops a log whose writer has fallen too far behind.
 var errBehind = errors.New("the lines were not written as fast as the work went on, and the rest were left out")
 
@@ -133,13 +139,13 @@ type LogOptions struct {
 	Run string
 	// AdvanceEvery is the least time between two advances of a span that
 	// the log writes, by the events' times; the advances in between are
-	// left out, and counted in "leftOut". 0 is a second; a negative value
-	// writes every advance the Bus sends.
+	// left out, and counted in "leftOut". 0 is DefaultAdvanceEvery; a
+	// negative value writes every advance the Bus sends.
 	AdvanceEvery time.Duration
 	// FlushEvery is how long a line waits at most before the log writes
 	// it, with the lines that came after it: what a reader that follows
 	// the log as it grows, such as a live view of the run, lags behind. 0
-	// is a second; a negative value writes each line as it comes.
+	// is DefaultFlushEvery; a negative value writes each line as it comes.
 	FlushEvery time.Duration
 }
 
@@ -147,7 +153,7 @@ type LogOptions struct {
 // writes, as LogOptions.AdvanceEvery gives it.
 func (o LogOptions) advanceEvery() time.Duration {
 	if o.AdvanceEvery == 0 {
-		return time.Second
+		return DefaultAdvanceEvery
 	}
 	return o.AdvanceEvery
 }
@@ -157,7 +163,7 @@ func (o LogOptions) advanceEvery() time.Duration {
 func (o LogOptions) flushEvery() time.Duration {
 	switch {
 	case o.FlushEvery == 0:
-		return logFlushEvery
+		return DefaultFlushEvery
 	case o.FlushEvery < 0:
 		return 0
 	}
