@@ -86,13 +86,15 @@ func ParseTraceContext(traceparent, tracestate string) (tc TraceContext, ok bool
 }
 
 // NewTraceContext makes the trace context of a trace that begins here, to
-// hand to a program this one starts, in its TRACEPARENT: a new trace id and
-// a new parent span id, read from r, 24 bytes in all. A program passes
-// crypto/rand.Reader, and a test bytes of its own. The first 16 bytes are
-// the trace id and the next 8 the span id, most significant byte first, as
-// ParseTraceContext reads one. The sampled flag is set, so Flags is 0x01,
-// because the program that makes a trace context records the run of the
-// program it hands it to; State is empty.
+// hand to a program this one starts, in its TRACEPARENT, for a program
+// without a Bus; a program with one hands on the context of the span the
+// child runs under, Span.TraceContext, which links the two event logs. It
+// is a new trace id and a new parent span id, read from r, 24 bytes in all.
+// A program passes crypto/rand.Reader, and a test bytes of its own. The
+// first 16 bytes are the trace id and the next 8 the span id, most
+// significant byte first, as ParseTraceContext reads one. The sampled flag
+// is set, so Flags is 0x01, because the program that makes a trace context
+// records the run of the program it hands it to; State is empty.
 //
 // A read that fails, or ends before 24 bytes, returns its error, wrapped.
 // So does an id of zeros, which W3C does not allow and only a source that

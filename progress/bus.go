@@ -150,7 +150,9 @@ func (b *Bus) TraceID() TraceID {
 func (b *Bus) Trace() TraceID { return b.TraceID() }
 
 // TraceContext returns the trace the Bus's spans belong to, and where it
-// came from, or the zero TraceContext for a nil Bus.
+// came from, or the zero TraceContext for a nil Bus. Its Parent is the
+// span of the program that handed the trace on, not a span of this Bus: a
+// program hands a child the context of its own span, Span.TraceContext.
 func (b *Bus) TraceContext() TraceContext {
 	if b == nil {
 		return TraceContext{}
@@ -403,6 +405,25 @@ func (s *Span) setFields(opts []Option) {
 	o.apply(opts)
 	o.Total = max(o.Total, s.fields.Total)
 	s.fields = sanitizeFields(o.Fields, s.fields)
+}
+
+// TraceContext returns the trace context of the span, to hand to a program
+// it starts, in its TRACEPARENT through Traceparent: the trace of the Bus,
+// with the span as the parent, so that the child's event log names the
+// span that started it. The trace flags and the tracestate are those the
+// Bus was handed, but for a trace with no parent, such as one the Bus
+// drew, whose flags are the sampled flag alone, as NewTraceContext sets
+// them. A nil span returns the zero TraceContext, whose Traceparent is "".
+func (s *Span) TraceContext() TraceContext {
+	if s == nil {
+		return TraceContext{}
+	}
+	tc := s.bus.trace
+	if tc.Parent == 0 {
+		tc.Flags = 0x01
+	}
+	tc.Parent = s.id
+	return tc
 }
 
 // End ends a span with the outcome of its work: ok for a nil error;
