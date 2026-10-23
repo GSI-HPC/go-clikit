@@ -30,12 +30,15 @@
 // terminal is, whether the process is in its foreground, whether standard
 // output goes into a pipe, whether the locale shows UTF-8, and which Theme
 // to draw in. IsTerminal, IsPipe, TerminalSize and InForeground ask the
-// system, and UTF8Locale and ThemeFor read the getenv they are given, for
-// the program to call. Nor does the package set anything process-wide: a
-// program that hands its children no trace context takes TRACEPARENT out of
-// its environment in Options.Trace, which Start calls only once it makes a
-// Bus, and the interrupt is the end of the command's context, not a signal
-// the package catches.
+// system, of a file such as os.Stderr, and UTF8Locale and ThemeFor read the
+// getenv they are given, for the program to call. A probe takes any value,
+// and asks the system only of one that gives a file descriptor, a
+// syscall.Conn such as an *os.File: a writer that wraps a file is never a
+// terminal, so a program asks of the file itself. Nor does the package set
+// anything process-wide: a program that hands its children no trace context
+// takes TRACEPARENT out of its environment in Options.Trace, which Start
+// calls only once it makes a Bus, and the interrupt is the end of the
+// command's context, not a signal the package catches.
 //
 // A program calls Start as a command begins and runs the command under
 // Session.Context, in a span of its own. Start writes its notes, picks the
@@ -264,6 +267,11 @@ func (o Options) prefix() string {
 // show it, with a note for standard error, or an error that refuses the
 // command. It writes nothing, and never returns ModeAuto.
 //
+// The note is empty, or one line without its newline that starts with the
+// program's name, "prog: …", as Options.Program gives it. It holds the
+// word the variable gave, which came from elsewhere, so the program
+// escapes it before it writes it, with termtext.Escape, as Start does.
+//
 // The flag's word comes before the variable's, and auto before neither.
 // auto is the live tree on a standard error that is a terminal, and not a
 // dumb one, while standard output goes into no pipe, and none elsewhere:
@@ -277,7 +285,7 @@ func (o Options) prefix() string {
 //
 // A program calls Choose before any command runs, to refuse a flag no
 // command could have, as Start would; Start calls it too.
-func Choose(o Options) (Mode, string, error) {
+func Choose(o Options) (mode Mode, note string, err error) {
 	word, from, ambient := o.Mode.value()
 	if ambient && word == "" {
 		word = ModeAuto.String()
@@ -289,7 +297,7 @@ func Choose(o Options) (Mode, string, error) {
 	case o.Dumb:
 		unfit = "the terminal cannot draw one (TERM is dumb)"
 	}
-	switch mode := modeOf(word); mode {
+	switch asked := modeOf(word); asked {
 	case ModeAuto:
 		if unfit != "" || o.IntoPipe {
 			return ModeNone, "", nil
@@ -297,19 +305,19 @@ func Choose(o Options) (Mode, string, error) {
 		return ModeTTY, "", nil
 	case ModeTTY, ModeCounter:
 		if unfit == "" {
-			return mode, "", nil
+			return asked, "", nil
 		}
 		if ambient {
 			return ModeNone, "", nil
 		}
 		what := "a live tree"
-		if mode == ModeCounter {
+		if asked == ModeCounter {
 			what = "a counter"
 		}
 		return ModeNone, "", fmt.Errorf("%s asks for %s, but %s; use none, or auto to draw one only where it can be",
 			from, what, unfit)
 	case ModePlain, ModeNone:
-		return mode, "", nil
+		return asked, "", nil
 	}
 	words := make([]string, 0, len(modeWords))
 	for _, m := range Modes() {

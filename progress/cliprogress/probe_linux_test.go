@@ -7,6 +7,7 @@ package cliprogress_test
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"syscall"
 	"testing"
@@ -55,5 +56,16 @@ func TestATerminalSaysItsSize(t *testing.T) {
 	}
 	if cliprogress.IsPipe(tty) || !cliprogress.InForeground(tty) {
 		t.Errorf("a terminal: IsPipe %v, InForeground %v", cliprogress.IsPipe(tty), cliprogress.InForeground(tty))
+	}
+
+	// A writer that wraps the terminal gives no file descriptor, and is
+	// never a terminal.
+	wrapped := struct{ io.Writer }{tty}
+	if cliprogress.IsTerminal(wrapped) || cliprogress.IsPipe(wrapped) {
+		t.Errorf("a wrapped terminal: IsTerminal %v, IsPipe %v; want neither",
+			cliprogress.IsTerminal(wrapped), cliprogress.IsPipe(wrapped))
+	}
+	if cols, rows, err := cliprogress.TerminalSize(wrapped); err == nil {
+		t.Errorf("a wrapped terminal: TerminalSize = %d, %d, a terminal's", cols, rows)
 	}
 }

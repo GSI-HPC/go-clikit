@@ -7,7 +7,6 @@ package cliprogress_test
 
 import (
 	"bytes"
-	"io"
 	"os"
 	"path/filepath"
 	"syscall"
@@ -47,7 +46,7 @@ func TestWhatIsNoTerminalHasNoSize(t *testing.T) {
 	_ = closed.Close()
 	tests := []struct {
 		name string
-		w    io.Writer
+		w    any
 		pipe bool
 	}{
 		{"a buffer", &bytes.Buffer{}, false},
@@ -56,6 +55,7 @@ func TestWhatIsNoTerminalHasNoSize(t *testing.T) {
 		{"a regular file", regular, false},
 		{"a closed file", closed, false},
 		{"no file", (*os.File)(nil), false},
+		{"nothing", nil, false},
 	}
 	for _, tc := range tests {
 		if got := cliprogress.IsPipe(tc.w); got != tc.pipe {
@@ -67,7 +67,7 @@ func TestWhatIsNoTerminalHasNoSize(t *testing.T) {
 		if !cliprogress.InForeground(tc.w) {
 			t.Errorf("%s: InForeground = false", tc.name)
 		}
-		if f, ok := tc.w.(*os.File); ok && cliprogress.IsTerminal(f) {
+		if cliprogress.IsTerminal(tc.w) {
 			t.Errorf("%s: IsTerminal = true", tc.name)
 		}
 	}
