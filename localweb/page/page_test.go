@@ -5,6 +5,7 @@ package page_test
 
 import (
 	"errors"
+	"fmt"
 	"html/template"
 	"net/http"
 	"net/http/httptest"
@@ -107,6 +108,57 @@ func TestIncludeErrors(t *testing.T) {
 	_, err = s.Render("lost", nil)
 	if err == nil || !strings.Contains(err.Error(), "page: render nope") {
 		t.Errorf("lost: got %v, want a failed render of nope", err)
+	}
+}
+
+// A block that includes itself, or blocks that include each other, fail
+// the render past MaxIncludeDepth, with and without Reload, and the set
+// renders as before afterwards.
+func TestIncludeCycle(t *testing.T) {
+	t.Parallel()
+
+	const src = `{{define "a"}}x{{include "a" .}}{{end}}` +
+		`{{define "b"}}{{include "c" .}}{{end}}` +
+		`{{define "c"}}{{include "b" .}}{{end}}` +
+		`{{define "ok"}}<p>{{include "frag" .}}</p>{{end}}` +
+		`{{define "frag"}}{{.}}{{end}}`
+	for _, reload := range []bool{false, true} {
+		t.Run(fmt.Sprint("reload=", reload), func(t *testing.T) {
+			t.Parallel()
+			s := mustParse(t, src, page.Options{Reload: reload})
+			for _, tc := range []struct{ name, want string }{
+				{"a", "page: render a: include a: nested more than 100 deep"},
+				{"b", "page: render b: include c: nested more than 100 deep"},
+			} {
+				got, err := s.Render(tc.name, nil)
+				if err == nil || err.Error() != tc.want || got != "" {
+					t.Errorf("Render(%s) = %q, %v, want %q", tc.name, got, err, tc.want)
+				}
+				w := httptest.NewRecorder()
+				if err := s.Respond(w, http.StatusOK, tc.name, nil); err == nil || w.Body.Len() != 0 {
+					t.Errorf("Respond(%s): got %v and %q, want an error and no body", tc.name, err, w.Body)
+				}
+				if got, err := s.Render("ok", "y"); err != nil || got != "<p>y</p>" {
+					t.Errorf("Render(ok) after %s = %q, %v, want <p>y</p>", tc.name, got, err)
+				}
+			}
+		})
+	}
+}
+
+// include nests MaxIncludeDepth deep, and no deeper.
+func TestIncludeDepth(t *testing.T) {
+	t.Parallel()
+
+	funcs := template.FuncMap{"dec": func(n int) int { return n - 1 }}
+	s := mustParse(t, `{{define "n"}}{{if .}}.{{include "n" (dec .)}}{{end}}{{end}}`, page.Options{Funcs: funcs})
+	got, err := s.Render("n", page.MaxIncludeDepth)
+	if want := strings.Repeat(".", page.MaxIncludeDepth); err != nil || got != want {
+		t.Errorf("Render(n, %d) = %q, %v, want %d dots", page.MaxIncludeDepth, got, err, page.MaxIncludeDepth)
+	}
+	_, err = s.Render("n", page.MaxIncludeDepth+1)
+	if want := "page: render n: include n: nested more than 100 deep"; err == nil || err.Error() != want {
+		t.Errorf("Render(n, %d): got %v, want %q", page.MaxIncludeDepth+1, err, want)
 	}
 }
 
