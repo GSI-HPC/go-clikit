@@ -6,6 +6,7 @@
 package launch_test
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -48,7 +49,9 @@ func ExampleAcquire() {
 	runtimeDir, _ := os.MkdirTemp("", "run-") // $XDG_RUNTIME_DIR in a program
 	defer func() { _ = os.RemoveAll(runtimeDir) }()
 
-	inst, err := launch.Acquire(runtimeDir, "prog")
+	ctx := context.Background() // the context of the command in a program
+
+	inst, err := launch.Acquire(ctx, runtimeDir, "prog")
 	if err != nil {
 		fmt.Println(err)
 		return
@@ -63,7 +66,7 @@ func ExampleAcquire() {
 		fmt.Println(err)
 		return
 	}
-	defer func() { _ = inst.Retire() }()
+	defer func() { _ = inst.Retire(ctx) }()
 	fmt.Println("prog ui: http://127.0.0.1:7374/?token=T")
 	// Output:
 	// prog ui: http://127.0.0.1:7374/?token=T

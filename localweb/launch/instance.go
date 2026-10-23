@@ -4,6 +4,7 @@
 package launch
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -119,8 +120,14 @@ func (i *Instance) Publish(rawURL string) error {
 // Retire removes the record when it is this process's, under the lock, so
 // that a start that runs at the same time sees the server either running
 // or gone. A program defers it after Publish.
-func (i *Instance) Retire() error {
-	if err := i.lock(); err != nil {
+//
+// Retire waits for the lock as Acquire does, until ctx ends, when it
+// returns the context's error, wrapped, and leaves the record, in which a
+// start finds no server once this process has ended. A lock that is
+// free it takes even when ctx has ended, so the context that stopped the
+// server can retire it.
+func (i *Instance) Retire(ctx context.Context) error {
+	if err := i.lock(ctx); err != nil {
 		return err
 	}
 	defer i.Release()
