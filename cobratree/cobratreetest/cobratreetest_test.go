@@ -44,7 +44,7 @@ func tree() *cobra.Command {
 		return nil
 	}}
 	root.AddCommand(get, env)
-	cobratree.Strict(root, nil)
+	cobratree.Strict(root)
 	return root
 }
 

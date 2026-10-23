@@ -31,8 +31,9 @@
 // Coded gives an error the exit status the code nearer its cause knows,
 // such as that of a host that could not be reached, and Status returns it.
 //
-// HelpTopics lets help show topics that are no command, such as the
-// concepts of a program's manual, beside the commands.
+// Topics, an Option of Strict, lets help show topics that are no command,
+// such as the concepts of a program's manual, beside the commands, and
+// offers their names where help is completed.
 //
 // ReadBuildInfo returns the module version, the revision and the time of
 // the commit, and whether the checkout was modified, as the toolchain
@@ -82,25 +83,63 @@ import (
 //     required flag(s) "realm" not set. A hook that sets a required flag
 //     is too late for this check.
 //
-// moved maps a command line a program no longer takes, its words after the
-// program's name, such as "status" or "get node", to the command line that
-// replaced it, such as "get cluster", for the error that a script calling
-// the old one gets. It may be nil.
+// Moved names the commands a program renamed, for the errors above, and
+// Topics adds help topics that are no command. A nil Option sets nothing.
 //
 // Strict expects the program to print the error Execute returns itself,
-// with SilenceErrors and SilenceUsage set on root.
-func Strict(root *cobra.Command, moved map[string]string) {
+// with SilenceErrors and SilenceUsage set on root. It panics when help
+// topics were added to the tree before it, with HelpTopics or an earlier
+// Strict, since its check of help would drop them, and, given Topics, on
+// a tree without subcommands, which has no help command.
+func Strict(root *cobra.Command, opts ...Option) {
+	if hasTopics(root) {
+		panic(fmt.Sprintf("cobratree: Strict called on %q, whose help shows topics already, which it would drop: pass Topics to one call of Strict instead", root.Name()))
+	}
+	var o options
+	for _, opt := range opts {
+		if opt != nil {
+			opt(&o)
+		}
+	}
+	var help *cobra.Command
+	if o.lookup != nil {
+		// Before any change, as it panics for a tree without help.
+		help = helpCommand(root)
+	}
 	root.InitDefaultHelpCmd()
 	root.InitDefaultCompletionCmd()
 	for _, sub := range root.Commands() {
 		if sub.Name() == "help" {
 			sub.Args = func(cmd *cobra.Command, args []string) error {
-				return helpTopic(cmd, args, moved)
+				return helpTopic(cmd, args, o.moved)
 			}
 		}
 	}
-	requireKnown(root, moved)
+	requireKnown(root, o.moved)
 	usageArgs(root)
+	if help != nil {
+		// After the checks, whose check of help the topics extend.
+		showTopics(root, help, o.lookup, o.names)
+	}
+}
+
+// An Option sets how Strict makes a tree strict: Moved or Topics.
+type Option func(*options)
+
+// options are what the Options given to Strict set.
+type options struct {
+	moved  map[string]string
+	lookup func(name string) (text string, ok bool)
+	names  func() []string
+}
+
+// Moved maps a command line a program no longer takes, its words after the
+// program's name, such as "status" or "get node", to the command line that
+// replaced it, such as "get cluster", for the error that a script calling
+// the old one gets: unknown command "status" for "prog" (it is now "get
+// cluster"). It may be nil. Given more than once, the last counts.
+func Moved(moved map[string]string) Option {
+	return func(o *options) { o.moved = moved }
 }
 
 // requireKnown makes every command that holds subcommands and runs nothing

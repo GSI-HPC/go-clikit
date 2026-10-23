@@ -25,7 +25,7 @@ func newTree() *cobra.Command {
 	cluster.Flags().StringP("output", "o", "human", "human or json")
 	get.AddCommand(cluster)
 	root.AddCommand(get)
-	cobratree.Strict(root, nil)
+	cobratree.Strict(root)
 	return root
 }
 
