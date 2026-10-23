@@ -53,9 +53,9 @@ func ExampleCheckCommandLines() {
 
 // Each command line names a command of the tree and its flags, or is
 // refused.
-func ExampleCheckCommandLine() {
+func ExampleValidateCommandLine() {
 	for _, line := range []string{"get cluster dev -o json", "get clusters", "get cluster --format json"} {
-		fmt.Println(cobratreetest.CheckCommandLine(newTree(), strings.Fields(line)))
+		fmt.Println(cobratreetest.ValidateCommandLine(newTree(), strings.Fields(line)))
 	}
 	// Output:
 	// <nil>
