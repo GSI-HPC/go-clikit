@@ -71,7 +71,7 @@ func TestRunWithNoArgs(t *testing.T) {
 	}
 }
 
-func TestCheckCommandLine(t *testing.T) {
+func TestValidateCommandLine(t *testing.T) {
 	for _, line := range []string{
 		"",
 		"get cluster",
@@ -91,7 +91,7 @@ func TestCheckCommandLine(t *testing.T) {
 		"get cluster -- --no-such-flag",
 		"get cluster -",
 	} {
-		if err := CheckCommandLine(tree(), strings.Fields(line)); err != nil {
+		if err := ValidateCommandLine(tree(), strings.Fields(line)); err != nil {
 			t.Errorf("prog %s: %v", line, err)
 		}
 	}
@@ -104,7 +104,7 @@ func TestCheckCommandLine(t *testing.T) {
 		"env --output json":      "prog env has no flag --output",
 		"NAME get cluster --x=1": "prog has no flag --x",
 	} {
-		err := CheckCommandLine(tree(), strings.Fields(line))
+		err := ValidateCommandLine(tree(), strings.Fields(line))
 		if err == nil || err.Error() != want {
 			t.Errorf("prog %s: error %v, want %q", line, err, want)
 		}
@@ -113,7 +113,7 @@ func TestCheckCommandLine(t *testing.T) {
 
 // A word under a runnable command with subcommands is refused only when
 // the command's own check refuses its arguments, as Execute refuses them.
-func TestCheckCommandLineUnderARunnableGroup(t *testing.T) {
+func TestValidateCommandLineUnderARunnableGroup(t *testing.T) {
 	run := func(*cobra.Command, []string) error { return nil }
 	build := func(rootRuns bool) *cobra.Command {
 		root := &cobra.Command{Use: "prog", SilenceErrors: true, SilenceUsage: true}
@@ -154,7 +154,7 @@ func TestCheckCommandLineUnderARunnableGroup(t *testing.T) {
 			"get mynode --bogus": "prog get has no flag --bogus",
 			"power bogus":        "prog power has no command bogus",
 		} {
-			err := CheckCommandLine(newTree(false), strings.Fields(line))
+			err := ValidateCommandLine(newTree(false), strings.Fields(line))
 			if got := fmt.Sprint(err); got != cmp.Or(want, "<nil>") {
 				t.Errorf("strict %v: prog %s: error %v, want %q", strict, line, err, want)
 			}
@@ -168,9 +168,19 @@ func TestCheckCommandLineUnderARunnableGroup(t *testing.T) {
 			}
 		}
 		// A runnable root takes no argument, by cobra's check or by Strict's.
-		err := CheckCommandLine(newTree(true), []string{"gte"})
+		err := ValidateCommandLine(newTree(true), []string{"gte"})
 		if got := fmt.Sprint(err); got != "prog has no command gte" {
 			t.Errorf("strict %v: prog gte: error %v, want prog has no command gte", strict, err)
+		}
+	}
+}
+
+// The deprecated name validates as ValidateCommandLine does.
+func TestCheckCommandLine(t *testing.T) {
+	for _, line := range []string{"get cluster", "get clusters"} {
+		args := strings.Fields(line)
+		if got, want := fmt.Sprint(CheckCommandLine(tree(), args)), fmt.Sprint(ValidateCommandLine(tree(), args)); got != want {
+			t.Errorf("prog %s: error %s, want %s", line, got, want)
 		}
 	}
 }

@@ -57,9 +57,9 @@ func Run(t testing.TB, root *cobra.Command, args ...string) (stdout, stderr stri
 }
 
 // CheckCommandLines checks every command line in text that runs the
-// program root is, by root's name, with CheckCommandLine, reports each that
-// fails through t.Errorf, with its line, and returns how many it checked,
-// for a test to require as many as the manual holds.
+// program root is, by root's name, with ValidateCommandLine, reports each
+// that fails through t.Errorf, with its line, and returns how many it
+// checked, for a test to require as many as the manual holds.
 //
 // text is read as lines of a shell script: a line that ends with a
 // backslash goes on in the next, a prompt of "$ " in front is left out, a
@@ -73,7 +73,7 @@ func CheckCommandLines(t testing.TB, root *cobra.Command, text string) (checked 
 	for _, line := range scriptLines(text) {
 		for _, args := range commandLines(root.Name(), line.text) {
 			checked++
-			if err := CheckCommandLine(root, args); err != nil {
+			if err := ValidateCommandLine(root, args); err != nil {
 				t.Errorf("line %d: %q: %v", line.n, line.text, err)
 			}
 		}
@@ -86,9 +86,11 @@ func CheckCommandLines(t testing.TB, root *cobra.Command, text string) (checked 
 // no command.
 var placeholder = regexp.MustCompile(`^[A-Z<\[(.]`)
 
-// CheckCommandLine reports whether args, the words of a command line after
-// the program's name, name a command of the tree under root and flags that
-// command has, its own or inherited. It runs nothing.
+// ValidateCommandLine reports whether args, the words of a command line
+// after the program's name, name a command of the tree under root and
+// flags that command has, its own or inherited, and returns the error that
+// says which does not. It runs nothing, and fails no test: CheckCommandLines
+// does that.
 //
 // The words that name commands come first: a command that holds
 // subcommands takes no other word, as Strict has it, unless it runs and
@@ -98,7 +100,7 @@ var placeholder = regexp.MustCompile(`^[A-Z<\[(.]`)
 // up, after them too, and takes the next word as its value unless it is a
 // bool, a count or written with =. What follows -- is the arguments' and
 // is not looked at, but by the check of a command that holds subcommands.
-func CheckCommandLine(root *cobra.Command, args []string) error {
+func ValidateCommandLine(root *cobra.Command, args []string) error {
 	cmd := root
 	commands := true
 	// group is a runnable command that holds subcommands, and word the
@@ -177,6 +179,15 @@ func takesArgs(cmd *cobra.Command, args []string) bool {
 		return false
 	}
 	return cmd.ValidateArgs(args) == nil
+}
+
+// CheckCommandLine reports whether args name a command of the tree under
+// root and flags it has, as ValidateCommandLine does.
+//
+// Deprecated: Use ValidateCommandLine; a name that starts with Check takes
+// a testing.TB and fails the test, as CheckCommandLines does (decision 36).
+func CheckCommandLine(root *cobra.Command, args []string) error {
+	return ValidateCommandLine(root, args)
 }
 
 // subcommand returns the subcommand of cmd that name names, or one of its
