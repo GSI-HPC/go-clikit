@@ -36,7 +36,7 @@ func (printer) Handle(e progress.Event) {
 // command watches or not.
 func reset(ctx context.Context, nodes []string) error {
 	ctx, step := progress.Start(ctx, progress.KindStep, "reset the machines",
-		progress.WithFlags(progress.Fold), progress.Total(len(nodes)))
+		progress.WithFlags(progress.FlagFold), progress.Total(len(nodes)))
 	// Every target is announced queued before the first runs, so that a
 	// display knows the whole of the work from the start.
 	targets := make([]*progress.Span, len(nodes))
@@ -278,7 +278,7 @@ func ExampleSpan_Advance() {
 	})
 	ctx := progress.WithBus(context.Background(), bus)
 	_, call := progress.Start(ctx, progress.KindCall, "download", progress.HTTP("GET", "/images/rocky-9.4.qcow2"))
-	call.Update(progress.Work(progress.Bytes, 2<<30))
+	call.Update(progress.Work(progress.UnitBytes, 2<<30))
 	for range 3 {
 		now = now.Add(100 * time.Millisecond)
 		call.Advance(8 << 20)
@@ -305,7 +305,7 @@ func ExampleSpan_SetAmount() {
 		Now:   func() time.Time { return now },
 	})
 	ctx := progress.WithBus(context.Background(), bus)
-	_, call := progress.Start(ctx, progress.KindCall, "firmware update", progress.Work(progress.Percent, 0))
+	_, call := progress.Start(ctx, progress.KindCall, "firmware update", progress.Work(progress.UnitPercent, 0))
 	for _, done := range []int64{40, 75, 100} {
 		now = now.Add(time.Second)
 		call.SetAmount(done)
@@ -331,7 +331,7 @@ func ExampleCountWriter() {
 		Now:   func() time.Time { return now },
 	})
 	ctx, step := progress.Start(progress.WithBus(context.Background(), bus), progress.KindStep, "copying the image")
-	ctx, call := progress.Start(ctx, progress.KindCall, "copy", progress.Work(progress.Bytes, 4<<20))
+	ctx, call := progress.Start(ctx, progress.KindCall, "copy", progress.Work(progress.UnitBytes, 4<<20))
 	image := bytes.NewReader(make([]byte, 4<<20))
 	var dst bytes.Buffer
 	n, err := io.Copy(progress.CountWriter(ctx, &dst), image)
@@ -364,11 +364,11 @@ func ExampleMeter() {
 	ctx, _ := progress.Start(progress.WithBus(context.Background(), bus), progress.KindCommand, "deploy")
 
 	ctx, _ = progress.Start(ctx, progress.KindStep, "copying the image",
-		progress.WithFlags(progress.Fold), progress.Total(4))
+		progress.WithFlags(progress.FlagFold), progress.Total(4))
 	targets := make([]*progress.Span, 4)
 	for i, node := range []string{"exe01", "exe02", "exe03", "exe04"} {
 		_, targets[i] = progress.Start(ctx, progress.KindTarget, node, progress.Queued(),
-			progress.Node(node), progress.Work(progress.Bytes, 1<<30))
+			progress.Node(node), progress.Work(progress.UnitBytes, 1<<30))
 	}
 	for _, target := range targets[:2] {
 		target.Run()

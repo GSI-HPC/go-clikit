@@ -17,14 +17,14 @@ import (
 	"github.com/GSI-HPC/go-clikit/progress"
 )
 
-// pool runs n targets under a Fold step, limit at a time, the way the pool
+// pool runs n targets under a FlagFold step, limit at a time, the way the pool
 // contract has it: every target queued before the first runs, each ended
 // before its place is given up, and those never started ended as canceled
 // once ctx ends. The targets in fail fail, and cancel, if set, is called
 // once the target it names has started.
 func pool(ctx context.Context, name string, n, limit int, fail map[int]bool, cancel map[int]context.CancelFunc) {
 	stepCtx, step := progress.Start(ctx, progress.KindStep, name,
-		progress.WithFlags(progress.Fold), progress.Total(n), progress.Limit(limit))
+		progress.WithFlags(progress.FlagFold), progress.Total(n), progress.Limit(limit))
 	ctxs, spans := make([]context.Context, n), make([]*progress.Span, n)
 	for i := range n {
 		node := fmt.Sprintf("exe%d", i+1)
@@ -92,12 +92,12 @@ func TestCheckAcceptsWorkThatKeepsThePromises(t *testing.T) {
 
 	ctx, bus, c := watch(t)
 	ctx, cmd := progress.Start(ctx, progress.KindCommand, "provision reinstall")
-	_, cred := progress.Start(ctx, progress.KindCall, "credential bmc", progress.WithFlags(progress.Hidden), progress.Source("prompt"))
+	_, cred := progress.Start(ctx, progress.KindCall, "credential bmc", progress.WithFlags(progress.FlagHidden), progress.Source("prompt"))
 	resume := progress.Suspend(ctx)
 	resume()
 	cred.End(nil)
 	// A download that reports its work, advanced as it goes.
-	_, download := progress.Start(ctx, progress.KindCall, "download", progress.Work(progress.Bytes, 2<<30))
+	_, download := progress.Start(ctx, progress.KindCall, "download", progress.Work(progress.UnitBytes, 2<<30))
 	download.Advance(8 << 20)
 	download.Advance(8 << 20)
 	download.End(nil)
@@ -105,7 +105,7 @@ func TestCheckAcceptsWorkThatKeepsThePromises(t *testing.T) {
 
 	// A staggered step: a batch that ran, one that failed, and one left
 	// out, which counts as its Total.
-	stepCtx, step := progress.Start(ctx, progress.KindStep, "power on", progress.WithFlags(progress.Fold), progress.Total(6), progress.Limit(2))
+	stepCtx, step := progress.Start(ctx, progress.KindStep, "power on", progress.WithFlags(progress.FlagFold), progress.Total(6), progress.Limit(2))
 	var batches []*progress.Span
 	var batchCtxs []context.Context
 	for i := range 3 {
@@ -153,7 +153,7 @@ func (es events) add(t progress.Type, span, parent progress.SpanID, k progress.K
 
 func queued(e *progress.Event) { e.State = progress.StateQueued }
 func folds(total int) func(*progress.Event) {
-	return func(e *progress.Event) { e.Flags |= progress.Fold; e.Total = total }
+	return func(e *progress.Event) { e.Flags |= progress.FlagFold; e.Total = total }
 }
 
 // Short names for the table below.
@@ -184,7 +184,7 @@ func worked(amount, size int64, u progress.Unit, ms int) func(*progress.Event) {
 func TestCheckHoldsTheWorkOfASpan(t *testing.T) {
 	t.Parallel()
 
-	b := progress.Bytes
+	b := progress.UnitBytes
 	tests := []struct {
 		name   string
 		events events
@@ -213,11 +213,11 @@ func TestCheckHoldsTheWorkOfASpan(t *testing.T) {
 			events{}.add(start, 1, 0, call, worked(0, -2, b, 0)).add(end, 1, 0, call, worked(0, -2, b, 0)),
 			"a Size of -2"},
 		{"a percentage of a Size other than 100",
-			events{}.add(start, 1, 0, call, worked(0, 50, progress.Percent, 0)).add(end, 1, 0, call, worked(0, 50, progress.Percent, 0)),
+			events{}.add(start, 1, 0, call, worked(0, 50, progress.UnitPercent, 0)).add(end, 1, 0, call, worked(0, 50, progress.UnitPercent, 0)),
 			"a Size of 50, not 100"},
 		{"a Unit that changes",
-			events{}.add(start, 1, 0, call, worked(0, 10, b, 0)).add(progress.TypeUpdate, 1, 0, call, worked(0, 10, progress.Items, 0)).
-				add(end, 1, 0, call, worked(0, 10, progress.Items, 0)),
+			events{}.add(start, 1, 0, call, worked(0, 10, b, 0)).add(progress.TypeUpdate, 1, 0, call, worked(0, 10, progress.UnitItems, 0)).
+				add(end, 1, 0, call, worked(0, 10, progress.UnitItems, 0)),
 			"changes the Unit of call \"s1\" (event 1) from bytes to items"},
 		{"a Unit that is taken back",
 			events{}.add(start, 1, 0, call, worked(0, 10, b, 0)).add(end, 1, 0, call),
@@ -233,10 +233,10 @@ func TestCheckHoldsTheWorkOfASpan(t *testing.T) {
 	// A Unit given after the start stays, and advances a tenth of a second
 	// apart are as often as the Bus sends them.
 	ok := events{}.add(start, 1, 0, call).
-		add(progress.TypeUpdate, 1, 0, call, worked(0, 100, progress.Percent, 0)).
-		add(advance, 1, 0, call, worked(10, 100, progress.Percent, 50)).
-		add(advance, 1, 0, call, worked(20, 100, progress.Percent, 150)).
-		add(end, 1, 0, call, worked(100, 100, progress.Percent, 160))
+		add(progress.TypeUpdate, 1, 0, call, worked(0, 100, progress.UnitPercent, 0)).
+		add(advance, 1, 0, call, worked(10, 100, progress.UnitPercent, 50)).
+		add(advance, 1, 0, call, worked(20, 100, progress.UnitPercent, 150)).
+		add(end, 1, 0, call, worked(100, 100, progress.UnitPercent, 160))
 	if problems := violations(ok); len(problems) > 0 {
 		t.Errorf("violations of work that keeps its promises: %q", problems)
 	}
@@ -286,7 +286,7 @@ func TestCheckFindsBrokenPromises(t *testing.T) {
 		{"a suspension never resumed", events{}.add(progress.TypeSuspend, 0, 0, 0), "never resumed"},
 		{"a resume with nothing suspended", events{}.add(progress.TypeResume, 0, 0, 0), "resumes what was not suspended"},
 		{"a flag that is not passed down",
-			events{}.add(start, 1, 0, step, func(e *progress.Event) { e.Flags = progress.Hidden }).add(start, 2, 1, call).add(end, 2, 1, call).add(end, 1, 0, step),
+			events{}.add(start, 1, 0, step, func(e *progress.Event) { e.Flags = progress.FlagHidden }).add(start, 2, 1, call).add(end, 2, 1, call).add(end, 1, 0, step),
 			"lacks the hidden of its parent"},
 		{"text that is not escaped", events{}.add(start, 1, 0, call).add(end, 1, 0, call, func(e *progress.Event) { e.Err = "\x1b[2J" }), "error that is not escaped"},
 		{"text that is too long", events{}.add(start, 1, 0, call, func(e *progress.Event) { e.Message = strings.Repeat("x", 300) }).add(end, 1, 0, call),
@@ -344,7 +344,7 @@ func TestTreeDrawsWhatIsNotFinished(t *testing.T) {
 
 	ctx, bus, c := watch(t)
 	ctx, _ = progress.Start(ctx, progress.KindCommand, "bmc power on")
-	ctx, _ = progress.Start(ctx, progress.KindStep, "power on", progress.WithFlags(progress.Fold), progress.Total(20))
+	ctx, _ = progress.Start(ctx, progress.KindStep, "power on", progress.WithFlags(progress.FlagFold), progress.Total(20))
 	for i := range 11 {
 		_, b := progress.Start(ctx, progress.KindBatch, "batch", progress.Queued(), progress.Batch(i+1, 11), progress.Node(fmt.Sprintf("exe%d", i+1)))
 		if i == 1 {
@@ -381,7 +381,7 @@ func TestCaptureKeepsEveryAdvanceAndTreeDrawsTheWork(t *testing.T) {
 	bus := progress.NewBus(progress.BusOptions{Sinks: []progress.Sink{c}, Now: func() time.Time { return now }})
 	ctx := progress.WithBus(context.Background(), bus)
 	ctx, cmd := progress.Start(ctx, progress.KindCommand, "fetch")
-	_, call := progress.Start(ctx, progress.KindCall, "download", progress.Work(progress.Bytes, 2<<30))
+	_, call := progress.Start(ctx, progress.KindCall, "download", progress.Work(progress.UnitBytes, 2<<30))
 	var amounts []int64
 	for range 5 {
 		call.Advance(1 << 30)
@@ -532,7 +532,7 @@ func TestTreeWritesANameAsItsOwnOnlyWhereItStandsAlone(t *testing.T) {
 
 	capture := &Capture{}
 	bus := progress.NewBus(progress.BusOptions{Sinks: []progress.Sink{capture}})
-	ctx, step := progress.Start(progress.WithBus(context.Background(), bus), progress.KindStep, "s", progress.WithFlags(progress.Fold), progress.Total(4))
+	ctx, step := progress.Start(progress.WithBus(context.Background(), bus), progress.KindStep, "s", progress.WithFlags(progress.FlagFold), progress.Total(4))
 	errs := map[string]error{
 		"c":     errors.New("context deadline exceeded"),
 		"e":     errors.New("i/o timeout"),

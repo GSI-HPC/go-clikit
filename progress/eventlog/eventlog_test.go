@@ -135,7 +135,7 @@ func TestDecodeLeavesOutWhatItDoesNotKnow(t *testing.T) {
 	}
 	e := l.Event
 	want := progress.Event{Seq: 3, Time: time.Date(2026, 9, 25, 10, 0, 0, 0, time.UTC), Type: progress.TypeEnd,
-		Span: 2, Parent: 1, Name: "exe1", Flags: progress.Fold, Fields: progress.Fields{Node: "exe1"}}
+		Span: 2, Parent: 1, Name: "exe1", Flags: progress.FlagFold, Fields: progress.Fields{Node: "exe1"}}
 	if !reflect.DeepEqual(e, want) {
 		t.Errorf("Decode = %+v, want %+v", e, want)
 	}

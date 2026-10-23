@@ -19,9 +19,9 @@
 // the call has started; it may grow as another starts, but never shrinks.
 // What has ended is the targets ended below the roots under way, and the
 // whole Total of each root that has ended, so it never goes back, never
-// passes what is expected, and, once every root has ended, is all of it.
-// A call that counts nothing sends nothing. Hidden spans are not counted,
-// as a display does not show them.
+// passes what is expected, and, once every root has ended, is all of it. A
+// call that counts nothing sends nothing. Spans with FlagHidden are not
+// counted, as a display does not show them.
 //
 // MCP asks that the progress of each notification be more than the one
 // before: after the first, a notification is sent only once more targets
@@ -133,7 +133,7 @@ func (n *Notifier) Handle(e progress.Event) {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 	count, counted := n.tally.Add(e)
-	shown := e.Flags&progress.Hidden == 0
+	shown := e.Flags&progress.FlagHidden == 0
 	switch e.Type {
 	case progress.TypeStart:
 		if _, ok := n.tally.Count(e.Span); ok && shown && isRoot(n.tally.Roots(), e.Span) {

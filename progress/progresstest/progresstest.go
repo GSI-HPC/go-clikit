@@ -18,20 +18,20 @@
 // promises Check lists. Three of them shape how work that runs in parallel
 // is reported, and are the ones a pool written by hand most often breaks:
 //
-//   - Every target of a Fold step or a batch, and every batch of a step, is
-//     announced queued, with progress.Queued, before the first of them
-//     runs. A pool that starts each target from its own goroutine as it
-//     takes its place, as errgroup.Go does, breaks this: start them all
+//   - Every target of a FlagFold step or a batch, and every batch of a
+//     step, is announced queued, with progress.Queued, before the first of
+//     them runs. A pool that starts each target from its own goroutine as
+//     it takes its place, as errgroup.Go does, breaks this: start them all
 //     first, then run them; the pools of the fanout package do.
-//   - When a Fold step or a batch ends, the targets under it that ended are
-//     its Total, however they ended, so a counter always reaches its total;
-//     no count passes its Total, and a Total never shrinks.
+//   - When a FlagFold step or a batch ends, the targets under it that ended
+//     are its Total, however they ended, so a counter always reaches its
+//     total; no count passes its Total, and a Total never shrinks.
 //   - No more targets run at once below a span than its Limit.
 //
 // The work of a span is held to rules too: an advance names a span that is
 // running and changes its Amount, two advances of a span come at least
 // 100 ms apart by their times, Amount and Size are never negative, a span
-// in progress.Percent has a Size of 100, and the Unit of a span never
+// in progress.UnitPercent has a Size of 100, and the Unit of a span never
 // changes once given. Capture keeps every advance the Bus sends, and Tree
 // draws the work of a span after its other fields.
 package progresstest
@@ -423,21 +423,21 @@ func digits(s string) int {
 //     ends after every span under it. Its Run, Update and Line events come
 //     between its Start and its End, and a Run only follows a queued Start.
 //  3. The work a step knows of is announced up front. The targets of a
-//     Fold step or a batch, and the batches of a step, all start queued
-//     before the first of them runs. When a Fold step or a batch ends,
+//     FlagFold step or a batch, and the batches of a step, all start queued
+//     before the first of them runs. When a FlagFold step or a batch ends,
 //     its targets that ended, however they ended, are its Total; a batch
-//     or a Fold step that was skipped or canceled before any target of
+//     or a FlagFold step that was skipped or canceled before any target of
 //     its own started counts as its Total. No count ever exceeds its
 //     Total, and no Total shrinks, so a counter never goes backwards and
 //     always reaches its total, even after an interrupt.
 //  4. No more targets run at once below a span than its Limit.
 //  5. Every Suspend is followed by one Resume.
 //  6. No text holds anything termtext.Escape would escape, and none is
-//     longer than its bound. Hidden and ShowLines are passed down.
+//     longer than its bound. FlagHidden and FlagShowLines are passed down.
 //  7. The work of a span is sound. An advance names a span that is
 //     running and changes its Amount; two advances of a span come at
 //     least 100 ms apart by their times; Amount and Size are never
-//     negative; a span in Percent has a Size of 100; and the Unit of a
+//     negative; a span in UnitPercent has a Size of 100; and the Unit of a
 //     span never changes once given.
 //
 // Each rule is a promise the progress package makes to every sink. A new
@@ -479,12 +479,12 @@ func (s *span) String() string {
 
 // counts reports whether s counts the targets below it against its Total.
 func (s *span) counts() bool {
-	return s.e.Kind == progress.KindBatch || s.e.Kind == progress.KindStep && s.e.Flags&progress.Fold != 0
+	return s.e.Kind == progress.KindBatch || s.e.Kind == progress.KindStep && s.e.Flags&progress.FlagFold != 0
 }
 
 // announces reports whether s announces the spans of kind k below it up
-// front: the targets of a Fold step or a batch, and the batches of any
-// step, Fold or not.
+// front: the targets of a FlagFold step or a batch, and the batches of any
+// step, FlagFold or not.
 func (s *span) announces(k progress.Kind) bool {
 	switch k {
 	case progress.KindTarget:
@@ -508,7 +508,7 @@ func (s *span) checkWork(e progress.Event, bad func(string, ...any)) {
 	if e.Size < 0 {
 		bad("event %d gives %s a Size of %d", e.Seq, s, e.Size)
 	}
-	if e.Unit == progress.Percent && e.Size != 100 {
+	if e.Unit == progress.UnitPercent && e.Size != 100 {
 		bad("event %d gives %s, in percent, a Size of %d, not 100", e.Seq, s, e.Size)
 	}
 	if s.unit != 0 && e.Unit != s.unit {
@@ -610,7 +610,7 @@ func violations(events []progress.Event) []string {
 				if p != nil {
 					s.parent = p
 					p.open++
-					if missing := p.e.Flags & (progress.Hidden | progress.ShowLines) &^ e.Flags; missing != 0 {
+					if missing := p.e.Flags & (progress.FlagHidden | progress.FlagShowLines) &^ e.Flags; missing != 0 {
 						bad("%s lacks the %s of its parent", s, missing)
 					}
 					if p.announces(e.Kind) {
@@ -660,7 +660,7 @@ func violations(events []progress.Event) []string {
 			}
 		case progress.TypeUpdate, progress.TypeAdvance:
 		case progress.TypeLine:
-			if e.Stream != progress.Stdout && e.Stream != progress.Stderr {
+			if e.Stream != progress.StreamStdout && e.Stream != progress.StreamStderr {
 				bad("event %d is a line of no stream", e.Seq)
 			}
 		case progress.TypeEnd:

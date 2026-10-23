@@ -58,25 +58,25 @@ type lineState struct {
 // lines that ended: a line cut off by the end of the output, or longer than
 // 64 KiB, is none it is given.
 //
-// When the innermost span in ctx has ShowLines and a sink wants lines, they
-// also go to the sinks as TypeLine events, sanitised and rate limited: a
-// burst of 20, then one each 100ms. A line that finds no place waits for
+// When the innermost span in ctx has FlagShowLines and a sink wants lines,
+// they also go to the sinks as TypeLine events, sanitised and rate limited:
+// a burst of 20, then one each 100ms. A line that finds no place waits for
 // the next one, in place of the line that waited before it, which is
 // counted as dropped; so the newest line is never lost, and is sent when
-// its place comes, whether another line comes or not. A line that does
-// not end is sent in pieces of 4 KiB, and what is left of it when the span
-// ends is sent before the End. The End sends the line that waits, and what
-// is left of the lines that did not end, though it finds no place for
-// them: of those, the newest of each stream, so that the last line of
-// stdout and that of stderr both reach the sinks. Until the End, the span
-// keeps the line of a writer that has not ended, but neither the writer
-// nor anything of one whose output ended with a line.
+// its place comes, whether another line comes or not. A line that does not
+// end is sent in pieces of 4 KiB, and what is left of it when the span ends
+// is sent before the End. The End sends the line that waits, and what is
+// left of the lines that did not end, though it finds no place for them: of
+// those, the newest of each stream, so that the last line of stdout and
+// that of stderr both reach the sinks. Until the End, the span keeps the
+// line of a writer that has not ended, but neither the writer nor anything
+// of one whose output ended with a line.
 //
 // Tee returns w itself when nothing needs the lines. The lines never fail a
 // write: what Write returns is what w returned.
 func Tee(ctx context.Context, w io.Writer, st Stream, parse func(Stream, string)) io.Writer {
 	s := SpanFrom(ctx)
-	if s != nil && (s.flags&ShowLines == 0 || !s.wantsLines()) {
+	if s != nil && (s.flags&FlagShowLines == 0 || !s.wantsLines()) {
 		s = nil
 	}
 	if s == nil && parse == nil {

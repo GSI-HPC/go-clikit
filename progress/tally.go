@@ -6,13 +6,14 @@ package progress
 // Tally keeps count of the targets of a Bus's work, from its events, the
 // way a display shows how far the work has got.
 //
-// A step with Fold and a batch count the targets below them. A target that
-// ends counts once in every such span above it, however it ended; a batch
-// or a Fold step left out, skipped or canceled before any target of its own
-// started, counts in the same spans as its Total, less what the batches and
-// steps left out below it have counted there already. So a count reaches its
-// Total once all the work it expects has ended, after an interrupt too,
-// and never passes it: progresstest.Check holds every source to that.
+// A step with FlagFold and a batch count the targets below them. A target
+// that ends counts once in every such span above it, however it ended; a
+// batch or a FlagFold step left out, skipped or canceled before any target
+// of its own started, counts in the same spans as its Total, less what the
+// batches and steps left out below it have counted there already. So a
+// count reaches its Total once all the work it expects has ended, after an
+// interrupt too, and never passes it: progresstest.Check holds every source
+// to that.
 //
 // The spans that count with none above them are the roots of the tally,
 // what a counter shows: "power on" as a whole, not each of its batches.
@@ -36,7 +37,7 @@ type Count struct {
 	// Total is the span's Total, the targets it expects.
 	Total int
 	// Done counts the targets that ended below, however they ended, and
-	// the Total of every batch or Fold step below that was left out, each
+	// the Total of every batch or FlagFold step below that was left out, each
 	// target once.
 	// Failed, Canceled and Skipped count those that ended so.
 	Done, Failed, Canceled, Skipped int
@@ -69,7 +70,7 @@ type tallied struct {
 // counts reports whether a span of kind k with flags f counts the targets
 // below it.
 func counts(k Kind, f Flags) bool {
-	return k == KindBatch || k == KindStep && f&Fold != 0
+	return k == KindBatch || k == KindStep && f&FlagFold != 0
 }
 
 // Add counts e in. When e ends a span that counts, Add returns where its

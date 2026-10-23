@@ -275,7 +275,7 @@ var (
 	statuses = named(progress.StatusOK, progress.StatusFailed, progress.StatusCanceled, progress.StatusSkipped)
 	classes  = named(progress.ClassTarget, progress.ClassTransport, progress.ClassTimeout,
 		progress.ClassAuth, progress.ClassPin, progress.ClassUsage, progress.ClassCanceled)
-	streams = named(progress.Stdout, progress.Stderr)
-	units   = named(progress.Items, progress.Bytes, progress.Percent)
-	flags   = named(progress.Hidden, progress.Fold, progress.ShowLines, progress.DryRun)
+	streams = named(progress.StreamStdout, progress.StreamStderr)
+	units   = named(progress.UnitItems, progress.UnitBytes, progress.UnitPercent)
+	flags   = named(progress.FlagHidden, progress.FlagFold, progress.FlagShowLines, progress.FlagDryRun)
 )

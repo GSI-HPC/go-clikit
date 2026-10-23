@@ -47,7 +47,7 @@ func last(t *testing.T, c *progresstest.Capture, typ progress.Type) progress.Eve
 
 // Work gives a span its unit and size when it starts, and an update gives
 // the size once it is known or changes it; the unit once given stays, a
-// size of 0 or less is one not known, and the size of work in Percent is
+// size of 0 or less is one not known, and the size of work in UnitPercent is
 // always 100.
 func TestWorkGivesAUnitThatStaysAndASize(t *testing.T) {
 	t.Parallel()
@@ -57,23 +57,23 @@ func TestWorkGivesAUnitThatStaysAndASize(t *testing.T) {
 		want          work
 	}{
 		{"none", nil, nil, work{}},
-		{"given at the start", []progress.Option{progress.Work(progress.Bytes, 2048)}, nil, work{0, 2048, progress.Bytes}},
-		{"a size not known", []progress.Option{progress.Work(progress.Items, -1)}, nil, work{0, 0, progress.Items}},
-		{"a zero unit counts items", []progress.Option{progress.Work(0, 10)}, nil, work{0, 10, progress.Items}},
-		{"percent is out of 100", []progress.Option{progress.Work(progress.Percent, 0)}, nil, work{0, 100, progress.Percent}},
-		{"the size given late", nil, []progress.Option{progress.Work(progress.Bytes, 4096)}, work{0, 4096, progress.Bytes}},
+		{"given at the start", []progress.Option{progress.Work(progress.UnitBytes, 2048)}, nil, work{0, 2048, progress.UnitBytes}},
+		{"a size not known", []progress.Option{progress.Work(progress.UnitItems, -1)}, nil, work{0, 0, progress.UnitItems}},
+		{"a zero unit counts items", []progress.Option{progress.Work(0, 10)}, nil, work{0, 10, progress.UnitItems}},
+		{"percent is out of 100", []progress.Option{progress.Work(progress.UnitPercent, 0)}, nil, work{0, 100, progress.UnitPercent}},
+		{"the size given late", nil, []progress.Option{progress.Work(progress.UnitBytes, 4096)}, work{0, 4096, progress.UnitBytes}},
 		{"the size changes, the unit stays",
-			[]progress.Option{progress.Work(progress.Bytes, 4096)},
-			[]progress.Option{progress.Work(progress.Items, 8192)}, work{0, 8192, progress.Bytes}},
+			[]progress.Option{progress.Work(progress.UnitBytes, 4096)},
+			[]progress.Option{progress.Work(progress.UnitItems, 8192)}, work{0, 8192, progress.UnitBytes}},
 		{"the size becomes unknown",
-			[]progress.Option{progress.Work(progress.Bytes, 4096)},
-			[]progress.Option{progress.Work(progress.Bytes, 0)}, work{0, 0, progress.Bytes}},
+			[]progress.Option{progress.Work(progress.UnitBytes, 4096)},
+			[]progress.Option{progress.Work(progress.UnitBytes, 0)}, work{0, 0, progress.UnitBytes}},
 		{"percent stays out of 100",
-			[]progress.Option{progress.Work(progress.Percent, 100)},
-			[]progress.Option{progress.Work(progress.Bytes, 7)}, work{0, 100, progress.Percent}},
+			[]progress.Option{progress.Work(progress.UnitPercent, 100)},
+			[]progress.Option{progress.Work(progress.UnitBytes, 7)}, work{0, 100, progress.UnitPercent}},
 		{"an update without work keeps it",
-			[]progress.Option{progress.Work(progress.Bytes, 4096)},
-			[]progress.Option{progress.Message("halfway")}, work{0, 4096, progress.Bytes}},
+			[]progress.Option{progress.Work(progress.UnitBytes, 4096)},
+			[]progress.Option{progress.Message("halfway")}, work{0, 4096, progress.UnitBytes}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
@@ -95,9 +95,9 @@ func TestWorkGivesAUnitThatStaysAndASize(t *testing.T) {
 func TestEndTakesWork(t *testing.T) {
 	t.Parallel()
 	ctx, _, capture := watched(t, progress.BusOptions{})
-	_, call := progress.Start(ctx, progress.KindCall, "download", progress.Work(progress.Bytes, 0))
-	call.End(nil, progress.Work(progress.Items, 512))
-	if got, want := workOf(last(t, capture, progress.TypeEnd)), (work{0, 512, progress.Bytes}); got != want {
+	_, call := progress.Start(ctx, progress.KindCall, "download", progress.Work(progress.UnitBytes, 0))
+	call.End(nil, progress.Work(progress.UnitItems, 512))
+	if got, want := workOf(last(t, capture, progress.TypeEnd)), (work{0, 512, progress.UnitBytes}); got != want {
 		t.Errorf("the span ends with %+v, want %+v", got, want)
 	}
 }
@@ -110,25 +110,25 @@ func TestAnAdvanceIsSentAtMostEvery100msByTheBusClock(t *testing.T) {
 	t.Parallel()
 	clock := newClock()
 	ctx, _, capture := watched(t, progress.BusOptions{Now: clock.Now})
-	_, call := progress.Start(ctx, progress.KindCall, "download", progress.Work(progress.Bytes, 100))
+	_, call := progress.Start(ctx, progress.KindCall, "download", progress.Work(progress.UnitBytes, 100))
 	call.Advance(10)
 	call.Advance(10)
 	clock.Add(50 * time.Millisecond)
 	call.Advance(10)
 	call.Update(progress.Message("halfway"))
-	if got, want := workOf(last(t, capture, progress.TypeUpdate)), (work{10, 100, progress.Bytes}); got != want {
+	if got, want := workOf(last(t, capture, progress.TypeUpdate)), (work{10, 100, progress.UnitBytes}); got != want {
 		t.Errorf("the update carries %+v, want the amount sent last, %+v", got, want)
 	}
 	clock.Add(50 * time.Millisecond)
 	call.Advance(10)
 	call.Advance(5)
 	call.End(nil)
-	want := []work{{10, 100, progress.Bytes}, {40, 100, progress.Bytes}}
+	want := []work{{10, 100, progress.UnitBytes}, {40, 100, progress.UnitBytes}}
 	if got := advances(capture); !equalWork(got, want) {
 		t.Errorf("advances %+v, want %+v", got, want)
 	}
 	end := last(t, capture, progress.TypeEnd)
-	if got, want := workOf(end), (work{45, 100, progress.Bytes}); got != want {
+	if got, want := workOf(end), (work{45, 100, progress.UnitBytes}); got != want {
 		t.Errorf("the end carries %+v, want the newest amount, %+v", got, want)
 	}
 	var times []time.Time
@@ -154,7 +154,7 @@ func equalWork(a, b []work) bool {
 	return true
 }
 
-// A span given no Work counts Items, and SetAmount sets the amount rather
+// A span given no Work counts UnitItems, and SetAmount sets the amount rather
 // than adding to it, down as well as up; one below 0 is sent as 0, and one
 // that does not change the amount sends nothing.
 func TestSetAmountSetsTheAmountOfASpanThatCountsItems(t *testing.T) {
@@ -169,7 +169,7 @@ func TestSetAmountSetsTheAmountOfASpanThatCountsItems(t *testing.T) {
 	clock.Add(100 * time.Millisecond)
 	step.Advance(-50)
 	step.End(nil)
-	want := []work{{70, 0, progress.Items}, {30, 0, progress.Items}, {0, 0, progress.Items}}
+	want := []work{{70, 0, progress.UnitItems}, {30, 0, progress.UnitItems}, {0, 0, progress.UnitItems}}
 	if got := advances(capture); !equalWork(got, want) {
 		t.Errorf("advances %+v, want %+v", got, want)
 	}
@@ -181,7 +181,7 @@ func TestOnlyARunningSpanAdvances(t *testing.T) {
 	t.Parallel()
 	clock := newClock()
 	ctx, _, capture := watched(t, progress.BusOptions{Now: clock.Now})
-	_, target := progress.Start(ctx, progress.KindTarget, "exe0001", progress.Queued(), progress.Work(progress.Bytes, 10))
+	_, target := progress.Start(ctx, progress.KindTarget, "exe0001", progress.Queued(), progress.Work(progress.UnitBytes, 10))
 	target.Advance(5)
 	target.SetAmount(5)
 	clock.Add(time.Second)
@@ -194,10 +194,10 @@ func TestOnlyARunningSpanAdvances(t *testing.T) {
 	var none *progress.Span
 	none.Advance(1)
 	none.SetAmount(1)
-	if got, want := advances(capture), []work{{1, 10, progress.Bytes}}; !equalWork(got, want) {
+	if got, want := advances(capture), []work{{1, 10, progress.UnitBytes}}; !equalWork(got, want) {
 		t.Errorf("advances %+v, want %+v", got, want)
 	}
-	if got, want := workOf(last(t, capture, progress.TypeEnd)), (work{1, 10, progress.Bytes}); got != want {
+	if got, want := workOf(last(t, capture, progress.TypeEnd)), (work{1, 10, progress.UnitBytes}); got != want {
 		t.Errorf("the end carries %+v, want %+v", got, want)
 	}
 }
@@ -222,7 +222,7 @@ func TestAnAmountThatWaitsIsSentWhenItsPlaceComes(t *testing.T) {
 		clock.Add(100 * time.Millisecond)
 		time.Sleep(100 * time.Millisecond)
 		synctest.Wait()
-		if got, want := advances(capture), []work{{1, 0, progress.Items}, {2, 0, progress.Items}}; !equalWork(got, want) {
+		if got, want := advances(capture), []work{{1, 0, progress.UnitItems}, {2, 0, progress.UnitItems}}; !equalWork(got, want) {
 			t.Errorf("advances %+v, want %+v", got, want)
 		}
 		// One sent by an advance before its timer fires leaves the timer
@@ -245,7 +245,7 @@ func TestAnAdvanceWaitsForItsPlaceByTheTimeOfDay(t *testing.T) {
 	t.Parallel()
 	synctest.Test(t, func(t *testing.T) {
 		ctx, _, capture := watched(t, progress.BusOptions{})
-		_, call := progress.Start(ctx, progress.KindCall, "download", progress.Work(progress.Bytes, 0))
+		_, call := progress.Start(ctx, progress.KindCall, "download", progress.Work(progress.UnitBytes, 0))
 		call.Advance(1)
 		time.Sleep(10 * time.Millisecond)
 		call.Advance(1)
@@ -293,8 +293,8 @@ func TestAClockThatMovesBackDelaysNoAdvanceForLong(t *testing.T) {
 }
 
 // A span whose first advance could not be sent before it ended, by a clock
-// that reads a time before 1970, ends with the amount, in Items when it was
-// given no Work.
+// that reads a time before 1970, ends with the amount, in UnitItems when it
+// was given no Work.
 func TestAnAmountNeverSentIsOnTheEnd(t *testing.T) {
 	t.Parallel()
 	synctest.Test(t, func(t *testing.T) {
@@ -306,7 +306,7 @@ func TestAnAmountNeverSentIsOnTheEnd(t *testing.T) {
 		if got := advances(capture); len(got) != 0 {
 			t.Errorf("advances %+v, want none", got)
 		}
-		if got, want := workOf(last(t, capture, progress.TypeEnd)), (work{3, 0, progress.Items}); got != want {
+		if got, want := workOf(last(t, capture, progress.TypeEnd)), (work{3, 0, progress.UnitItems}); got != want {
 			t.Errorf("the end carries %+v, want %+v", got, want)
 		}
 	})
@@ -318,12 +318,12 @@ func TestASpanEndedForItCarriesItsAmount(t *testing.T) {
 	t.Parallel()
 	clock := newClock()
 	ctx, bus, capture := watched(t, progress.BusOptions{Now: clock.Now})
-	_, call := progress.Start(ctx, progress.KindCall, "download", progress.Work(progress.Bytes, 10))
+	_, call := progress.Start(ctx, progress.KindCall, "download", progress.Work(progress.UnitBytes, 10))
 	call.Advance(2)
 	call.Advance(2)
 	bus.Close()
 	end := last(t, capture, progress.TypeEnd)
-	if got, want := workOf(end), (work{4, 10, progress.Bytes}); got != want || end.Status != progress.StatusCanceled {
+	if got, want := workOf(end), (work{4, 10, progress.UnitBytes}); got != want || end.Status != progress.StatusCanceled {
 		t.Errorf("the end carries %+v and %s, want %+v and canceled", got, end.Status, want)
 	}
 }
@@ -334,8 +334,8 @@ func TestASpanEndedForItCarriesItsAmount(t *testing.T) {
 func TestWithoutABusAdvanceAllocatesNothing(t *testing.T) {
 	ctx := context.Background()
 	allocs := testing.AllocsPerRun(100, func() {
-		_, call := progress.Start(ctx, progress.KindCall, "download", progress.Work(progress.Bytes, 2<<30))
-		call.Update(progress.Work(progress.Bytes, 4<<30))
+		_, call := progress.Start(ctx, progress.KindCall, "download", progress.Work(progress.UnitBytes, 2<<30))
+		call.Update(progress.Work(progress.UnitBytes, 4<<30))
 		call.Advance(8 << 20)
 		call.SetAmount(16 << 20)
 		call.End(nil)
@@ -356,7 +356,7 @@ func BenchmarkAdvance(b *testing.B) {
 		bus := progress.NewBus(progress.BusOptions{Sinks: []progress.Sink{discard{}}})
 		defer bus.Close()
 		_, call := progress.Start(progress.WithBus(context.Background(), bus), progress.KindCall, "download",
-			progress.Work(progress.Bytes, 0))
+			progress.Work(progress.UnitBytes, 0))
 		defer call.End(nil)
 		for b.Loop() {
 			call.Advance(4096)
@@ -366,7 +366,7 @@ func BenchmarkAdvance(b *testing.B) {
 		bus := progress.NewBus(progress.BusOptions{Sinks: []progress.Sink{discard{}}})
 		defer bus.Close()
 		_, call := progress.Start(progress.WithBus(context.Background(), bus), progress.KindCall, "download",
-			progress.Work(progress.Bytes, 0))
+			progress.Work(progress.UnitBytes, 0))
 		defer call.End(nil)
 		b.RunParallel(func(pb *testing.PB) {
 			for pb.Next() {

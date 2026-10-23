@@ -41,17 +41,17 @@ func TestCountWriterAdvancesTheSpanByWhatEachWriteTook(t *testing.T) {
 	}{
 		{"every write in full", &bytes.Buffer{}, []string{"0123456789", "abcdefghij", "klmnopqrst"},
 			[]int{10, 10, 10}, false,
-			[]work{{10, 100, progress.Bytes}, {20, 100, progress.Bytes}, {30, 100, progress.Bytes}}},
+			[]work{{10, 100, progress.UnitBytes}, {20, 100, progress.UnitBytes}, {30, 100, progress.UnitBytes}}},
 		{"an empty write advances nothing", &bytes.Buffer{}, []string{"", "abcd"},
-			[]int{0, 4}, false, []work{{4, 100, progress.Bytes}}},
+			[]int{0, 4}, false, []work{{4, 100, progress.UnitBytes}}},
 		{"a short write advances by what it took", failing{}, []string{"0123456789"},
-			[]int{5}, true, []work{{5, 100, progress.Bytes}}},
+			[]int{5}, true, []work{{5, 100, progress.UnitBytes}}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			clock := newClock()
 			ctx, _, capture := watched(t, progress.BusOptions{Now: clock.Now})
-			ctx, call := progress.Start(ctx, progress.KindCall, "copy", progress.Work(progress.Bytes, 100))
+			ctx, call := progress.Start(ctx, progress.KindCall, "copy", progress.Work(progress.UnitBytes, 100))
 			w := progress.CountWriter(ctx, tc.w)
 			var failed bool
 			for i, p := range tc.writes {
@@ -85,16 +85,16 @@ func TestCountReaderAdvancesTheSpanByWhatEachReadGave(t *testing.T) {
 		want []work
 	}{
 		{"reads in pieces", strings.NewReader("0123456789"), 4,
-			[]work{{4, 100, progress.Bytes}, {8, 100, progress.Bytes}, {10, 100, progress.Bytes}}},
+			[]work{{4, 100, progress.UnitBytes}, {8, 100, progress.UnitBytes}, {10, 100, progress.UnitBytes}}},
 		{"a read that gives bytes and io.EOF", &eofReader{"abc"}, 8,
-			[]work{{3, 100, progress.Bytes}}},
+			[]work{{3, 100, progress.UnitBytes}}},
 		{"a read that gives nothing", strings.NewReader(""), 8, nil},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			clock := newClock()
 			ctx, _, capture := watched(t, progress.BusOptions{Now: clock.Now})
-			ctx, call := progress.Start(ctx, progress.KindCall, "read", progress.Work(progress.Bytes, 100))
+			ctx, call := progress.Start(ctx, progress.KindCall, "read", progress.Work(progress.UnitBytes, 100))
 			r := progress.CountReader(ctx, tc.r)
 			buf := make([]byte, tc.size)
 			for {
@@ -118,7 +118,7 @@ func TestCountReaderAdvancesTheSpanByWhatEachReadGave(t *testing.T) {
 func TestCountReturnsWhatItWrapsReturned(t *testing.T) {
 	t.Parallel()
 	ctx, _, _ := watched(t, progress.BusOptions{})
-	ctx, call := progress.Start(ctx, progress.KindCall, "copy", progress.Work(progress.Bytes, 100))
+	ctx, call := progress.Start(ctx, progress.KindCall, "copy", progress.Work(progress.UnitBytes, 100))
 	buf := make([]byte, 8)
 	n, err := progress.CountReader(ctx, &eofReader{"abc"}).Read(buf)
 	if n != 3 || !errors.Is(err, io.EOF) || string(buf[:n]) != "abc" {
@@ -137,8 +137,8 @@ func TestCountAdvancesTheInnermostSpanOnly(t *testing.T) {
 	t.Parallel()
 	clock := newClock()
 	ctx, _, capture := watched(t, progress.BusOptions{Now: clock.Now})
-	ctx, step := progress.Start(ctx, progress.KindStep, "copying the image", progress.Work(progress.Bytes, 100))
-	ctx, call := progress.Start(ctx, progress.KindCall, "copy", progress.Work(progress.Bytes, 100))
+	ctx, step := progress.Start(ctx, progress.KindStep, "copying the image", progress.Work(progress.UnitBytes, 100))
+	ctx, call := progress.Start(ctx, progress.KindCall, "copy", progress.Work(progress.UnitBytes, 100))
 	w := progress.CountWriter(ctx, &bytes.Buffer{})
 	clock.Add(100 * time.Millisecond)
 	if _, err := w.Write([]byte("0123456789")); err != nil {
@@ -151,7 +151,7 @@ func TestCountAdvancesTheInnermostSpanOnly(t *testing.T) {
 			t.Errorf("an advance of a %s, want the call's only", e.Kind)
 		}
 	}
-	if got, want := advances(capture), []work{{10, 100, progress.Bytes}}; !equalWork(got, want) {
+	if got, want := advances(capture), []work{{10, 100, progress.UnitBytes}}; !equalWork(got, want) {
 		t.Errorf("advances %+v, want %+v", got, want)
 	}
 }
@@ -164,7 +164,7 @@ func TestCountCountsOnlyWhileTheSpanRuns(t *testing.T) {
 	clock := newClock()
 	ctx, _, capture := watched(t, progress.BusOptions{Now: clock.Now})
 	ctx, target := progress.Start(ctx, progress.KindTarget, "exe0001", progress.Queued(),
-		progress.Work(progress.Bytes, 100))
+		progress.Work(progress.UnitBytes, 100))
 	w := progress.CountWriter(ctx, &bytes.Buffer{})
 	if _, err := w.Write([]byte("0123")); err != nil {
 		t.Fatalf("write: %v", err)
@@ -179,10 +179,10 @@ func TestCountCountsOnlyWhileTheSpanRuns(t *testing.T) {
 	if _, err := w.Write([]byte("01")); err != nil {
 		t.Fatalf("write: %v", err)
 	}
-	if got, want := advances(capture), []work{{7, 100, progress.Bytes}}; !equalWork(got, want) {
+	if got, want := advances(capture), []work{{7, 100, progress.UnitBytes}}; !equalWork(got, want) {
 		t.Errorf("advances %+v, want %+v", got, want)
 	}
-	if got, want := workOf(last(t, capture, progress.TypeEnd)), (work{7, 100, progress.Bytes}); got != want {
+	if got, want := workOf(last(t, capture, progress.TypeEnd)), (work{7, 100, progress.UnitBytes}); got != want {
 		t.Errorf("the end carries %+v, want %+v", got, want)
 	}
 }
@@ -237,14 +237,14 @@ func TestACopyThroughCountEndsWithItsBytes(t *testing.T) {
 	t.Parallel()
 	clock := newClock()
 	ctx, _, capture := watched(t, progress.BusOptions{Now: clock.Now})
-	ctx, call := progress.Start(ctx, progress.KindCall, "copy", progress.Work(progress.Bytes, 26))
+	ctx, call := progress.Start(ctx, progress.KindCall, "copy", progress.Work(progress.UnitBytes, 26))
 	var dst bytes.Buffer
 	n, err := io.Copy(progress.CountWriter(ctx, &dst), strings.NewReader("abcdefghijklmnopqrstuvwxyz"))
 	call.End(err)
 	if err != nil || n != 26 {
 		t.Fatalf("copy moved %d bytes, %v, want 26", n, err)
 	}
-	if got, want := workOf(last(t, capture, progress.TypeEnd)), (work{26, 26, progress.Bytes}); got != want {
+	if got, want := workOf(last(t, capture, progress.TypeEnd)), (work{26, 26, progress.UnitBytes}); got != want {
 		t.Errorf("the end carries %+v, want %+v", got, want)
 	}
 }

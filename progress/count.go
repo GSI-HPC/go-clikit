@@ -10,8 +10,8 @@ import (
 
 // CountWriter returns a writer that writes to w and advances the innermost
 // span in ctx by the bytes w took, from each call, a short write included.
-// It is meant for a span given Work(Bytes, ...), so that its amount is
-// bytes; a span given no Work counts Items, as Advance does. The writer
+// It is meant for a span given Work(UnitBytes, ...), so that its amount is
+// bytes; a span given no Work counts UnitItems, as Advance does. The writer
 // advances nothing once the span has ended, and a write returns what w
 // returned. It returns w itself when ctx carries no span, which costs
 // nothing.
@@ -25,11 +25,11 @@ func CountWriter(ctx context.Context, w io.Writer) io.Writer {
 
 // CountReader returns a reader that reads from r and advances the innermost
 // span in ctx by the bytes each read gave, a read that also returns an
-// error included. It is meant for a span given Work(Bytes, ...), so that its
-// amount is bytes; a span given no Work counts Items, as Advance does. The
-// reader advances nothing once the span has ended, and a read returns what r
-// returned. It returns r itself when ctx carries no span, which costs
-// nothing.
+// error included. It is meant for a span given Work(UnitBytes, ...), so
+// that its amount is bytes; a span given no Work counts UnitItems, as
+// Advance does. The reader advances nothing once the span has ended, and a
+// read returns what r returned. It returns r itself when ctx carries no
+// span, which costs nothing.
 func CountReader(ctx context.Context, r io.Reader) io.Reader {
 	s := SpanFrom(ctx)
 	if s == nil {

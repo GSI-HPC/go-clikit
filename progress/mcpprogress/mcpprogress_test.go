@@ -74,7 +74,7 @@ func call(t *testing.T, c *client, o mcpprogress.Options, work func(ctx context.
 // step starts a step of targets, as fanout.Map does, and returns it with
 // the targets, queued.
 func step(ctx context.Context, name string, targets int, opts ...progress.Option) (*progress.Span, []*progress.Span) {
-	opts = append([]progress.Option{progress.WithFlags(progress.Fold), progress.Total(targets)}, opts...)
+	opts = append([]progress.Option{progress.WithFlags(progress.FlagFold), progress.Total(targets)}, opts...)
 	stepCtx, s := progress.Start(ctx, progress.KindStep, name, opts...)
 	spans := make([]*progress.Span, targets)
 	for i := range spans {
@@ -172,7 +172,7 @@ func TestProgressOfStepsInTurnOnlyGrows(t *testing.T) {
 func TestTheLineSaysHowTheTargetsEnded(t *testing.T) {
 	c := &client{}
 	notes := call(t, c, mcpprogress.Options{}, func(ctx context.Context) {
-		stepCtx, s := progress.Start(ctx, progress.KindStep, "reboot", progress.WithFlags(progress.Fold), progress.Total(4))
+		stepCtx, s := progress.Start(ctx, progress.KindStep, "reboot", progress.WithFlags(progress.FlagFold), progress.Total(4))
 		errs := []error{nil, errors.New("no route to host"), context.Canceled, progress.Skip("drained")}
 		ctxs, batches := make([]context.Context, len(errs)), make([]*progress.Span, len(errs))
 		for i := range errs {
@@ -204,7 +204,7 @@ func TestNothingCountedSendsNothing(t *testing.T) {
 			cmd.End(nil)
 		},
 		"a hidden step": func(ctx context.Context) {
-			s, targets := step(ctx, "probe the nodes", 2, progress.WithFlags(progress.Hidden))
+			s, targets := step(ctx, "probe the nodes", 2, progress.WithFlags(progress.FlagHidden))
 			for _, target := range targets {
 				target.End(nil)
 			}
