@@ -269,3 +269,46 @@ func TestTraceparent(t *testing.T) {
 		})
 	}
 }
+
+// A span hands a child the trace of its Bus with itself as the parent, so
+// that the child's log names the span that started it: with the flags and
+// the tracestate the Bus was handed, or sampled for a trace that began
+// with the Bus. A nil span has no trace context, and no traceparent.
+func TestTheTraceContextOfASpan(t *testing.T) {
+	t.Parallel()
+
+	upstream, ok := progress.ParseTraceContext("00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00", "rojo=1")
+	if !ok {
+		t.Fatal("the traceparent was refused")
+	}
+	for _, tc := range []struct {
+		name         string
+		trace        progress.TraceContext
+		flags        byte
+		state        string
+		sameAsHanded bool
+	}{
+		{"a trace handed on", upstream, 0x00, "rojo=1", true},
+		{"a trace of its own", progress.TraceContext{}, 0x01, "", false},
+	} {
+		capture := &progresstest.Capture{}
+		bus := progress.NewBus(progress.BusOptions{Sinks: []progress.Sink{capture}, Trace: tc.trace})
+		_, cmd := progress.Start(progress.WithBus(context.Background(), bus), progress.KindCommand, "exec")
+		got := cmd.TraceContext()
+		cmd.End(nil)
+		bus.Close()
+		want := progress.TraceContext{ID: bus.TraceID(), Parent: capture.Events()[0].Span, Flags: tc.flags, State: tc.state}
+		if got != want || tc.sameAsHanded && got.ID != upstream.ID {
+			t.Errorf("%s: TraceContext() = %+v, want %+v", tc.name, got, want)
+		}
+		back, ok := progress.ParseTraceContext(got.Traceparent(), got.State)
+		if !ok || back != got {
+			t.Errorf("%s: the traceparent %q reads back as %+v, %t", tc.name, got.Traceparent(), back, ok)
+		}
+	}
+
+	var none *progress.Span
+	if got := none.TraceContext(); got != (progress.TraceContext{}) || got.Traceparent() != "" {
+		t.Errorf("a nil span has the trace context %+v", got)
+	}
+}
