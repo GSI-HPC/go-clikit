@@ -275,8 +275,7 @@ const (
 	TypeStart Type = iota + 1
 	// TypeRun is a queued span whose work has started.
 	TypeRun
-	// TypeUpdate is a span whose Total, Message or Work (Unit and Size)
-	// changed.
+	// TypeUpdate is a span whose fields Update set.
 	TypeUpdate
 	// TypeLine is a line of output from the work of a call.
 	TypeLine
@@ -582,12 +581,11 @@ type Classifier interface {
 // Option sets what a span says about itself when it starts, changes or
 // ends.
 //
-// Start takes every option. Update takes Total, Message and Work only, and
-// ignores the others. End takes every option that sets a field, but not
-// Queued or Flagged, which only Start can give; it is where a field
-// learned late is set, such as an address known only once the work has
-// started, or the Exit of a command. A field an option does not set keeps
-// the value it had.
+// Start takes every option. Update and End take every option that sets a
+// field, but not Queued or Flagged, which only Start can give: they are
+// where a field learned late is set, such as an address known only once
+// the work has started, or the Exit of a command. A field an option does
+// not set keeps the value it had.
 //
 // An option is a bare noun, mostly the name of the field it sets, such as
 // Host or Total; With names only WithBus, which returns a context. An

@@ -360,9 +360,11 @@ func (s *Span) Run() {
 	b.emit(s.event(TypeRun))
 }
 
-// Update changes the Total, Message and Work of a span that has not ended.
-// A Total smaller than the one before is ignored, and so is a unit other
-// than the one Work gave before, and other options.
+// Update sets the fields the options give of a span that has not ended,
+// as End does, such as an address learned once the work has started, and
+// sends them. A Total smaller than the one before is ignored, and so is a
+// unit other than the one Work gave before; Queued and Flagged, which only
+// Start can give, are ignored too.
 func (s *Span) Update(opts ...Option) {
 	if s == nil {
 		return
@@ -373,14 +375,17 @@ func (s *Span) Update(opts ...Option) {
 	if b.closed || s.state == StateEnded {
 		return
 	}
+	s.setFields(opts)
+	b.emit(s.event(TypeUpdate))
+}
+
+// setFields sets the fields opts give, under the rules that a Total never
+// shrinks and a unit once given stays. b.mu is held.
+func (s *Span) setFields(opts []Option) {
 	o := options{Fields: s.fields}
 	o.apply(opts)
-	s.fields.Total = max(s.fields.Total, o.Total)
-	if o.Message != s.fields.Message {
-		s.fields.Message = Sanitize(o.Message, MaxField)
-	}
-	s.fields.Unit, s.fields.Size = o.Unit, o.Size
-	b.emit(s.event(TypeUpdate))
+	o.Total = max(o.Total, s.fields.Total)
+	s.fields = sanitizeFields(o.Fields, s.fields)
 }
 
 // End ends a span with the outcome of its work: ok for a nil error;
@@ -458,10 +463,7 @@ func (s *Span) end(status Status, class Class, text string, opts []Option) {
 	dropped := s.flushLines()
 	s.endWork()
 	if len(opts) > 0 {
-		o := options{Fields: s.fields}
-		o.apply(opts)
-		o.Total = max(o.Total, s.fields.Total)
-		s.fields = sanitizeFields(o.Fields, s.fields)
+		s.setFields(opts)
 	}
 	s.state = StateEnded
 	if s.prev != nil {
