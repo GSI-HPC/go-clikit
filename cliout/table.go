@@ -23,6 +23,7 @@ package cliout
 
 import (
 	"io"
+	"slices"
 	"strings"
 
 	"github.com/GSI-HPC/go-clikit/termtext"
@@ -54,9 +55,10 @@ type Table struct {
 	Caption string
 }
 
-// Add appends a row of cells.
+// Add appends a row of cells. It copies them, so a caller may reuse the
+// slice it passed for the next row (decision 42).
 func (t *Table) Add(cells ...string) {
-	t.Rows = append(t.Rows, cells)
+	t.Rows = append(t.Rows, slices.Clone(cells))
 }
 
 // Write writes t to w: the headings, then a line for each row, the cells of

@@ -80,6 +80,25 @@ func TestTableWriteNothing(t *testing.T) {
 	}
 }
 
+// Add copies the cells, so a row buffer the caller reuses changes no row
+// added before.
+func TestTableAddCopiesTheCells(t *testing.T) {
+	table := &cliout.Table{Columns: []cliout.Column{{Name: "NODE"}, {Name: "STATE"}}}
+	row := make([]string, 2)
+	for _, node := range [][2]string{{"exe0001", "drained"}, {"exe0002", "idle"}} {
+		row[0], row[1] = node[0], node[1]
+		table.Add(row...)
+	}
+	row[0], row[1] = "changed", "after"
+	want := "" +
+		"NODE     STATE\n" +
+		"exe0001  drained\n" +
+		"exe0002  idle\n"
+	if got := write(t, table, false); got != want {
+		t.Errorf("wrote\n%s\nwant\n%s", got, want)
+	}
+}
+
 // hostile is what a node that was taken over might answer: a carriage
 // return and cursor-up to write over the line of another node, and OSC 52
 // to write the clipboard.
