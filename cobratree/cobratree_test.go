@@ -185,6 +185,88 @@ func TestStrictOnALoneCommand(t *testing.T) {
 	}
 }
 
+// requiredTree builds a strict tree whose get cluster requires --realm,
+// takes --json or --yaml but not both, --user and --key together, and runs
+// a PreRunE that records it ran.
+func requiredTree(ran *bool) *cobra.Command {
+	root := &cobra.Command{Use: "prog", SilenceErrors: true, SilenceUsage: true}
+	get := &cobra.Command{Use: "get"}
+	cluster := &cobra.Command{Use: "cluster [NAME]", RunE: run, PreRunE: func(*cobra.Command, []string) error {
+		*ran = true
+		return nil
+	}}
+	cluster.Flags().String("realm", "", "the realm")
+	cluster.Flags().Bool("json", false, "as JSON")
+	cluster.Flags().Bool("yaml", false, "as YAML")
+	cluster.Flags().String("user", "", "the user")
+	cluster.Flags().String("key", "", "the key")
+	if err := cluster.MarkFlagRequired("realm"); err != nil {
+		panic(err)
+	}
+	cluster.MarkFlagsMutuallyExclusive("json", "yaml")
+	cluster.MarkFlagsRequiredTogether("user", "key")
+	get.AddCommand(cluster)
+	root.AddCommand(get)
+	cobratree.Strict(root, nil)
+	return root
+}
+
+// The errors cobra returns for required flags and flag groups are usage
+// errors, in cobra's words, on a command without an argument check too,
+// and come before its PreRun hooks.
+func TestStrictMarksFlagErrorsAsUsageErrors(t *testing.T) {
+	for _, tc := range []struct {
+		args []string
+		want string
+	}{
+		{[]string{"get", "cluster"}, `required flag(s) "realm" not set`},
+		{[]string{"get", "cluster", "dev", "--json"}, `required flag(s) "realm" not set`},
+		{
+			[]string{"get", "cluster", "--realm", "r", "--json", "--yaml"},
+			"if any flags in the group [json yaml] are set none of the others can be; [json yaml] were all set",
+		},
+		{
+			[]string{"get", "cluster", "--realm", "r", "--user", "u"},
+			"if any flags in the group [user key] are set they must all be set; missing [key]",
+		},
+	} {
+		t.Run(strings.Join(tc.args, " "), func(t *testing.T) {
+			ran := false
+			root := requiredTree(&ran)
+			root.SetArgs(tc.args)
+			err := root.Execute()
+			if err == nil || err.Error() != tc.want {
+				t.Fatalf("error %v, want %q", err, tc.want)
+			}
+			if !cobratree.IsUsage(err) {
+				t.Errorf("%v is no usage error", err)
+			}
+			if ran {
+				t.Error("PreRunE ran, want the flags checked before it")
+			}
+		})
+	}
+	ran := false
+	root := requiredTree(&ran)
+	root.SetArgs([]string{"get", "cluster", "dev", "--realm", "r", "--json", "--user", "u", "--key", "k"})
+	if err := root.Execute(); err != nil || !ran {
+		t.Errorf("error %v, ran %v; want the command to run", err, ran)
+	}
+}
+
+// The check of the flags looks only at flags that were parsed, as they
+// are when cobra calls it.
+func TestStrictChecksFlagsOnlyOnceParsed(t *testing.T) {
+	ran := false
+	cluster, _, err := requiredTree(&ran).Find([]string{"get", "cluster"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := cluster.ValidateArgs([]string{"dev"}); err != nil {
+		t.Errorf("ValidateArgs before parsing: %v, want nil", err)
+	}
+}
+
 func TestFlagErrorsAreUsageErrors(t *testing.T) {
 	for _, tc := range []struct {
 		args []string

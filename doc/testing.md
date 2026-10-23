@@ -158,7 +158,8 @@ program executes it: a table of command lines that name no command, with
 the exact text of each error, which is an interface (decision 24), and of
 those that name one, which run or print their help; and the flags pflag
 cannot parse, before the command, after it and on a command the tree
-traverses, each a usage error. What the toolchain records is tested inside
+traverses, and a required flag not given and the flags of a group given
+wrongly, each a usage error. What the toolchain records is tested inside
 the package, on a `debug.BuildInfo` per kind of build: none, a checkout,
 one of a tag, one with changes, and `go install` of a release.
 
