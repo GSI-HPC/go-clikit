@@ -10,6 +10,15 @@ import (
 	"net/netip"
 )
 
+// tcpOnly refuses a listener whose address is not TCP, such as the Unix
+// socket of Listen: PeerListener would close each of its connections.
+func tcpOnly(l net.Listener) error {
+	if _, ok := l.Addr().(*net.TCPAddr); !ok {
+		return fmt.Errorf("the listener at %s is not TCP; a Unix socket of Listen needs no peer check", l.Addr())
+	}
+	return nil
+}
+
 // peerListener is the listener PeerListener returns.
 type peerListener struct {
 	net.Listener

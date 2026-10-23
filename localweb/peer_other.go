@@ -24,7 +24,14 @@ import (
 // matches errors.ErrUnsupported, and the program decides: serve on a Unix
 // socket (Listen), or refuse to start. A connection whose owner cannot be
 // told is closed.
-func PeerListener(net.Listener, int, func(error)) (net.Listener, error) {
+//
+// On every system, PeerListener returns an error when l is not a TCP
+// listener, whose connections it would all close (doc/decisions.md,
+// decision 40).
+func PeerListener(l net.Listener, _ int, _ func(error)) (net.Listener, error) {
+	if err := tcpOnly(l); err != nil {
+		return nil, err
+	}
 	return nil, fmt.Errorf("the owner of a TCP connection cannot be told on this system: %w", errors.ErrUnsupported)
 }
 

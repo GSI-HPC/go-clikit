@@ -155,6 +155,26 @@ func TestPeerListenerAccept(t *testing.T) {
 	}
 }
 
+// unixListener is a listener with the address of a Unix socket.
+type unixListener struct{ queueListener }
+
+func (*unixListener) Addr() net.Addr {
+	return &net.UnixAddr{Name: "/run/user/1000/prog.sock", Net: "unix"}
+}
+
+// A listener that is not TCP is refused, on every system, as each of its
+// connections would be closed.
+func TestPeerListenerRefusesAListenerThatIsNotTCP(t *testing.T) {
+	t.Parallel()
+
+	pl, err := PeerListener(&unixListener{}, 0, nil)
+
+	if pl != nil || err == nil || !strings.Contains(err.Error(), "/run/user/1000/prog.sock is not TCP") ||
+		errors.Is(err, errors.ErrUnsupported) {
+		t.Errorf("PeerListener = %v, %v, want an error that the listener is not TCP", pl, err)
+	}
+}
+
 func TestPeerListenerAcceptFailure(t *testing.T) {
 	t.Parallel()
 
