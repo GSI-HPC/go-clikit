@@ -66,6 +66,10 @@ import (
 //     subcommand is suggested, within cobra's SuggestionsMinimumDistance,
 //     2 unless the command sets its own; with none, a command that moved
 //     names its new place.
+//   - A root that holds subcommands and runs, with no argument check of
+//     its own, refuses any argument in the same words, as cobra refuses
+//     one in its own. A runnable command below the root keeps cobra's
+//     rule and takes any argument; one with a check of its own keeps it.
 //   - help refuses a topic that names no command, all of it, and says
 //     which word is not known.
 //   - Every argument check in the tree returns a usage error, and that of
@@ -100,13 +104,20 @@ func Strict(root *cobra.Command, moved map[string]string) {
 }
 
 // requireKnown makes every command that holds subcommands and runs nothing
-// print its help when invoked bare and refuse any argument. Cobra prints
-// such a command's help and succeeds whatever its arguments.
+// print its help when invoked bare and refuse any argument, and a root
+// that holds subcommands and runs, without an argument check of its own,
+// refuse any argument. Cobra prints such a command's help and succeeds
+// whatever its arguments, and refuses a word under such a root in words
+// of its own that name no moved command.
 func requireKnown(cmd *cobra.Command, moved map[string]string) {
 	for _, sub := range cmd.Commands() {
 		requireKnown(sub, moved)
 	}
-	if !cmd.HasSubCommands() || cmd.Runnable() {
+	if !cmd.HasSubCommands() {
+		return
+	}
+	runnable := cmd.Runnable()
+	if runnable && (cmd.HasParent() || cmd.Args != nil) {
 		return
 	}
 	if cmd.SuggestionsMinimumDistance <= 0 {
@@ -116,8 +127,10 @@ func requireKnown(cmd *cobra.Command, moved map[string]string) {
 	cmd.Args = func(cmd *cobra.Command, args []string) error {
 		return unknown(cmd, args, moved)
 	}
-	cmd.RunE = func(cmd *cobra.Command, _ []string) error {
-		return cmd.Help()
+	if !runnable {
+		cmd.RunE = func(cmd *cobra.Command, _ []string) error {
+			return cmd.Help()
+		}
 	}
 }
 
