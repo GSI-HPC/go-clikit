@@ -24,7 +24,7 @@ func ExampleStrict() {
 		RunE: func(*cobra.Command, []string) error { return nil },
 	})
 	root.AddCommand(get)
-	cobratree.Strict(root, map[string]string{"status": "get cluster"})
+	cobratree.Strict(root, cobratree.Moved(map[string]string{"status": "get cluster"}))
 
 	for _, args := range [][]string{
 		{"gte"},
@@ -113,19 +113,23 @@ func ExampleStatus() {
 }
 
 // A program shows the concepts of its manual with help, beside its
-// commands, and lists them under a word of its own.
-func ExampleHelpTopics() {
+// commands, lists them under a word of its own, and offers their names
+// where help is completed.
+func ExampleTopics() {
 	root := &cobra.Command{Use: "prog", SilenceErrors: true, SilenceUsage: true}
 	root.AddCommand(&cobra.Command{Use: "version", RunE: func(*cobra.Command, []string) error { return nil }})
-	cobratree.Strict(root, nil)
 	topics := map[string]string{
 		"realm":  "A realm keeps the clusters of one user apart from another's.\n",
 		"topics": "realm   what a realm is\n",
 	}
-	help := cobratree.HelpTopics(root, func(name string) (string, bool) {
-		text, ok := topics[name]
-		return text, ok
-	})
+	cobratree.Strict(root, cobratree.Topics(
+		func(name string) (string, bool) {
+			text, ok := topics[name]
+			return text, ok
+		},
+		func() []string { return []string{"realm", "topics"} },
+	))
+	help, _, _ := root.Find([]string{"help"})
 	help.Short = "Help about any command or topic"
 
 	root.SetOut(os.Stdout)

@@ -15,8 +15,8 @@ import (
 // run is a command that does nothing.
 func run(*cobra.Command, []string) error { return nil }
 
-// tree builds a program's command tree, made strict with moved.
-func tree(moved map[string]string) *cobra.Command {
+// tree builds a program's command tree, made strict with opts.
+func tree(opts ...cobratree.Option) *cobra.Command {
 	root := &cobra.Command{Use: "prog", SilenceErrors: true, SilenceUsage: true}
 	root.PersistentFlags().String("realm", "", "the realm")
 	get := &cobra.Command{Use: "get", Short: "Show things"}
@@ -34,13 +34,13 @@ func tree(moved map[string]string) *cobra.Command {
 		&cobra.Command{Use: "version", Args: cobra.NoArgs, RunE: run},
 		&cobra.Command{Use: "logs", RunE: run}, // no check: any arguments
 	)
-	cobratree.Strict(root, moved)
+	cobratree.Strict(root, opts...)
 	return root
 }
 
 // execute runs a strict tree with args.
 func execute(moved map[string]string, args ...string) (string, error) {
-	root := tree(moved)
+	root := tree(cobratree.Moved(moved))
 	var out bytes.Buffer
 	root.SetOut(&out)
 	root.SetErr(&out)
@@ -123,7 +123,7 @@ func TestStrictMakesARunnableRootStrict(t *testing.T) {
 		get := &cobra.Command{Use: "get"}
 		get.AddCommand(&cobra.Command{Use: "cluster", RunE: run})
 		root.AddCommand(get)
-		cobratree.Strict(root, moved)
+		cobratree.Strict(root, cobratree.Moved(moved))
 		return root
 	}
 	for _, tc := range []struct {
@@ -159,16 +159,29 @@ func TestStrictMakesARunnableRootStrict(t *testing.T) {
 func TestStrictKeepsTheCheckOfARunnableRoot(t *testing.T) {
 	root := &cobra.Command{Use: "prog [NAME]", Args: cobra.MaximumNArgs(1), RunE: run, SilenceErrors: true, SilenceUsage: true}
 	root.AddCommand(&cobra.Command{Use: "get", RunE: run})
-	cobratree.Strict(root, nil)
+	cobratree.Strict(root)
 	root.SetArgs([]string{"gte"})
 	if err := root.Execute(); err != nil {
 		t.Errorf("prog gte: %v, want the root to take the word", err)
 	}
 }
 
+// A nil Option sets nothing, as the call of the two-argument Strict
+// without moves did.
+func TestStrictTakesANilOption(t *testing.T) {
+	root := &cobra.Command{Use: "prog", SilenceErrors: true, SilenceUsage: true}
+	root.AddCommand(&cobra.Command{Use: "get", RunE: run})
+	cobratree.Strict(root, nil, cobratree.Moved(nil))
+	root.SetArgs([]string{"status"})
+	want := `unknown command "status" for "prog"`
+	if err := root.Execute(); err == nil || err.Error() != want {
+		t.Errorf("error %v, want %q", err, want)
+	}
+}
+
 // A command's own SuggestionsMinimumDistance holds.
 func TestStrictKeepsTheDistanceOfSuggestions(t *testing.T) {
-	root := tree(nil)
+	root := tree()
 	root.SuggestionsMinimumDistance = 1
 	root.SetArgs([]string{"gxx"})
 	err := root.Execute()
@@ -215,7 +228,7 @@ func TestStrictWritesCompletionToTheOutputItWasGiven(t *testing.T) {
 	root.AddCommand(&cobra.Command{Use: "version", RunE: run})
 	var out bytes.Buffer
 	root.SetOut(&out)
-	cobratree.Strict(root, nil)
+	cobratree.Strict(root)
 	root.SetArgs([]string{"completion", "bash"})
 	if err := root.Execute(); err != nil {
 		t.Fatal(err)
@@ -228,7 +241,7 @@ func TestStrictWritesCompletionToTheOutputItWasGiven(t *testing.T) {
 // A tree with no subcommands gets no help or completion command.
 func TestStrictOnALoneCommand(t *testing.T) {
 	root := &cobra.Command{Use: "prog NAME", Args: cobra.ExactArgs(1), RunE: run, SilenceErrors: true, SilenceUsage: true}
-	cobratree.Strict(root, nil)
+	cobratree.Strict(root)
 	if root.HasSubCommands() {
 		t.Errorf("subcommands %v, want none", root.Commands())
 	}
@@ -262,7 +275,7 @@ func requiredTree(ran *bool) *cobra.Command {
 	cluster.MarkFlagsRequiredTogether("user", "key")
 	get.AddCommand(cluster)
 	root.AddCommand(get)
-	cobratree.Strict(root, nil)
+	cobratree.Strict(root)
 	return root
 }
 

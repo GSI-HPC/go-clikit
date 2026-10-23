@@ -6,6 +6,8 @@ package cobratree_test
 import (
 	"bytes"
 	"errors"
+	"io"
+	"slices"
 	"strings"
 	"testing"
 
@@ -24,10 +26,13 @@ func topics(name string) (string, bool) {
 	return text, ok
 }
 
+// topicNames lists the topics, "get" among them, and "gone", which topics
+// does not know.
+func topicNames() []string { return []string{"topics", "realm", "get", "gone"} }
+
 // executeTopics runs a strict tree with help topics with args.
 func executeTopics(args ...string) (string, error) {
-	root := tree(moved)
-	cobratree.HelpTopics(root, topics)
+	root := tree(cobratree.Moved(moved), cobratree.Topics(topics, topicNames))
 	var out bytes.Buffer
 	root.SetOut(&out)
 	root.SetErr(&out)
@@ -36,7 +41,7 @@ func executeTopics(args ...string) (string, error) {
 	return out.String(), err
 }
 
-func TestHelpTopicsShowsATopic(t *testing.T) {
+func TestTopicsShowsATopic(t *testing.T) {
 	for _, tc := range []struct {
 		args []string
 		want string
@@ -58,7 +63,7 @@ func TestHelpTopicsShowsATopic(t *testing.T) {
 
 // A command wins over a topic of its name, and help still shows the
 // commands.
-func TestHelpTopicsLeavesTheCommands(t *testing.T) {
+func TestTopicsLeavesTheCommands(t *testing.T) {
 	for _, args := range [][]string{
 		{"help"},
 		{"help", "get"},
@@ -78,7 +83,7 @@ func TestHelpTopicsLeavesTheCommands(t *testing.T) {
 
 // What is neither a command nor a topic is refused as Strict refuses it; a
 // topic takes no more words.
-func TestHelpTopicsRefusesTheRest(t *testing.T) {
+func TestTopicsRefusesTheRest(t *testing.T) {
 	for _, tc := range []struct {
 		args []string
 		want string
@@ -128,7 +133,7 @@ func TestHelpTopicsOnALenientTree(t *testing.T) {
 
 // A help command of the program's own, with a RunE, still runs it, and a
 // topic that cannot be written fails the command.
-func TestHelpTopicsWithAHelpCommandOfItsOwn(t *testing.T) {
+func TestTopicsWithAHelpCommandOfItsOwn(t *testing.T) {
 	root := &cobra.Command{Use: "prog", SilenceErrors: true, SilenceUsage: true}
 	root.AddCommand(&cobra.Command{Use: "version", RunE: run})
 	ran := false
@@ -136,7 +141,7 @@ func TestHelpTopicsWithAHelpCommandOfItsOwn(t *testing.T) {
 		ran = true
 		return nil
 	}})
-	cobratree.HelpTopics(root, topics)
+	cobratree.Strict(root, cobratree.Topics(topics, topicNames))
 	root.SetArgs([]string{"help", "version"})
 	if err := root.Execute(); err != nil || !ran {
 		t.Errorf("help version: ran %v, error %v; want the program's help to run", ran, err)
@@ -147,6 +152,161 @@ func TestHelpTopicsWithAHelpCommandOfItsOwn(t *testing.T) {
 	if err := root.Execute(); !errors.Is(err, errWrite) {
 		t.Errorf("help realm on a failing output: error %v, want %v", err, errWrite)
 	}
+
+	// The program's help completes nothing itself; the topics are offered.
+	var out bytes.Buffer
+	root.SetOut(&out)
+	root.SetErr(io.Discard)
+	root.SetArgs([]string{"__complete", "help", "r"})
+	if err := root.Execute(); err != nil {
+		t.Fatal(err)
+	}
+	if got := completions(out.String()); !slices.Equal(got, []string{"realm"}) {
+		t.Errorf("completed %q, want realm", got)
+	}
+}
+
+// completions returns the completions cobra's __complete wrote in out,
+// without the line of the directive.
+func completions(out string) []string {
+	var got []string
+	for line := range strings.Lines(out) {
+		if strings.HasPrefix(line, ":") {
+			break
+		}
+		got = append(got, strings.TrimSuffix(line, "\n"))
+	}
+	return got
+}
+
+// help completes the topics after the commands, but for those a command
+// shadows and those the lookup does not know, and only as its first word,
+// and nothing after a topic.
+func TestTopicsAreCompleted(t *testing.T) {
+	for _, tc := range []struct {
+		args []string
+		want []string
+	}{
+		{[]string{"help", "re"}, []string{"realm"}},
+		{[]string{"help", "t"}, []string{"topics"}},
+		{[]string{"help", "g"}, []string{"get\tShow things"}},
+		{[]string{"help", "get", ""}, []string{"cluster", "nodes"}},
+		{[]string{"help", "realm", ""}, nil},
+	} {
+		t.Run(strings.Join(tc.args, " "), func(t *testing.T) {
+			out, err := executeTopics(append([]string{"__complete"}, tc.args...)...)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got := completions(out); !slices.Equal(got, tc.want) {
+				t.Errorf("completed %q, want %q", got, tc.want)
+			}
+		})
+	}
+	out, err := executeTopics("__complete", "help", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := completions(out)
+	if n := len(got); n < 3 || !slices.Equal(got[n-2:], []string{"topics", "realm"}) || !slices.Contains(got, "version") {
+		t.Errorf("completed %q, want the commands, then topics and realm", got)
+	}
+}
+
+// Without a list of names, help completes the commands alone.
+func TestTopicsWithoutNames(t *testing.T) {
+	root := tree(cobratree.Topics(topics, nil))
+	var out bytes.Buffer
+	root.SetOut(&out)
+	root.SetErr(io.Discard)
+	root.SetArgs([]string{"__complete", "help", "re"})
+	if err := root.Execute(); err != nil {
+		t.Fatal(err)
+	}
+	if got := completions(out.String()); got != nil {
+		t.Errorf("completed %q, want nothing", got)
+	}
+	out.Reset()
+	root.SetArgs([]string{"__complete", "help", "get", "n"})
+	if err := root.Execute(); err != nil {
+		t.Fatal(err)
+	}
+	if got := completions(out.String()); !slices.Equal(got, []string{"nodes"}) {
+		t.Errorf("completed %q, want nodes", got)
+	}
+	out.Reset()
+	root.SetArgs([]string{"help", "realm"})
+	if err := root.Execute(); err != nil || out.String() != "A realm keeps clusters apart.\n" {
+		t.Errorf("help realm: %q, %v; want the topic", out.String(), err)
+	}
+}
+
+// Topics refuses a nil lookup, and a tree without subcommands, which has
+// no help command, before Strict changes it.
+func TestTopicsRefuses(t *testing.T) {
+	wantPanic(t, "cobratree: Topics needs a lookup", func() { cobratree.Topics(nil, topicNames) })
+
+	ran := false
+	root := &cobra.Command{Use: "prog NAME", Args: cobra.ExactArgs(1), SilenceErrors: true, SilenceUsage: true, RunE: func(*cobra.Command, []string) error {
+		ran = true
+		return nil
+	}}
+	wantPanic(t, `cobratree: help topics need a help command, and "prog" has no subcommands`, func() {
+		cobratree.Strict(root, cobratree.Topics(topics, topicNames))
+	})
+	root.SetArgs([]string{"realm"})
+	if err := root.Execute(); err != nil || !ran {
+		t.Errorf("prog realm: ran %v, error %v; want the root to run", ran, err)
+	}
+}
+
+// HelpTopics after Strict, in the order it asks for, still shows the
+// topics and refuses the rest.
+func TestHelpTopicsAfterStrict(t *testing.T) {
+	root := tree(cobratree.Moved(moved))
+	help := cobratree.HelpTopics(root, topics)
+	if help.Name() != "help" {
+		t.Fatalf("HelpTopics returned %q, want the help command", help.Name())
+	}
+	var out bytes.Buffer
+	root.SetOut(&out)
+	root.SetArgs([]string{"help", "realm"})
+	if err := root.Execute(); err != nil || out.String() != "A realm keeps clusters apart.\n" {
+		t.Errorf("help realm: %q, %v; want the topic", out.String(), err)
+	}
+	root.SetArgs([]string{"help", "crate"})
+	want := `unknown help topic "crate": unknown command "crate" for "prog" (did you mean "create"?)`
+	if err := root.Execute(); err == nil || err.Error() != want || !cobratree.IsUsage(err) {
+		t.Errorf("help crate: error %v, want the usage error %q", err, want)
+	}
+}
+
+// Strict after HelpTopics, or after a Strict with Topics, would drop the
+// topics, and HelpTopics on a tree whose help shows topics already would
+// show them twice: each panics.
+func TestTopicsInTheWrongOrder(t *testing.T) {
+	root := &cobra.Command{Use: "prog", SilenceErrors: true, SilenceUsage: true}
+	root.AddCommand(&cobra.Command{Use: "version", RunE: run})
+	cobratree.HelpTopics(root, topics)
+	again := `cobratree: Strict called on "prog", whose help shows topics already, which it would drop: pass Topics to one call of Strict instead`
+	wantPanic(t, again, func() { cobratree.Strict(root) })
+	wantPanic(t, again, func() { cobratree.Strict(tree(cobratree.Topics(topics, nil))) })
+
+	twice := `cobratree: HelpTopics called on "prog", whose help shows topics already: pass Topics to Strict alone`
+	wantPanic(t, twice, func() { cobratree.HelpTopics(root, topics) })
+	wantPanic(t, twice, func() { cobratree.HelpTopics(tree(cobratree.Topics(topics, nil)), topics) })
+}
+
+// wantPanic runs f and fails t unless f panics with want.
+func wantPanic(t *testing.T, want string, f func()) {
+	t.Helper()
+	defer func() {
+		t.Helper()
+		if r := recover(); r != want {
+			t.Errorf("panic %v, want %q", r, want)
+		}
+	}()
+	f()
 }
 
 var errWrite = errors.New("write failed")
@@ -160,14 +320,10 @@ func (failingWriter) Write([]byte) (int, error) { return 0, errWrite }
 // take its root over.
 func TestHelpTopicsOnALoneCommand(t *testing.T) {
 	root := &cobra.Command{Use: "prog NAME", Args: cobra.ExactArgs(1), RunE: run}
-	defer func() {
-		want := `cobratree: help topics need a help command, and "prog" has no subcommands`
-		if r := recover(); r != want {
-			t.Errorf("panic %v, want %q", r, want)
-		}
-		if root.RunE == nil || root.Name() != "prog" {
-			t.Error("HelpTopics changed the root")
-		}
-	}()
-	cobratree.HelpTopics(root, topics)
+	wantPanic(t, `cobratree: help topics need a help command, and "prog" has no subcommands`, func() {
+		cobratree.HelpTopics(root, topics)
+	})
+	if root.HasSubCommands() || root.Annotations != nil {
+		t.Error("HelpTopics changed the root")
+	}
 }
