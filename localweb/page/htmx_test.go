@@ -20,23 +20,31 @@ func request(hx string) *http.Request {
 	return r
 }
 
-// Only the header HX-Request: true marks htmx.
+// Only the header HX-Request: true marks htmx, and not on a history
+// restore.
 func TestIsHTMX(t *testing.T) {
 	t.Parallel()
 
 	for _, tc := range []struct {
-		hx   string
-		want bool
+		hx, restore string
+		want        bool
 	}{
-		{"true", true},
-		{"", false},
-		{"1", false},
-		{"TRUE", false},
-		{"false", false},
+		{"true", "", true},
+		{"", "", false},
+		{"1", "", false},
+		{"TRUE", "", false},
+		{"false", "", false},
+		{"true", "true", false},
+		{"true", "false", true},
+		{"", "true", false},
 	} {
-		t.Run("["+tc.hx+"]", func(t *testing.T) {
+		t.Run("["+tc.hx+"]["+tc.restore+"]", func(t *testing.T) {
 			t.Parallel()
-			if got := page.IsHTMX(request(tc.hx)); got != tc.want {
+			r := request(tc.hx)
+			if tc.restore != "" {
+				r.Header.Set("HX-History-Restore-Request", tc.restore)
+			}
+			if got := page.IsHTMX(r); got != tc.want {
 				t.Errorf("IsHTMX = %v, want %v", got, tc.want)
 			}
 		})
