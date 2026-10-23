@@ -70,7 +70,7 @@ func (s *sender) options(size int, pause time.Duration) fanout.BatchOptions {
 	return fanout.BatchOptions{
 		Step:        "power on",
 		Size:        size,
-		Limit:       2,
+		ReportLimit: 2,
 		Pause:       pause,
 		BeforePause: func(d time.Duration) { s.log = append(s.log, fmt.Sprintf("note: waiting %s", d)) },
 		Before: func(i, n int, batch *nodeset.NodeSet) {
@@ -478,6 +478,43 @@ func TestBatchesReturnTheErrorThatEndedTheRun(t *testing.T) {
 			}
 			if first, _, _ := strings.Cut(w.Finish(), "\n"); first != "step power on total=6 [fold]: "+tc.step {
 				t.Errorf("the step ended %q, want it %s", first, tc.step)
+			}
+		})
+	}
+}
+
+// ReportLimit is recorded on each batch and enforces nothing; below one
+// records none. The deprecated Limit is read while ReportLimit is zero.
+func TestBatchesRecordTheReportLimit(t *testing.T) {
+	t.Parallel()
+
+	for _, tc := range []struct {
+		name string
+		o    fanout.BatchOptions
+		want string
+	}{
+		{"none", fanout.BatchOptions{}, ""},
+		{"a report limit", fanout.BatchOptions{ReportLimit: 1}, " limit=1"},
+		{"below one", fanout.BatchOptions{ReportLimit: -1, Limit: 3}, ""},
+		{"the old field", fanout.BatchOptions{Limit: 3}, " limit=3"},
+		{"the old field below one", fanout.BatchOptions{Limit: -3}, ""},
+		{"both", fanout.BatchOptions{ReportLimit: 1, Limit: 3}, " limit=1"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			ctx, w := progresstest.Watch(context.Background(), t)
+			o := tc.o
+			o.Step = "power on"
+			// One target at a time, so that any limit recorded holds.
+			_, err := fanout.Batches(ctx, set(t, "exe1"), o, (&sender{}).run)
+			if err != nil {
+				t.Fatal(err)
+			}
+			want := "step power on total=1 [fold]: ok\n" +
+				"  batch 1/1 node=exe1 batch=1/1 total=1" + tc.want + ": ok\n" +
+				"    target exe1: ok\n"
+			if got := w.Finish(); got != want {
+				t.Errorf("tree:\n%s\nwant:\n%s", got, want)
 			}
 		})
 	}

@@ -12,6 +12,12 @@
 // under way on each key, such as a host, at most Limit at a time on any one
 // key, however many keys the pool works on at once.
 //
+// Each limit has its own zero rule. The limit of Each and MapOptions.Limit
+// enforce how many items are worked on at once, and below one are
+// DefaultLimit, 16. Keyed.Limit enforces how many are under way on one key,
+// and below one is one. BatchOptions.ReportLimit enforces nothing: Batches
+// records it on each batch for a report, and below one records none.
+//
 // Map and Batches keep the promises progresstest.Check holds an emitter
 // to: every target or batch is announced queued before the first runs,
 // each is ended before its place is given up, and those never started end

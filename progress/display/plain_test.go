@@ -205,7 +205,7 @@ exec: failed in 12s: 3 ok, 1 failed
 	t.Run("in batches", func(t *testing.T) {
 		t.Parallel()
 		f := newPlainFixture(t, "exec")
-		_, err := fanout.Batches(f.ctx, nodeset.MustParse("exe[1-4]"), fanout.BatchOptions{Step: "power on", Size: 2, Limit: 1},
+		_, err := fanout.Batches(f.ctx, nodeset.MustParse("exe[1-4]"), fanout.BatchOptions{Step: "power on", Size: 2, ReportLimit: 1},
 			func(ctx context.Context, batch *nodeset.NodeSet) error {
 				outcomes, _ := fanout.Map(ctx, batch.Expand(), fanout.MapOptions[string]{Limit: 1},
 					func(_ context.Context, node string) (struct{}, error) {

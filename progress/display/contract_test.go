@@ -223,10 +223,10 @@ func TestTheCounterOfAPowerOnInBatches(t *testing.T) {
 func testTheCounterOfAPowerOnInBatches(t *testing.T) {
 	s := newSession(t, "bmc power", counterDisplay)
 	o := duringPauses(fanout.BatchOptions{
-		Step:  "power on",
-		Size:  2,
-		Limit: 1,
-		Pause: 5 * time.Second,
+		Step:        "power on",
+		Size:        2,
+		ReportLimit: 1,
+		Pause:       5 * time.Second,
 		BeforePause: func(pause time.Duration) {
 			_, _ = fmt.Fprintf(s.errOut, "waiting %s before the next batch\n", pause)
 		},
