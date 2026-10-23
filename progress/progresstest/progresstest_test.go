@@ -24,7 +24,7 @@ import (
 // once the target it names has started.
 func pool(ctx context.Context, name string, n, limit int, fail map[int]bool, cancel map[int]context.CancelFunc) {
 	stepCtx, step := progress.Start(ctx, progress.KindStep, name,
-		progress.WithFlags(progress.FlagFold), progress.Total(n), progress.Limit(limit))
+		progress.Flagged(progress.FlagFold), progress.Total(n), progress.Limit(limit))
 	ctxs, spans := make([]context.Context, n), make([]*progress.Span, n)
 	for i := range n {
 		node := fmt.Sprintf("exe%d", i+1)
@@ -92,7 +92,7 @@ func TestCheckAcceptsWorkThatKeepsThePromises(t *testing.T) {
 
 	ctx, bus, c := watch(t)
 	ctx, cmd := progress.Start(ctx, progress.KindCommand, "provision reinstall")
-	_, cred := progress.Start(ctx, progress.KindCall, "credential bmc", progress.WithFlags(progress.FlagHidden), progress.Source("prompt"))
+	_, cred := progress.Start(ctx, progress.KindCall, "credential bmc", progress.Flagged(progress.FlagHidden), progress.Source("prompt"))
 	resume := progress.Suspend(ctx)
 	resume()
 	cred.End(nil)
@@ -105,7 +105,7 @@ func TestCheckAcceptsWorkThatKeepsThePromises(t *testing.T) {
 
 	// A staggered step: a batch that ran, one that failed, and one left
 	// out, which counts as its Total.
-	stepCtx, step := progress.Start(ctx, progress.KindStep, "power on", progress.WithFlags(progress.FlagFold), progress.Total(6), progress.Limit(2))
+	stepCtx, step := progress.Start(ctx, progress.KindStep, "power on", progress.Flagged(progress.FlagFold), progress.Total(6), progress.Limit(2))
 	var batches []*progress.Span
 	var batchCtxs []context.Context
 	for i := range 3 {
@@ -344,7 +344,7 @@ func TestTreeDrawsWhatIsNotFinished(t *testing.T) {
 
 	ctx, bus, c := watch(t)
 	ctx, _ = progress.Start(ctx, progress.KindCommand, "bmc power on")
-	ctx, _ = progress.Start(ctx, progress.KindStep, "power on", progress.WithFlags(progress.FlagFold), progress.Total(20))
+	ctx, _ = progress.Start(ctx, progress.KindStep, "power on", progress.Flagged(progress.FlagFold), progress.Total(20))
 	for i := range 11 {
 		_, b := progress.Start(ctx, progress.KindBatch, "batch", progress.Queued(), progress.Batch(i+1, 11), progress.Node(fmt.Sprintf("exe%d", i+1)))
 		if i == 1 {
@@ -532,7 +532,7 @@ func TestTreeWritesANameAsItsOwnOnlyWhereItStandsAlone(t *testing.T) {
 
 	capture := &Capture{}
 	bus := progress.NewBus(progress.BusOptions{Sinks: []progress.Sink{capture}})
-	ctx, step := progress.Start(progress.WithBus(context.Background(), bus), progress.KindStep, "s", progress.WithFlags(progress.FlagFold), progress.Total(4))
+	ctx, step := progress.Start(progress.WithBus(context.Background(), bus), progress.KindStep, "s", progress.Flagged(progress.FlagFold), progress.Total(4))
 	errs := map[string]error{
 		"c":     errors.New("context deadline exceeded"),
 		"e":     errors.New("i/o timeout"),

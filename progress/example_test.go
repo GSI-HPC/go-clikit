@@ -36,7 +36,7 @@ func (printer) Handle(e progress.Event) {
 // command watches or not.
 func reset(ctx context.Context, nodes []string) error {
 	ctx, step := progress.Start(ctx, progress.KindStep, "reset the machines",
-		progress.WithFlags(progress.FlagFold), progress.Total(len(nodes)))
+		progress.Flagged(progress.FlagFold), progress.Total(len(nodes)))
 	// Every target is announced queued before the first runs, so that a
 	// display knows the whole of the work from the start.
 	targets := make([]*progress.Span, len(nodes))
@@ -277,7 +277,7 @@ func ExampleSpan_Advance() {
 		Now:   func() time.Time { return now },
 	})
 	ctx := progress.WithBus(context.Background(), bus)
-	_, call := progress.Start(ctx, progress.KindCall, "download", progress.HTTP("GET", "/images/rocky-9.4.qcow2"))
+	_, call := progress.Start(ctx, progress.KindCall, "download", progress.HTTPRequest("GET", "/images/rocky-9.4.qcow2"))
 	call.Update(progress.Work(progress.UnitBytes, 2<<30))
 	for range 3 {
 		now = now.Add(100 * time.Millisecond)
@@ -364,7 +364,7 @@ func ExampleMeter() {
 	ctx, _ := progress.Start(progress.WithBus(context.Background(), bus), progress.KindCommand, "deploy")
 
 	ctx, _ = progress.Start(ctx, progress.KindStep, "copying the image",
-		progress.WithFlags(progress.FlagFold), progress.Total(4))
+		progress.Flagged(progress.FlagFold), progress.Total(4))
 	targets := make([]*progress.Span, 4)
 	for i, node := range []string{"exe01", "exe02", "exe03", "exe04"} {
 		_, targets[i] = progress.Start(ctx, progress.KindTarget, node, progress.Queued(),

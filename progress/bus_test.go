@@ -120,7 +120,7 @@ func TestWithoutABusTheRestAllocatesNothing(t *testing.T) {
 	ctx := context.Background()
 	failed := errors.New("failed")
 	allocs := testing.AllocsPerRun(100, func() {
-		ctx, step := progress.Start(ctx, progress.KindStep, "reset the machines", progress.WithFlags(progress.FlagFold), progress.Total(3))
+		ctx, step := progress.Start(ctx, progress.KindStep, "reset the machines", progress.Flagged(progress.FlagFold), progress.Total(3))
 		step.Update(progress.Message("waiting for the machines"), progress.Total(4))
 		_, skipped := progress.Start(ctx, progress.KindTarget, "exe0002", progress.Queued())
 		skipped.Skip("dry run")
@@ -161,8 +161,8 @@ func TestASpanReportsItsLifeInOrder(t *testing.T) {
 
 	clock := newClock()
 	ctx, bus, capture := watched(t, progress.BusOptions{Now: clock.Now})
-	cmdCtx, cmd := progress.Start(ctx, progress.KindCommand, "bmc power on", progress.WithFlags(progress.FlagDryRun))
-	stepCtx, step := progress.Start(cmdCtx, progress.KindStep, "power on", progress.WithFlags(progress.FlagFold), progress.Total(1), progress.Limit(8))
+	cmdCtx, cmd := progress.Start(ctx, progress.KindCommand, "bmc power on", progress.Flagged(progress.FlagDryRun))
+	stepCtx, step := progress.Start(cmdCtx, progress.KindStep, "power on", progress.Flagged(progress.FlagFold), progress.Total(1), progress.Limit(8))
 	_, target := progress.Start(stepCtx, progress.KindTarget, "exe0001", progress.Queued(), progress.Node("exe0001"))
 	clock.Add(time.Second)
 	target.Run()
@@ -285,7 +285,7 @@ func TestSkipIsTheEndOfASpanLeftOut(t *testing.T) {
 	t.Parallel()
 
 	ctx, bus, capture := watched(t, progress.BusOptions{})
-	stepCtx, step := progress.Start(ctx, progress.KindStep, "power on", progress.WithFlags(progress.FlagFold), progress.Total(4))
+	stepCtx, step := progress.Start(ctx, progress.KindStep, "power on", progress.Flagged(progress.FlagFold), progress.Total(4))
 	firstCtx, first := progress.Start(stepCtx, progress.KindBatch, "batch", progress.Queued(), progress.Batch(1, 2), progress.Total(2))
 	_, second := progress.Start(stepCtx, progress.KindBatch, "batch", progress.Queued(), progress.Batch(2, 2), progress.Total(2))
 	first.Run()
@@ -311,9 +311,9 @@ func TestHiddenAndShowLinesArePassedDown(t *testing.T) {
 	t.Parallel()
 
 	ctx, bus, capture := watched(t, progress.BusOptions{})
-	ctx, cmd := progress.Start(ctx, progress.KindCommand, "exec", progress.WithFlags(progress.FlagDryRun))
-	ctx, step := progress.Start(ctx, progress.KindStep, "uptime", progress.WithFlags(progress.FlagFold|progress.FlagShowLines))
-	ctx, lookup := progress.Start(ctx, progress.KindCall, "credential bmc", progress.WithFlags(progress.FlagHidden))
+	ctx, cmd := progress.Start(ctx, progress.KindCommand, "exec", progress.Flagged(progress.FlagDryRun))
+	ctx, step := progress.Start(ctx, progress.KindStep, "uptime", progress.Flagged(progress.FlagFold|progress.FlagShowLines))
+	ctx, lookup := progress.Start(ctx, progress.KindCall, "credential bmc", progress.Flagged(progress.FlagHidden))
 	_, inner := progress.Start(ctx, progress.KindCall, "ssh")
 	inner.End(nil)
 	lookup.End(nil)
@@ -499,7 +499,7 @@ func TestEventsHaveOneOrderUnderConcurrency(t *testing.T) {
 	t.Parallel()
 
 	ctx, bus, capture := watched(t, progress.BusOptions{})
-	stepCtx, step := progress.Start(ctx, progress.KindStep, "uptime", progress.WithFlags(progress.FlagFold), progress.Total(64), progress.Limit(8))
+	stepCtx, step := progress.Start(ctx, progress.KindStep, "uptime", progress.Flagged(progress.FlagFold), progress.Total(64), progress.Limit(8))
 	spans := make([]*progress.Span, 64)
 	ctxs := make([]context.Context, 64)
 	for i := range spans {
@@ -591,7 +591,7 @@ func TestASinkThatPanicsIsRemoved(t *testing.T) {
 	// A sink that panics when asked for lines asks for none.
 	lines := progress.NewBus(progress.BusOptions{Sinks: []progress.Sink{&panicky{lines: true}}, PanicLog: io.Discard})
 	var lctx context.Context
-	lctx, span = progress.Start(progress.WithBus(context.Background(), lines), progress.KindCall, "ssh", progress.WithFlags(progress.FlagShowLines))
+	lctx, span = progress.Start(progress.WithBus(context.Background(), lines), progress.KindCall, "ssh", progress.Flagged(progress.FlagShowLines))
 	var buf bytes.Buffer
 	if w := progress.Tee(lctx, &buf, progress.StreamStdout, nil); w != &buf {
 		t.Errorf("Tee = %T, want the writer itself", w)
@@ -638,7 +638,7 @@ func TestASinkIsAskedForLinesOnce(t *testing.T) {
 		Sinks:    []progress.Sink{bad, &panicky{n: 1}, &panicky{n: 2}, good},
 		PanicLog: &log,
 	})
-	ctx, span := progress.Start(progress.WithBus(context.Background(), bus), progress.KindCall, "ssh", progress.WithFlags(progress.FlagShowLines))
+	ctx, span := progress.Start(progress.WithBus(context.Background(), bus), progress.KindCall, "ssh", progress.Flagged(progress.FlagShowLines))
 	var buf bytes.Buffer
 	if w := progress.Tee(ctx, &buf, progress.StreamStdout, nil); w == &buf {
 		t.Error("Tee returned the writer itself, although a sink still wants the lines")

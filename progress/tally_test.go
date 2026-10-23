@@ -46,7 +46,7 @@ func TestTallyCountsEveryTargetOnce(t *testing.T) {
 	// A fan-out: one target ends well, one fails, one is interrupted
 	// before it starts.
 	stepCtx, step := progress.Start(ctx, progress.KindStep, "reset the machines",
-		progress.WithFlags(progress.FlagFold), progress.Total(3), progress.Limit(1))
+		progress.Flagged(progress.FlagFold), progress.Total(3), progress.Limit(1))
 	fan := targets(stepCtx, 3)
 	fan[0].Run()
 	fan[0].End(nil)
@@ -60,7 +60,7 @@ func TestTallyCountsEveryTargetOnce(t *testing.T) {
 	step.End(errors.New("2 of 3 failed"))
 
 	// Batches: the first runs, and the second is left out after it.
-	stepCtx, step = progress.Start(ctx, progress.KindStep, "power on", progress.WithFlags(progress.FlagFold), progress.Total(4))
+	stepCtx, step = progress.Start(ctx, progress.KindStep, "power on", progress.Flagged(progress.FlagFold), progress.Total(4))
 	first, one := progress.Start(stepCtx, progress.KindBatch, "1/2", progress.Queued(), progress.Batch(1, 2), progress.Total(2))
 	_, two := progress.Start(stepCtx, progress.KindBatch, "2/2", progress.Queued(), progress.Batch(2, 2), progress.Total(2))
 	if roots := sink.tally.Roots(); len(roots) != 1 || roots[0].Queued != 4 || roots[0].Batch != "" {
@@ -148,8 +148,8 @@ func TestTallyCountsANestedStepLeftOutOnce(t *testing.T) {
 	t.Parallel()
 	sink := &tallied{ended: map[string]progress.Count{}}
 	ctx, bus, _ := watched(t, progress.BusOptions{Sinks: []progress.Sink{sink}})
-	outerCtx, _ := progress.Start(ctx, progress.KindStep, "outer", progress.WithFlags(progress.FlagFold), progress.Total(6))
-	innerCtx, _ := progress.Start(outerCtx, progress.KindStep, "inner", progress.WithFlags(progress.FlagFold), progress.Total(6))
+	outerCtx, _ := progress.Start(ctx, progress.KindStep, "outer", progress.Flagged(progress.FlagFold), progress.Total(6))
+	innerCtx, _ := progress.Start(outerCtx, progress.KindStep, "inner", progress.Flagged(progress.FlagFold), progress.Total(6))
 	progress.Start(innerCtx, progress.KindBatch, "1/2", progress.Queued(), progress.Batch(1, 2), progress.Total(4))
 	bus.Close()
 
