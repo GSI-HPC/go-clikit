@@ -185,7 +185,7 @@ func TestReducerRuns(t *testing.T) {
 	}
 	// A run whose first line is lost takes its trace from its events.
 	ru := reduce(eventlog.Options{}, ev("eeee", 1, "start", 1, 0, `"kind":"command","name":"x","state":"running"`)).Runs()[0]
-	if ru.Trace.Trace.String() != "4bf92f3577b34da6a3ce929d0e0e4736" || ru.Program != "" {
+	if ru.Trace.ID.String() != "4bf92f3577b34da6a3ce929d0e0e4736" || ru.Program != "" {
 		t.Errorf("the run without its first line = %+v", ru)
 	}
 }

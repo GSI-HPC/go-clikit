@@ -316,20 +316,21 @@ func TestTailAfterAnError(t *testing.T) {
 
 // sink keeps the runs it is told of and the events it is given.
 type sink struct {
-	runs   []progress.Run
+	runs   []progress.RunInfo
 	events []progress.Event
 }
 
-func (s *sink) Begin(r progress.Run)    { s.runs = append(s.runs, r) }
-func (s *sink) Handle(e progress.Event) { s.events = append(s.events, e) }
+func (s *sink) Begin(r progress.RunInfo) { s.runs = append(s.runs, r) }
+func (s *sink) Handle(e progress.Event)  { s.events = append(s.events, e) }
 
-// handler is a sink that is no TraceSink.
+// handler is a sink that is no RunSink.
 type handler struct{ events []progress.Event }
 
 func (h *handler) Handle(e progress.Event) { h.events = append(h.events, e) }
 
 // Forward gives a sink every event of the log once, in order, the log
-// read again after a reset too, and tells a TraceSink of the run first.
+// read again after a reset too, and tells a RunSink of the run first,
+// with the version the log names.
 func TestForward(t *testing.T) {
 	lines := golden(t)
 	var want []progress.Event
@@ -349,7 +350,7 @@ func TestForward(t *testing.T) {
 			feed.Line([]byte(l))
 		}
 	}
-	if len(s.runs) != 1 || s.runs[0].Trace.Parent.String() != "00f067aa0ba902b7" {
+	if len(s.runs) != 1 || s.runs[0].Trace.Parent.String() != "00f067aa0ba902b7" || s.runs[0].Version != "v1.2.3" {
 		t.Errorf("the runs = %+v, want the golden log's", s.runs)
 	}
 	if !reflect.DeepEqual(s.events, want) {
@@ -357,7 +358,7 @@ func TestForward(t *testing.T) {
 	}
 
 	// Another run in the same log is given too; a sink that is no
-	// TraceSink is given the events alone.
+	// RunSink is given the events alone.
 	var h handler
 	feed = eventlog.Forward(&h)
 	feed.Line([]byte(lines[1]))

@@ -14,11 +14,11 @@ import (
 	"github.com/GSI-HPC/go-clikit/termtext"
 )
 
-// Run is the progress of one command: the Bus Start made for it, the
+// Session is the progress of one command: the Bus Start made for it, the
 // display that shows it and the event log that records it, or none of
 // them. Its methods are not safe for concurrent use, but for the writers
 // they return, which are.
-type Run struct {
+type Session struct {
 	ctx     context.Context
 	mode    Mode
 	prefix  string
@@ -36,6 +36,12 @@ type Run struct {
 	finished bool
 }
 
+// Run is the old name of Session.
+//
+// Deprecated: Use Session. progress.Run and Span.Run name other things
+// (decision 36).
+type Run = Session
+
 // shown is a display: the Tree, the Counter or Plain.
 type shown interface {
 	progress.Sink
@@ -44,16 +50,16 @@ type shown interface {
 	Close()
 }
 
-// Start returns the Run of a command whose context is ctx, as o asks for:
-// a display when o.Mode has one drawn, an event log when o.Log names one,
-// and the Bus they are the sinks of. It writes the notes Choose and the
-// event log have, escaped, to o.Notes first.
+// Start returns the Session of a command whose context is ctx, as o asks
+// for: a display when o.Mode has one drawn, an event log when o.Log names
+// one, and the Bus they are the sinks of. It writes the notes Choose and
+// the event log have, escaped, to o.Notes first.
 //
-// A Run with neither has no Bus: its Context is ctx, its writers are the
-// streams they are given, and Finish does nothing. So is the Run of a ctx
-// that carries a Bus already, such as a test's or a server's for one call,
-// whose Bus is its maker's: Start then reads o not at all, writes nothing
-// and refuses nothing.
+// A Session with neither has no Bus: its Context is ctx, its writers are
+// the streams they are given, and Finish does nothing. So is the Session of
+// a ctx that carries a Bus already, such as a test's or a server's for one
+// call, whose Bus is its maker's: Start then reads o not at all, writes
+// nothing and refuses nothing.
 //
 // An error is the command line's, as Choose's is: a word the flag gives
 // that names no Mode, a display the terminal cannot show, or a log the
@@ -63,8 +69,8 @@ type shown interface {
 //
 // The display is drawn on o.Stderr, and the tree stops drawing what runs,
 // and says the command was interrupted, once ctx is done.
-func Start(ctx context.Context, o Options) (*Run, error) {
-	r := &Run{ctx: ctx, mode: ModeNone}
+func Start(ctx context.Context, o Options) (*Session, error) {
+	r := &Session{ctx: ctx, mode: ModeNone}
 	if progress.BusFrom(ctx) != nil {
 		return r, nil
 	}
@@ -181,7 +187,7 @@ func openLog(o Options) (f *os.File, quiet bool, note string, err error) {
 // as --progress-log /dev/stderr names it. The log writes from a goroutine
 // of its own, so its lines then go through the Terminal's Lines, above the
 // display, and never into it.
-func (r *Run) logWriter() io.Writer {
+func (r *Session) logWriter() io.Writer {
 	if r.term != nil && sameFile(r.logFile, r.stderr) {
 		return r.term.Lines(r.stderr)
 	}
@@ -202,17 +208,17 @@ func sameFile(f *os.File, w io.Writer) bool {
 
 // Context returns the context the command runs under: the one Start was
 // given, with the Bus.
-func (r *Run) Context() context.Context { return r.ctx }
+func (r *Session) Context() context.Context { return r.ctx }
 
 // Mode returns how the progress is shown: ModeTTY, ModeCounter or
 // ModePlain, or ModeNone without a display.
-func (r *Run) Mode() Mode { return r.mode }
+func (r *Session) Mode() Mode { return r.mode }
 
 // Writer returns a writer to w, a stream that shows on the terminal the
 // display draws on, such as standard error, or standard output when it is
 // the same terminal, that takes the display off before it writes, as
 // display.Terminal.Writer does; w itself without a display.
-func (r *Run) Writer(w io.Writer) io.Writer {
+func (r *Session) Writer(w io.Writer) io.Writer {
 	if r.term == nil {
 		return w
 	}
@@ -222,7 +228,7 @@ func (r *Run) Writer(w io.Writer) io.Writer {
 // Lines returns a writer to w for the lines of goroutines beside the
 // command, such as a logger's, which holds them while a question is asked,
 // as display.Terminal.Lines does; w itself without a display.
-func (r *Run) Lines(w io.Writer) io.Writer {
+func (r *Session) Lines(w io.Writer) io.Writer {
 	if r.term == nil {
 		return w
 	}
@@ -231,7 +237,7 @@ func (r *Run) Lines(w io.Writer) io.Writer {
 
 // Draw draws a frame of the display, for a test that set Options.Manual
 // and moves its clock by hand; without a display it does nothing.
-func (r *Run) Draw() {
+func (r *Session) Draw() {
 	if r.shown != nil {
 		r.shown.Draw()
 	}
@@ -246,10 +252,10 @@ func (r *Run) Draw() {
 // that could not be written fails nothing: a note says once that it stops
 // short, unless it is the default log.
 //
-// The writers the Run returned pass their bytes through from then on. The
-// program puts its own writers back, and then writes the command's error.
-// A second Finish does nothing.
-func (r *Run) Finish(summary bool) {
+// The writers the Session returned pass their bytes through from then on.
+// The program puts its own writers back, and then writes the command's
+// error. A second Finish does nothing.
+func (r *Session) Finish(summary bool) {
 	if r.bus == nil || r.finished {
 		return
 	}

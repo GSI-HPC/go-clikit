@@ -117,3 +117,6 @@ func TestTheLocaleIsReadAsTheCLibraryReadsIt(t *testing.T) {
 		}
 	}
 }
+
+// The old name of Session stays for one minor release (decision 36).
+var _ *cliprogress.Run = (*cliprogress.Session)(nil)

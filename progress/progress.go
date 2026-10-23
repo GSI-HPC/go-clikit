@@ -525,23 +525,39 @@ type LineSink interface {
 	WantsLines() bool
 }
 
-// Run is what a Bus tells a TraceSink about the run its events belong to.
-// Fields may be added in a minor release.
-type Run struct {
+// RunInfo is what a Bus tells a RunSink about the run its events belong
+// to. Fields may be added in a minor release.
+type RunInfo struct {
 	// Trace is the trace the run's spans belong to, and where it came
 	// from: BusOptions.Trace, or a trace drawn at random.
 	Trace TraceContext
 	// Program names the program, BusOptions.Program.
 	Program string
+	// Version is the version of the program, which a Bus does not know
+	// and leaves empty; a reader of an event log, such as eventlog's
+	// Forwarder, passes on the version the log's first line names.
+	Version string
 }
 
-// TraceSink is a Sink that records the run its events belong to, as an
+// Run is the old name of RunInfo.
+//
+// Deprecated: Use RunInfo. Run also names a method of Span, a lifecycle
+// in cliprogress and a snapshot in eventlog (decision 36).
+type Run = RunInfo
+
+// RunSink is a Sink that records the run its events belong to, as an
 // event log does. The Bus tells it once, when it is made, before any
 // event.
-type TraceSink interface {
+type RunSink interface {
 	// Begin receives the run the Bus's events belong to.
-	Begin(Run)
+	Begin(RunInfo)
 }
+
+// TraceSink is the old name of RunSink.
+//
+// Deprecated: Use RunSink, which says what it is given: a run, not traces
+// (decision 36).
+type TraceSink = RunSink
 
 // Suspender is a Sink that draws on the terminal, and takes itself off it
 // while something else asks a question there. Suspend and Resume are called

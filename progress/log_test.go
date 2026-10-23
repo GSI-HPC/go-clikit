@@ -37,7 +37,7 @@ import (
 func logged(t *testing.T, o progress.BusOptions, work func(ctx context.Context)) (string, []progress.Event) {
 	t.Helper()
 	var out bytes.Buffer
-	log := progress.NewLog(&out, progress.LogOptions{Run: "0123456789abcdef", Version: "v1.2.3"})
+	log := progress.NewLog(&out, progress.LogOptions{RunID: "0123456789abcdef", Version: "v1.2.3"})
 	capture := &progresstest.Capture{Lines: true}
 	o.Sinks = []progress.Sink{capture, log}
 	bus := progress.NewBus(o)
@@ -452,7 +452,7 @@ func TestEveryPartOfAnEventIsLoggedOrLeftOutOnPurpose(t *testing.T) {
 	}
 
 	var out bytes.Buffer
-	log := progress.NewLog(&out, progress.LogOptions{Run: "0123456789abcdef"})
+	log := progress.NewLog(&out, progress.LogOptions{RunID: "0123456789abcdef"})
 	log.Handle(e)
 	if err := log.Close(); err != nil {
 		t.Fatal(err)
@@ -524,7 +524,7 @@ func TestALogThatCannotBeWrittenStopsAndSaysWhy(t *testing.T) {
 	t.Parallel()
 
 	w := &unwritable{}
-	log := progress.NewLog(w, progress.LogOptions{Run: "0123456789abcdef"})
+	log := progress.NewLog(w, progress.LogOptions{RunID: "0123456789abcdef"})
 	capture := &progresstest.Capture{}
 	bus := progress.NewBus(progress.BusOptions{Sinks: []progress.Sink{log, capture}})
 	ctx := progress.WithBus(context.Background(), bus)
@@ -579,7 +579,7 @@ func TestTheLogIsWrittenSoonAfterEachLine(t *testing.T) {
 		t.Parallel()
 		synctest.Test(t, func(t *testing.T) {
 			w := &writes{}
-			log := progress.NewLog(w, progress.LogOptions{Run: "0123456789abcdef"})
+			log := progress.NewLog(w, progress.LogOptions{RunID: "0123456789abcdef"})
 			bus := progress.NewBus(progress.BusOptions{Sinks: []progress.Sink{log}})
 			_, cmd := progress.Start(progress.WithBus(context.Background(), bus), progress.KindCommand, "exec")
 			synctest.Wait()
@@ -603,7 +603,7 @@ func TestTheLogIsWrittenSoonAfterEachLine(t *testing.T) {
 		t.Parallel()
 		synctest.Test(t, func(t *testing.T) {
 			w := &writes{}
-			log := progress.NewLog(w, progress.LogOptions{Run: "0123456789abcdef", FlushEvery: 25 * time.Millisecond})
+			log := progress.NewLog(w, progress.LogOptions{RunID: "0123456789abcdef", FlushEvery: 25 * time.Millisecond})
 			bus := progress.NewBus(progress.BusOptions{Sinks: []progress.Sink{log}})
 			_, cmd := progress.Start(progress.WithBus(context.Background(), bus), progress.KindCommand, "exec")
 			time.Sleep(24 * time.Millisecond)
@@ -641,7 +641,7 @@ func TestTheLogIsWrittenSoonAfterEachLine(t *testing.T) {
 		t.Parallel()
 		synctest.Test(t, func(t *testing.T) {
 			w := &writes{}
-			log := progress.NewLog(w, progress.LogOptions{Run: "0123456789abcdef", FlushEvery: -1})
+			log := progress.NewLog(w, progress.LogOptions{RunID: "0123456789abcdef", FlushEvery: -1})
 			bus := progress.NewBus(progress.BusOptions{Sinks: []progress.Sink{log}})
 			_, cmd := progress.Start(progress.WithBus(context.Background(), bus), progress.KindCommand, "exec")
 			synctest.Wait()
@@ -660,7 +660,7 @@ func TestTheLogIsWrittenSoonAfterEachLine(t *testing.T) {
 		t.Parallel()
 		synctest.Test(t, func(t *testing.T) {
 			w := &writes{}
-			log := progress.NewLog(w, progress.LogOptions{Run: "0123456789abcdef"})
+			log := progress.NewLog(w, progress.LogOptions{RunID: "0123456789abcdef"})
 			bus := progress.NewBus(progress.BusOptions{Sinks: []progress.Sink{log}})
 			ctx, cmd := progress.Start(progress.WithBus(context.Background(), bus), progress.KindCommand, "exec")
 			_, step := progress.Start(ctx, progress.KindStep, "run")
@@ -756,7 +756,7 @@ func TestALogThatFallsBehindKeepsWhatItHad(t *testing.T) {
 	// gives up on it.
 	synctest.Test(t, func(*testing.T) {
 		w := &gate{open: make(chan struct{})}
-		log := progress.NewLog(w, progress.LogOptions{Run: "0123456789abcdef"})
+		log := progress.NewLog(w, progress.LogOptions{RunID: "0123456789abcdef"})
 		bus := progress.NewBus(progress.BusOptions{Sinks: []progress.Sink{log}})
 		ctx := progress.WithBus(context.Background(), bus)
 		for i := range n {
@@ -800,7 +800,7 @@ func TestTheLogIsWrittenInWholeLines(t *testing.T) {
 	t.Parallel()
 
 	w := &writes{}
-	log := progress.NewLog(w, progress.LogOptions{Run: "0123456789abcdef"})
+	log := progress.NewLog(w, progress.LogOptions{RunID: "0123456789abcdef"})
 	bus := progress.NewBus(progress.BusOptions{Sinks: []progress.Sink{log}})
 	ctx := progress.WithBus(context.Background(), bus)
 	for i := range 3000 {
@@ -854,8 +854,8 @@ func TestTwoRunsAppendingToOneFileCanBeToldApart(t *testing.T) {
 				return
 			}
 			defer func() { _ = f.Close() }()
-			log := progress.NewLog(f, progress.LogOptions{Run: run})
-			bus := progress.NewBus(progress.BusOptions{Sinks: []progress.Sink{log}, Trace: progress.TraceContext{Trace: trace}})
+			log := progress.NewLog(f, progress.LogOptions{RunID: run})
+			bus := progress.NewBus(progress.BusOptions{Sinks: []progress.Sink{log}, Trace: progress.TraceContext{ID: trace}})
 			ctx := progress.WithBus(context.Background(), bus)
 			for i := range events / 2 {
 				_, s := progress.Start(ctx, progress.KindCall, "ssh", progress.Node(fmt.Sprintf("exe%04d", i)))
@@ -984,7 +984,7 @@ func TestALogStartsNoWriteOnceCloseHasGivenUp(t *testing.T) {
 func TestTheEventLogNamesTheProgram(t *testing.T) {
 	t.Parallel()
 	var out bytes.Buffer
-	log := progress.NewLog(&out, progress.LogOptions{Run: "0123456789abcdef", Program: "sind", Version: "v1.2.3"})
+	log := progress.NewLog(&out, progress.LogOptions{RunID: "0123456789abcdef", Program: "sind", Version: "v1.2.3"})
 	bus := progress.NewBus(progress.BusOptions{Sinks: []progress.Sink{log}})
 	bus.Close()
 	if err := log.Close(); err != nil {
@@ -1008,7 +1008,7 @@ func TestTheEventLogTakesTheProgramFromTheBus(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			var out bytes.Buffer
-			log := progress.NewLog(&out, progress.LogOptions{Run: "0123456789abcdef", Program: tc.log})
+			log := progress.NewLog(&out, progress.LogOptions{RunID: "0123456789abcdef", Program: tc.log})
 			bus := progress.NewBus(progress.BusOptions{Program: tc.bus, Sinks: []progress.Sink{log}})
 			bus.Close()
 			if err := log.Close(); err != nil {
@@ -1022,6 +1022,57 @@ func TestTheEventLogTakesTheProgramFromTheBus(t *testing.T) {
 	}
 }
 
+// A log told no version takes the run's, as a reader of a child's log
+// passes it on, and one told its own keeps it.
+func TestTheEventLogTakesTheVersionFromTheRun(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct{ name, log, run, want string }{
+		{"from the run", "", "v1.0.0", `"version":"v1.0.0"`},
+		{"the log's own", "v2.0.0", "v1.0.0", `"version":"v2.0.0"`},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			var out bytes.Buffer
+			log := progress.NewLog(&out, progress.LogOptions{RunID: "0123456789abcdef", Version: tc.log})
+			log.Begin(progress.RunInfo{Program: "sind", Version: tc.run})
+			if err := log.Close(); err != nil {
+				t.Fatalf("closing the log: %v", err)
+			}
+			first, _, _ := strings.Cut(out.String(), "\n")
+			if !strings.HasSuffix(first, ","+tc.want+"}") {
+				t.Errorf("the first line is %s, want %s", first, tc.want)
+			}
+		})
+	}
+}
+
+// The old name of RunID stays for one minor release (decision 36), and
+// is read when RunID is empty.
+func TestTheOldNameOfRunID(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name string
+		o    progress.LogOptions
+		want string
+	}{
+		{"Run alone", progress.LogOptions{Run: "0123456789abcdef"}, "0123456789abcdef"},
+		{"RunID first", progress.LogOptions{RunID: "fedcba9876543210", Run: "0123456789abcdef"}, "fedcba9876543210"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			var out bytes.Buffer
+			log := progress.NewLog(&out, tc.o)
+			log.Begin(progress.RunInfo{})
+			if err := log.Close(); err != nil {
+				t.Fatalf("closing the log: %v", err)
+			}
+			if want := `"run":"` + tc.want + `"`; !strings.Contains(out.String(), want) {
+				t.Errorf("the log is %s, want %s", out.String(), want)
+			}
+		})
+	}
+}
+
 // advancesLogged feeds a log with options o one advance of a span every
 // 100 ms from the start of the second one, n of them, and the span's end,
 // and returns the lines it wrote as seq and leftOut pairs, "end" for the
@@ -1029,7 +1080,7 @@ func TestTheEventLogTakesTheProgramFromTheBus(t *testing.T) {
 func advancesLogged(t *testing.T, o progress.LogOptions, n int) [][2]int {
 	t.Helper()
 	var out bytes.Buffer
-	o.Run = "0123456789abcdef"
+	o.RunID = "0123456789abcdef"
 	log := progress.NewLog(&out, o)
 	at := time.Date(2026, 10, 10, 12, 0, 0, 0, time.UTC)
 	span := progress.SpanID(7)
@@ -1092,7 +1143,7 @@ func TestTheLogSamplesTheAdvancesOfASpan(t *testing.T) {
 func TestTheLogForgetsTheSamplingOfASpanThatEnded(t *testing.T) {
 	t.Parallel()
 	var out bytes.Buffer
-	log := progress.NewLog(&out, progress.LogOptions{Run: "0123456789abcdef"})
+	log := progress.NewLog(&out, progress.LogOptions{RunID: "0123456789abcdef"})
 	at := time.Date(2026, 10, 10, 12, 0, 0, 0, time.UTC)
 	for i, typ := range []progress.Type{progress.TypeAdvance, progress.TypeAdvance, progress.TypeEnd,
 		progress.TypeAdvance, progress.TypeEnd} {

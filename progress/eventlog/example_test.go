@@ -29,7 +29,7 @@ func ExampleDecode() {
 		case err != nil:
 			fmt.Println("skipped:", err)
 		case l.Begin:
-			fmt.Println(l.Run, l.Program, l.Version)
+			fmt.Println(l.RunID, l.Program, l.Version)
 		case l.Event.Type == progress.TypeEnd:
 			e := l.Event
 			fmt.Println(e.Seq, e.Type, e.Kind, e.Name, e.Status, e.Class, e.Err)
@@ -110,7 +110,7 @@ func ExampleReducer() {
 	if err != nil {
 		panic(err)
 	}
-	log := progress.NewLog(f, progress.LogOptions{Run: "0123456789abcdef", Version: "v1.2.3"})
+	log := progress.NewLog(f, progress.LogOptions{RunID: "0123456789abcdef", Version: "v1.2.3"})
 	bus := progress.NewBus(progress.BusOptions{Sinks: []progress.Sink{log}, Program: "prog"})
 	ctx, cmd := progress.Start(progress.WithBus(context.Background(), bus), progress.KindCommand, "status")
 	fanout.Map(ctx, []string{"exe1", "exe2"}, fanout.MapOptions[string]{Step: "probe the nodes"},

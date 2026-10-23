@@ -4,6 +4,7 @@
 package progress_test
 
 import (
+	"io"
 	"testing"
 
 	"github.com/GSI-HPC/go-clikit/progress"
@@ -50,5 +51,17 @@ func TestOldOptionNames(t *testing.T) {
 	}
 	if got, want := [2]string{e.Method, e.Path}, [2]string{"GET", "/redfish/v1"}; got != want {
 		t.Errorf("HTTP gave %q, want %q", got, want)
+	}
+}
+
+// The old names of RunInfo, RunSink and Bus.TraceID stay for one minor
+// release (decision 36).
+func TestOldRunNames(t *testing.T) {
+	var log progress.TraceSink = progress.NewLog(io.Discard, progress.LogOptions{})
+	log.Begin(progress.Run{Program: "prog"})
+	bus := progress.NewBus(progress.BusOptions{})
+	defer bus.Close()
+	if bus.Trace() != bus.TraceID() || bus.TraceID() != bus.TraceContext().ID {
+		t.Errorf("Trace = %v, TraceID = %v, want both %v", bus.Trace(), bus.TraceID(), bus.TraceContext().ID)
 	}
 }

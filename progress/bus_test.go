@@ -444,9 +444,9 @@ func TestSpanIDsAreNeverZeroAndNeverShared(t *testing.T) {
 	seen := map[progress.SpanID]bool{}
 	for range 2 {
 		capture := &progresstest.Capture{}
-		bus := progress.NewBus(progress.BusOptions{Sinks: []progress.Sink{capture}, Trace: progress.TraceContext{Trace: trace}})
-		if bus.Trace() != trace {
-			t.Errorf("Trace() = %s, want %s", bus.Trace(), trace)
+		bus := progress.NewBus(progress.BusOptions{Sinks: []progress.Sink{capture}, Trace: progress.TraceContext{ID: trace}})
+		if bus.TraceID() != trace {
+			t.Errorf("Trace() = %s, want %s", bus.TraceID(), trace)
 		}
 		ctx := progress.WithBus(context.Background(), bus)
 		for range 1000 {
@@ -466,10 +466,10 @@ func TestSpanIDsAreNeverZeroAndNeverShared(t *testing.T) {
 	}
 
 	a, b := progress.NewBus(progress.BusOptions{}), progress.NewBus(progress.BusOptions{})
-	if a.Trace() == (progress.TraceID{}) || a.Trace() == b.Trace() {
-		t.Errorf("drawn traces %s and %s", a.Trace(), b.Trace())
+	if a.TraceID() == (progress.TraceID{}) || a.TraceID() == b.TraceID() {
+		t.Errorf("drawn traces %s and %s", a.TraceID(), b.TraceID())
 	}
-	if s := a.Trace().String(); len(s) != 32 {
+	if s := a.TraceID().String(); len(s) != 32 {
 		t.Errorf("a trace id reads %q, want 32 hexadecimal digits", s)
 	}
 	if s := progress.SpanID(0xabc).String(); s != "0000000000000abc" {
@@ -535,7 +535,7 @@ type panicky struct {
 	lines, begin bool
 }
 
-func (p *panicky) Begin(progress.Run) {
+func (p *panicky) Begin(progress.RunInfo) {
 	if p.begin {
 		panic("the log could not begin")
 	}

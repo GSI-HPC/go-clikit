@@ -42,8 +42,13 @@ import (
 // Line is one line of an event log, decoded: the first line of a run,
 // which says what the run is, or one of its events.
 type Line struct {
-	// Run names the run the line belongs to, the same on every line of
+	// RunID names the run the line belongs to, the same on every line of
 	// the run: the lines of several runs may be in one log.
+	RunID string
+	// Run is the old name of RunID, which Decode sets to the same.
+	//
+	// Deprecated: Use RunID, as Run.ID and progress.LogOptions.RunID name
+	// it (decision 36).
 	Run string
 	// Trace is the trace the run's spans belong to. On the first line of
 	// a run it says too where the trace came from, when another program
@@ -136,8 +141,9 @@ func Decode(b []byte) (Line, error) {
 	if l.Run == "" {
 		return Line{}, errors.New("a line of the event log without a run")
 	}
-	out := Line{Run: progress.Sanitize(l.Run, progress.MaxField)}
-	out.Trace.Trace, _ = traceID(l.Trace)
+	out := Line{RunID: progress.Sanitize(l.Run, progress.MaxField)}
+	out.Run = out.RunID
+	out.Trace.ID, _ = traceID(l.Trace)
 	if l.Type == "trace" {
 		out.Begin = true
 		out.Program = progress.Sanitize(l.Program, progress.MaxField)
