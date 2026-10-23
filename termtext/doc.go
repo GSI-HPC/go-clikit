@@ -91,7 +91,10 @@
 // column, and a terminal that draws U+FE0F narrow shows less than Width
 // counts. Truncate shortens text to a number of columns with the same
 // widths, and Wrap fills text into lines of that many columns, indents
-// included. All three expect text that is already escaped: a control
-// character or an escape sequence is counted as the columns of its runes,
-// not as what it does to the terminal.
+// included. Both name that number cols, and read zero or less in opposite
+// ways (decision 42): Truncate with cols of zero or less returns "", no
+// columns at all, and Wrap with cols of zero or less never breaks a line,
+// no limit at all. All three expect text that is already escaped: a
+// control character or an escape sequence is counted as the columns of its
+// runes, not as what it does to the terminal.
 package termtext

@@ -5,23 +5,24 @@ package termtext
 
 import "strings"
 
-// Wrap fills s into lines of at most width columns, as Width counts them,
+// Wrap fills s into lines of at most cols columns, as Width counts them,
 // and returns them, each ended by a newline, the last one too. The first
 // line starts with first and every later line with rest, such as an indent,
-// and both count towards width.
+// and both count towards cols.
 //
 // s is split into words as strings.Fields splits it, so its newlines and
 // runs of spaces are lost: Wrap fills one paragraph. A word is added to the
-// line while the line, a space and the word fit in width columns, and
-// starts the next line otherwise. A line holds at least one word, and a
-// word is never cut: one wider than width stays whole on a line of its own,
-// which is then wider than width. s without words gives "". A width of zero
-// or less never ends a line, so every word goes on the first line.
+// line while the line, a space and the word fit in cols columns, and starts
+// the next line otherwise. A line holds at least one word, and a word is
+// never cut: one wider than cols stays whole on a line of its own, which is
+// then wider than cols. s without words gives "". cols of zero or less never
+// ends a line, so every word goes on the first line; Truncate reads zero
+// the other way, as no columns at all.
 //
 // Wrap does not escape: s is text of the program's own, such as the help of
 // a command. Untrusted text has to be escaped by Escape first, since Width
 // counts what a control character does as the columns of its runes.
-func Wrap(s string, width int, first, rest string) string {
+func Wrap(s string, cols int, first, rest string) string {
 	words := strings.Fields(s)
 	if len(words) == 0 {
 		return ""
@@ -32,24 +33,24 @@ func Wrap(s string, width int, first, rest string) string {
 	restCols, restLast := measure(0, 0, rest)
 
 	b.WriteString(first)
-	cols, last := firstCols, firstLast
+	used, last := firstCols, firstLast
 	onLine := false
 	for _, w := range words {
 		if onLine {
 			// A space takes one column and ends in a rune of one column.
-			c, l := measure(cols+1, 1, w)
-			if width <= 0 || c <= width {
+			c, l := measure(used+1, 1, w)
+			if cols <= 0 || c <= cols {
 				b.WriteByte(' ')
 				b.WriteString(w)
-				cols, last = c, l
+				used, last = c, l
 				continue
 			}
 			b.WriteByte('\n')
 			b.WriteString(rest)
-			cols, last = restCols, restLast
+			used, last = restCols, restLast
 		}
 		b.WriteString(w)
-		cols, last = measure(cols, last, w)
+		used, last = measure(used, last, w)
 		onLine = true
 	}
 	b.WriteByte('\n')
