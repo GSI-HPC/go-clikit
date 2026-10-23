@@ -15,8 +15,9 @@ gitignored).
 
 The packages, most of them moved here with their history from the
 repository where they were written, which `README.md` names;
-`progress/cliprogress` and `cobratree` were written here, from the code
-clusterctl and sind each carried (decisions 21 and 24). v0: the API may
+`progress/cliprogress`, `cobratree`, `fsutil` and `doctor` were written
+here, from the code clusterctl, sind and brig each carried (decisions 21,
+24, 37 and 38). v0: the API may
 still change in a minor release (see Compatibility).
 
 | Package | What it holds | Release |
@@ -41,25 +42,27 @@ still change in a minor release (see Compatibility).
 | `localweb/assets` | a page's static files at addresses with a hash, cached for good | v0.9.0 |
 | `localweb/page` | a page's templates in one set, answers to htmx | v0.9.0 |
 | `localweb/htmx` | htmx, its SSE extension and idiomorph, checked against their releases | v0.9.0 |
+| `fsutil` | writing a file whole or not at all, a lock beside a shared file, refusing a file another user could have written | v0.10.0 |
+| `doctor` | the checks of a doctor command, in fixed words, as text and as JSON | v0.10.0 |
 
 ## Layout
 
 - `doc.go`: the package comment of `clikit`, which lists the packages.
 - `termtext/`: `escape.go`, the escaper and its policy (`doc.go`);
   `width.go`, display widths and `Truncate`; `wrap.go`, `Wrap`;
-  `writer.go`, `NewEscapeWriter`.
+  `writer.go`, `EscapeWriter` and `NewEscapeWriter`.
 - `progress/`: `progress.go`, the vocabulary (kinds, states, classes, units,
   flags, `Fields`, `Event`, the sink interfaces and the options); `bus.go`,
   the `Bus`, spans and `Suspend`; `classify.go`, `Classify`, `ErrSkipped`
   and `Skip`; `lines.go`, `Tee` and the lines of output; `sanitize.go`;
   `tally.go`; `work.go`, `Advance`, `SetAmount` and how often the Bus
-  sends the amount; `count.go`, `CountWriter` and `CountReader`;
+  sends the amount; `count.go`, `AdvanceWriter` and `AdvanceReader`;
   `meter.go`, `Meter`, which rolls the work up the tree; `log.go`, the
   event log; `trace.go`, the W3C trace context.
   `testdata/log-v1.jsonl` is the golden event log.
 - `progress/display/`: `terminal.go`, the `Terminal` and its writers;
   `style.go`, cutting a row that sets colours by the columns it shows;
-  `theme.go`, `Theme`, `Colours`, the five themes and the look a display
+  `theme.go`, `Theme`, `Colors`, the five themes and the look a display
   draws with; `tree.go`, `counter.go`, `plain.go` and `summary.go`, one
   display each; `work.go`, the forms the work of a span is drawn in.
   `contract_test.go` holds the displays to their promises on a `Screen`,
@@ -69,7 +72,7 @@ still change in a minor release (see Compatibility).
   colours a theme draws when its `Styles` is set.
 - `progress/cliprogress/`: `cliprogress.go`, the package comment, `Mode`,
   `Setting`, `Options`, `Choose` and `UTF8Locale`; `run.go`, `Start` and
-  `Run`; `probe.go` and `probe_unix.go`, `IsTerminal`, `IsPipe`,
+  `Session`; `probe.go` and `probe_unix.go`, `IsTerminal`, `IsPipe`,
   `TerminalSize` and `InForeground`, with `termios_bsd.go` and
   `termios_other.go`; `appendprivate.go`, the private file of the event
   log; `rotate.go` and `rotate_flock.go`, moving the default log aside;
@@ -78,47 +81,60 @@ still change in a minor release (see Compatibility).
   flock.
 - `progress/mcpprogress/`: `mcpprogress.go`, the package comment,
   `Notifier` and `Options`.
-- `progress/eventlog/`: `eventlog.go`, the package comment, `Line` and
-  `Decode`; `tail.go`, `Tail`, `Feed` and `MaxLine`; `forward.go`,
-  `Forward`; `reducer.go`, `Reducer`, `Options`, `Run` and `Span`.
+- `progress/eventlog/`: `eventlog.go`, the package comment, `Line`,
+  `Decode`, `ErrVersion` and `VersionError`; `tail.go`, `Tail`, `Feed`
+  and `MaxLine`; `forward.go`, `NewForwarder` and `Forwarder`;
+  `reducer.go`, `Reducer`, `ReducerOptions`, `Run` and `Span`.
 - `fanout/`: `each.go`, `Each` and the package comment; `map.go`, `Map`,
-  `MapOptions`, `Item`, `Outcome`, `Summary` and `Failure`; `batches.go`;
+  `MapOptions`, `ItemInfo`, `Outcome`, `Summary`, `FailedItem` and
+  `FailureError`; `batches.go`;
   `recover.go`, `Recovered` and `PanicError`; `keyed.go`, `Keyed`.
 - `fanout/fanouttest/`: `fanouttest.go`, `InFlight`.
 - `cliout/`: `table.go`, the package comment, `Table` and `Column`;
   `json.go`, `WriteJSON`.
-- `cobratree/`: `cobratree.go`, the package comment and `Strict`;
+- `doctor/`: `doctor.go`, the package comment, `Status`, `Check`,
+  `Worst`, `Count` and `Write`.
+- `fsutil/`: `fsutil.go`, the package comment, `WriteAtomic`, `Update`,
+  `DefaultLockWait`, `EnsureDir`, `CheckTrusted` and `ErrUntrusted`;
+  `lock_unix.go`, `Lock` and its file, with `holder_linux.go`, the holder of a lock read from
+  `/proc/locks`, and `owner_unix.go`, the owner of a file.
+  `lock_other.go`, `holder_other.go` and `owner_other.go` are for
+  systems that are not Unix, or not Linux.
+- `cobratree/`: `cobratree.go`, the package comment, `Strict` and its
+  options;
   `usage.go`, `Usage`, `Usagef`, `IsUsage`, `InvalidValue` and
   `FlagError`; `status.go`, `Coded` and `Status`; `help.go`,
-  `HelpTopics`; `buildinfo.go`, `BuildInfo`, `ReadBuildInfo` and
-  `Resolve`.
+  the help topics; `buildinfo.go`, `BuildInfo`, its `Resolve`, and
+  `ReadBuildInfo`.
 - `cobratree/cobratreetest/`: `cobratreetest.go`, `Run`,
-  `CheckCommandLine` and `CheckCommandLines`.
+  `ValidateCommandLine` and `CheckCommandLines`.
 - `localweb/`: `localweb.go`, the package comment, `Refusal`, `Refuser`,
   `Refuse` and `SafeMethod`; `guard.go`, `Headers`, `NoStore`, `Hosts`,
-  `Origin`, `SameOrigin` and `CrossSite`; `listen.go`, `CheckAddr`,
+  `HostsOptions`, `MisdirectedRefusal`, `OriginPolicy`, `SameOrigin` and
+  `CrossSite`; `listen.go`, `CheckAddr`,
   `Listen`, `ListenOptions` and `Bound`, with `socket_unix.go`, the
   Unix socket; `peer_linux.go`, `PeerListener`, with `peer.go`;
-  `serve.go`, `Serve` and `ServeOptions`. `socket_other.go` and
+  `serve.go`, `Serve`, `ServeOptions` and `Stopping`. `socket_other.go` and
   `peer_other.go` are for systems that are not Unix, or not Linux.
   `peer_linux.go` holds `ListenerOwner` too.
 - `localweb/session/`: `session.go`, the package comment, `NewToken`,
-  `Options`, `Sessions`, `New`, `Middleware` and `CSRF`.
+  `Options`, `Manager`, `New`, `Middleware` and `CSRF`.
 - `localweb/sse/`: `sse.go`, the package comment, `Serve`, `Options`,
   `Event` and `Format`; `notifier.go`, `Notifier` and `Subscription`.
-- `localweb/localwebtest/`: `localwebtest.go`, `Client`, `Login` and
-  `Reader`.
+- `localweb/localwebtest/`: `localwebtest.go`, `Client` and its `CSRF`,
+  `Login` and `Reader`.
 - `localweb/launch/`: `launch.go`, the package comment and `Opener`;
   `instance.go`, `Instance`, `Record`, `Running`, `Publish` and `Retire`,
   with `instance_unix.go`, `Acquire` and the lock; `start_unix.go`,
   `Detached`. `instance_other.go` and `start_other.go` are for systems
   that are not Unix, or have no flock.
-- `localweb/assets/`: `assets.go`, the package comment, `Assets`,
+- `localweb/assets/`: `assets.go`, the package comment, `Set`,
   `Options` and `ContentType`.
-- `localweb/page/`: `page.go`, the package comment, `Set`, `Parse` and
-  `Options`; `htmx.go`, `IsHTMX`, `Redirect` and `Retarget`.
-- `localweb/htmx/`: `htmx.go`, the package comment, `Files` and `Config`,
-  and the three scripts, whose licence `REUSE.toml` records.
+- `localweb/page/`: `page.go`, the package comment, `Set`, `Parse`,
+  `Options` and `MaxIncludeDepth`; `htmx.go`, `IsHTMX`, `Redirect` and `Retarget`.
+- `localweb/htmx/`: `htmx.go`, the package comment, `Files`, `Config`
+  and the versions `ScriptVersion`, `SSEVersion` and `MorphVersion`, and
+  the three scripts, whose licence `REUSE.toml` records.
 - Every package has an `example_test.go`. Failing fuzz inputs go under the
   package's `testdata/fuzz/`.
 - `doc/`: `README.md` maps the documentation; `architecture.md` says how
@@ -162,8 +178,8 @@ go-test-coverage: `go install github.com/vladopajic/go-test-coverage/v2@latest`.
   carries them after its front matter. A file that cannot hold a comment,
   such as `go.sum`, is annotated in `REUSE.toml`.
 - Requirements follow decision 3: `go-nodeset` and `golang.org/x/text`,
-  `golang.org/x/sys` in `progress/cliprogress`, `fsutil` and `localweb` alone
-  (decisions 22 and 26), and
+  `golang.org/x/sys` in `progress/cliprogress`, `fsutil` and
+  `localweb/launch` alone (decisions 22, 26 and 35), and
   anything else only with a record. Never the MCP Go SDK, charmbracelet,
   testify or OpenTelemetry. cobra and pflag only in `cobratree` (decision
   24); `termtext`, `cliout`, `progress` and `fanout`, which library
@@ -174,6 +190,12 @@ go-test-coverage: `go install github.com/vladopajic/go-test-coverage/v2@latest`.
   Tests use the standard library, table-driven, with `t.Errorf`/`t.Fatalf`.
 - Every file stays at 100% statement coverage. A branch no test can reach is
   deleted, not excluded.
+- Shapes and names follow decision 36: enum constants take their type
+  as a prefix, options are bare nouns, `NewX` returns `*X`, `Check*`
+  takes a `testing.TB`, a blocking call takes a context, and identifiers
+  use American spelling. A rename keeps a deprecated alias for one minor
+  release, whose `Deprecated:` paragraph ends with `(decision 36)`; the
+  SA1019 exclusion in `.golangci.yml` matches only those.
 - Every exported identifier has a doc comment. Usage is shown in `Example`
   functions, which pkg.go.dev renders.
 - Wrap errors with `fmt.Errorf("context: %w", err)`. An exported error value
@@ -198,7 +220,11 @@ go-test-coverage: `go install github.com/vladopajic/go-test-coverage/v2@latest`.
   texts of decision 31, and the refusals, headers, cookie and frames of
   `localweb` and its packages (decision 34), and the files, record,
   addresses, htmx headers, `htmx.Config` and script versions of decision
-  35. Changing any of them is a breaking change; a
+  35 (`htmx.Config` restores history as a page since decision 41), the name and
+  mode of the lock file of `fsutil` (decision 37), the status words, the
+  JSON keys and the text `Write` writes of `doctor` (decision 38), and
+  the CRLF rule of `termtext` (decision 42). Changing any of them is a
+  breaking change; a
   new or stricter `Check` rule is one too.
 - The kit reads no environment: whether to draw in colour, NO_COLOR and
   TERM included, is the program's to decide, and a theme is a parameter;
@@ -209,7 +235,8 @@ go-test-coverage: `go install github.com/vladopajic/go-test-coverage/v2@latest`.
   on that path, which a benchmark or `testing.AllocsPerRun` keeps honest.
 - Fuzz targets sit next to the code, and a failing input found by CI is
   committed under `testdata/fuzz/`.
-- Comments and documentation are plain British English.
+- Comments and documentation are plain British English; identifiers
+  use American spelling (decision 36).
 - Never commit a `go.work` or a `replace` directive. To try a change in a
   program that imports the module, put an uncommitted `go.work` in a parent
   directory.
