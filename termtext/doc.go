@@ -24,13 +24,23 @@
 //
 //   - every C0 control (U+0000 to U+001F) and DEL (U+007F), except that
 //     EscapeLines keeps newline and tab, which cannot move the cursor back
-//     over text already written;
+//     over text already written, and a carriage return just before a
+//     newline (the CRLF rule below);
 //   - every C1 control (U+0080 to U+009F), which some terminals read as the
 //     introducer of a control sequence;
 //   - the bidirectional controls U+061C, U+200E, U+200F, U+202A to U+202E
 //     and U+2066 to U+2069;
 //   - the line and paragraph separators U+2028 and U+2029;
 //   - every byte that is not part of valid UTF-8, such as a lone 0x9b.
+//
+// The CRLF rule (decision 42): in EscapeLines and the writer of
+// NewEscapeWriter, a carriage return immediately before a newline is part
+// of the line end and is written as it is, \r\n, since the newline that
+// follows it leaves nothing for it to overwrite; text with CRLF line ends,
+// which ssh -t and a Windows host write, keeps them. A carriage return
+// anywhere else is escaped, one at the end of the text too, and Escape,
+// for one line, escapes every carriage return. The writer holds back a
+// carriage return that ends a write until the next byte says which it is.
 //
 // An escaped rune or byte is written in one of these forms, with lower-case
 // hexadecimal digits: carriage return as \r, and newline and tab, where

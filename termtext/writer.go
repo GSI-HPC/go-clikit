@@ -17,16 +17,19 @@ const maxHeld = 64 << 10
 // NewEscapeWriter returns an EscapeWriter that passes what it is given on
 // to w, escaped, as a stream: the output of a child program or of a command
 // on a remote host, say, which is shown on a terminal as it arrives. Each
-// line is escaped with EscapeLines, so newline and tab are kept and every
-// other control character is shown as an escape, a carriage return too.
+// line is escaped with EscapeLines: newline and tab are kept, and so is a
+// carriage return just before a newline, the CRLF line end (decision 42);
+// every other control character is shown as an escape, a carriage return
+// anywhere else too.
 //
 // The writer holds a line back until its newline comes, or until Close, so
 // that a rune that arrives in two writes is not cut in two and escaped as
 // bytes that are not UTF-8. It holds back no more than 64 KiB: a longer
 // line is written out, escaped, up to its last whole rune, without a
 // newline, and goes on with the next write; the bytes of a rune that is not
-// whole yet, three at most, are held back. The text written to w is the
-// same whatever the writes were cut as.
+// whole yet, three at most, are held back, and so is a carriage return
+// that ends what was written, until the next byte says whether it ends the
+// line. The text written to w is the same whatever the writes were cut as.
 //
 // The writer is safe for concurrent use, and calls w one at a time.
 func NewEscapeWriter(w io.Writer) *EscapeWriter {
@@ -70,8 +73,10 @@ func (e *EscapeWriter) Write(p []byte) (int, error) {
 		// what is held back stays bounded whatever p is.
 		chunk := p[:min(len(p), maxHeld+1-len(e.part))]
 		if i := bytes.IndexByte(chunk, '\n'); i >= 0 {
-			e.part = append(e.part, chunk[:i]...)
-			keep(e.write(string(e.part), "\n"))
+			// The newline is escaped with the line, which keeps a
+			// carriage return just before it.
+			e.part = append(e.part, chunk[:i+1]...)
+			keep(e.write(string(e.part), ""))
 			e.part, e.cut = e.part[:0], false
 			p = p[i+1:]
 			continue
@@ -80,6 +85,10 @@ func (e *EscapeWriter) Write(p []byte) (int, error) {
 		p = p[len(chunk):]
 		if len(e.part) > maxHeld {
 			whole := wholeRunes(e.part)
+			if e.part[whole-1] == '\r' {
+				// A newline may come next and make it a line end.
+				whole--
+			}
 			keep(e.write(string(e.part[:whole]), ""))
 			e.part, e.cut = e.part[:copy(e.part, e.part[whole:])], true
 		}
@@ -88,7 +97,8 @@ func (e *EscapeWriter) Write(p []byte) (int, error) {
 }
 
 // Close writes the line that has not ended, escaped, followed by a
-// newline, and does not close w. It returns the error of w. A second Close
+// newline, and does not close w. A carriage return that ends it is escaped,
+// since no newline came after it. It returns the error of w. A second Close
 // does nothing.
 func (e *EscapeWriter) Close() error {
 	e.mu.Lock()

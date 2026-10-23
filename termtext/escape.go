@@ -14,7 +14,8 @@ import (
 // characters would otherwise act on the terminal. It replaces every rune
 // the package's escape policy names with a visible escape such as \x1b or
 // \u009b, and a byte that is not UTF-8 with one such as \xff. Newline and
-// tab are escaped too, as \n and \t, so that a message, a log line or a
+// tab are escaped too, as \n and \t, and every carriage return as \r, the
+// one of a CRLF line end included, so that a message, a log line or a
 // table cell cannot start a line that seems to be another.
 //
 // Text that holds none of these is returned unchanged. Escaping is
@@ -26,9 +27,11 @@ func Escape(s string) string {
 
 // EscapeLines is Escape for text whose lines are kept, such as the output
 // of a program: newline and tab are written as they are, since they cannot
-// move the cursor back over text already written. Text that has to stay on
-// one line needs Escape. Escaping is idempotent: EscapeLines changes
-// nothing in text it returned.
+// move the cursor back over text already written, and so is a carriage
+// return just before a newline, the CRLF line end (decision 42). Every
+// other carriage return is escaped. Text that has to stay on one line needs
+// Escape. Escaping is idempotent: EscapeLines changes nothing in text it
+// returned.
 func EscapeLines(s string) string {
 	return escape(s, false)
 }
@@ -37,7 +40,7 @@ func escape(s string, oneLine bool) string {
 	i := 0
 	for i < len(s) {
 		r, size := utf8.DecodeRuneInString(s[i:])
-		if needsEscape(r, size, oneLine) {
+		if needsEscape(r, size, oneLine) && !lineEnd(s, i, oneLine) {
 			break
 		}
 		i += size
@@ -52,7 +55,7 @@ func escape(s string, oneLine bool) string {
 	for i < len(s) {
 		r, size := utf8.DecodeRuneInString(s[i:])
 		switch {
-		case !needsEscape(r, size, oneLine):
+		case !needsEscape(r, size, oneLine), lineEnd(s, i, oneLine):
 			b.WriteString(s[i : i+size])
 		case r == utf8.RuneError && size == 1:
 			fmt.Fprintf(&b, `\x%02x`, s[i])
@@ -70,6 +73,12 @@ func escape(s string, oneLine bool) string {
 		i += size
 	}
 	return b.String()
+}
+
+// lineEnd reports whether the byte at i of s is a carriage return that
+// ends a line with the newline after it, which escaping in lines keeps.
+func lineEnd(s string, i int, oneLine bool) bool {
+	return !oneLine && s[i] == '\r' && i+1 < len(s) && s[i+1] == '\n'
 }
 
 // needsEscape reports whether a rune may not reach a terminal as it is.
