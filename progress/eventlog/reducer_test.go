@@ -5,6 +5,7 @@ package eventlog_test
 
 import (
 	"fmt"
+	"reflect"
 	"slices"
 	"strings"
 	"testing"
@@ -63,10 +64,10 @@ func draw(r eventlog.Run) string {
 }
 
 // reduce folds lines into a Reducer with o.
-func reduce(o eventlog.Options, lines ...string) *eventlog.Reducer {
+func reduce(o eventlog.ReducerOptions, lines ...string) *eventlog.Reducer {
 	r := eventlog.NewReducer(o)
 	for _, l := range lines {
-		r.Line([]byte(l))
+		r.Take([]byte(l))
 	}
 	return r
 }
@@ -114,7 +115,7 @@ func names(r *eventlog.Reducer) []string {
 // its events said of it. The commands the Bus ran after the first have no
 // parent the log holds, and are the first's.
 func TestReducerGoldenLog(t *testing.T) {
-	r := reduce(eventlog.Options{}, golden(t)...)
+	r := reduce(eventlog.ReducerOptions{}, golden(t)...)
 	runs := r.Runs()
 	if len(runs) != 1 {
 		t.Fatalf("%d runs, want 1", len(runs))
@@ -173,7 +174,7 @@ func TestReducerRuns(t *testing.T) {
 		ev("dddd", 1, "start", 7, 0, `"kind":"step","name":"lone","state":"running"`),
 		"not a line",
 	}
-	r := reduce(eventlog.Options{}, lines...)
+	r := reduce(eventlog.ReducerOptions{}, lines...)
 	if got := names(r); !slices.Equal(got, []string{"two", "one"}) {
 		t.Errorf("the runs = %q", got)
 	}
@@ -184,7 +185,7 @@ func TestReducerRuns(t *testing.T) {
 		t.Errorf("Changed() again = %q", got)
 	}
 	// A run whose first line is lost takes its trace from its events.
-	ru := reduce(eventlog.Options{}, ev("eeee", 1, "start", 1, 0, `"kind":"command","name":"x","state":"running"`)).Runs()[0]
+	ru := reduce(eventlog.ReducerOptions{}, ev("eeee", 1, "start", 1, 0, `"kind":"command","name":"x","state":"running"`)).Runs()[0]
 	if ru.Trace.ID.String() != "4bf92f3577b34da6a3ce929d0e0e4736" || ru.Program != "" {
 		t.Errorf("the run without its first line = %+v", ru)
 	}
@@ -197,38 +198,117 @@ func TestReducerKeep(t *testing.T) {
 	lines = append(lines, command("aaaa", "a", "")...)
 	lines = append(lines, command("bbbb", "b", "ok")...)
 	lines = append(lines, command("cccc", "c", "")...)
-	r := reduce(eventlog.Options{Keep: 2}, lines...)
+	r := reduce(eventlog.ReducerOptions{KeepRuns: 2}, lines...)
 	if got := names(r); !slices.Equal(got, []string{"c", "a"}) {
 		t.Errorf("the runs = %q, want the ended one gone", got)
 	}
 	r.Changed()
-	r.Line([]byte(command("dddd", "d", "")[0]))
+	r.Take([]byte(command("dddd", "d", "")[0]))
 	if got := r.Changed(); !slices.Equal(got, []string{"aaaa", "dddd"}) {
 		t.Errorf("Changed() = %q, want the one that went too", got)
 	}
-	r.Line([]byte(command("dddd", "d", "")[1]))
-	r.Line([]byte(command("aaaa", "a", "ok")[2]))
+	r.Take([]byte(command("dddd", "d", "")[1]))
+	r.Take([]byte(command("aaaa", "a", "ok")[2]))
 	if got := names(r); !slices.Equal(got, []string{"d", "c"}) {
 		t.Errorf("the runs = %q, want none that came back", got)
 	}
 
-	// Of many runs that went, the Reducer forgets which once there are
-	// 16 times Keep, so that a late line may make one again.
-	r = reduce(eventlog.Options{Keep: 1})
+	// Of many runs that went, the Reducer remembers the last 16 times
+	// KeepRuns, and forgets the oldest first, so that a late line of one
+	// of those brings nothing back, and one of an older run may make it
+	// again.
+	r = reduce(eventlog.ReducerOptions{KeepRuns: 1})
 	for i := range 20 {
-		r.Line([]byte(command(fmt.Sprintf("r%02d", i), "x", "ok")[0]))
+		r.Take([]byte(command(fmt.Sprintf("r%02d", i), "x", "ok")[0]))
 	}
-	r.Line([]byte(command("r00", "back", "")[1]))
+	r.Take([]byte(command("r03", "late", "")[1]))
+	r.Take([]byte(command("r02", "back", "")[1]))
 	if got := names(r); !slices.Equal(got, []string{"back"}) {
-		t.Errorf("the runs = %q, want the run back", got)
+		t.Errorf("the runs = %q, want the oldest run back, and no other", got)
+	}
+}
+
+// The old names of ReducerOptions, KeepRuns and Take stay for one minor
+// release (decision 36): Keep is read when KeepRuns is 0.
+func TestReducerOldNames(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		o    eventlog.Options
+		want []string
+	}{
+		{"Keep alone", eventlog.Options{Keep: 1}, []string{"b"}},
+		{"KeepRuns first", eventlog.Options{KeepRuns: 2, Keep: 1}, []string{"b", "a"}},
+	} {
+		r := eventlog.NewReducer(tc.o)
+		for _, l := range append(command("aaaa", "a", "ok"), command("bbbb", "b", "ok")...) {
+			r.Line([]byte(l))
+		}
+		if got := names(r); !slices.Equal(got, tc.want) {
+			t.Errorf("%s: the runs = %q, want %q", tc.name, got, tc.want)
+		}
+	}
+}
+
+// Run looks a run up by its ID, as Changed gives them: a run it holds, one
+// without a command so far too, which has a zero Root, and none for a run
+// it dropped or never had.
+func TestReducerRun(t *testing.T) {
+	r := reduce(eventlog.ReducerOptions{KeepRuns: 2},
+		append(command("aaaa", "a", "ok"), append(command("bbbb", "b", ""), command("cccc", "c", "")[0])...)...)
+	if got := r.Changed(); !slices.Equal(got, []string{"aaaa", "bbbb", "cccc"}) {
+		t.Errorf("Changed() = %q, want the oldest first", got)
+	}
+	if got := names(r); !slices.Equal(got, []string{"b"}) {
+		t.Errorf("the runs = %q, want b alone, c having no command", got)
+	}
+	ru, ok := r.Run("bbbb")
+	if !ok || ru.Root.Name != "b" || !reflect.DeepEqual(ru, r.Runs()[0]) {
+		t.Errorf("Run(bbbb) = %+v, %t; want what Runs gives", ru, ok)
+	}
+	if ru, ok := r.Run("cccc"); !ok || ru.ID != "cccc" || ru.Program != "prog" || ru.Root.ID != 0 || ru.Done() {
+		t.Errorf("Run(cccc) = %+v, %t; want the run without a command", ru, ok)
+	}
+	for _, id := range []string{"aaaa", "dddd"} {
+		if ru, ok := r.Run(id); ok {
+			t.Errorf("Run(%s) = %+v, want none", id, ru)
+		}
+	}
+}
+
+// The lines a Reducer cannot read are counted, those of a newer version
+// of the log among them, so that a view that shows nothing can say why; a
+// Reset does not forget them.
+func TestReducerSkipped(t *testing.T) {
+	r := reduce(eventlog.ReducerOptions{}, command("aaaa", "a", "ok")...)
+	r.Take([]byte("not a line"))
+	r.Take([]byte(`{"v":2,"run":"aaaa","type":"start"}`))
+	r.Reset()
+	if got := r.Skipped(); got != 2 {
+		t.Errorf("Skipped() = %d, want 2", got)
+	}
+}
+
+// Span embeds progress.Fields, so a field added to Fields with the name of
+// one of Span's own would be hidden on Span without a word.
+func TestSpanAndFieldsShareNoName(t *testing.T) {
+	fields := map[string]bool{}
+	ft := reflect.TypeFor[progress.Fields]()
+	for i := range ft.NumField() {
+		fields[ft.Field(i).Name] = true
+	}
+	st := reflect.TypeFor[eventlog.Span]()
+	for i := range st.NumField() {
+		if f := st.Field(i); !f.Anonymous && fields[f.Name] {
+			t.Errorf("Span.%s hides Fields.%s", f.Name, f.Name)
+		}
 	}
 }
 
 func TestReducerDefaults(t *testing.T) {
-	for _, o := range []eventlog.Options{{}, {Keep: -1, MaxSpans: -1}} {
+	for _, o := range []eventlog.ReducerOptions{{}, {KeepRuns: -1, MaxSpans: -1}} {
 		r := eventlog.NewReducer(o)
 		for i := range 101 {
-			r.Line([]byte(command(fmt.Sprintf("r%03d", i), "x", "")[1]))
+			r.Take([]byte(command(fmt.Sprintf("r%03d", i), "x", "")[1]))
 		}
 		if got := len(r.Runs()); got != 100 {
 			t.Errorf("%+v keeps %d runs, want 100", o, got)
@@ -238,7 +318,7 @@ func TestReducerDefaults(t *testing.T) {
 
 // Beyond MaxSpans, the spans that start are left out, with their events.
 func TestReducerMaxSpans(t *testing.T) {
-	r := reduce(eventlog.Options{MaxSpans: 2},
+	r := reduce(eventlog.ReducerOptions{MaxSpans: 2},
 		ev("r", 1, "start", 1, 0, `"kind":"command","name":"c","state":"running"`),
 		ev("r", 2, "start", 2, 1, `"kind":"target","name":"t2","state":"running"`),
 		ev("r", 3, "start", 3, 1, `"kind":"target","name":"t3","state":"running"`),
@@ -255,7 +335,7 @@ func TestReducerMaxSpans(t *testing.T) {
 // events are left out; a span whose parent the log does not hold, or that
 // is its own, is the root's.
 func TestReducerSpans(t *testing.T) {
-	r := reduce(eventlog.Options{},
+	r := reduce(eventlog.ReducerOptions{},
 		ev("r", 1, "start", 1, 0, `"kind":"command","name":"c","state":"running"`),
 		ev("r", 2, "start", 2, 1, `"kind":"step","name":"s","flags":["fold"],"state":"running","total":2`),
 		ev("r", 3, "start", 3, 2, `"kind":"target","name":"t","state":"queued","node":"n1"`),
@@ -282,13 +362,13 @@ command "c" running queued=01.0 started=01.0
 	if got != want {
 		t.Errorf("the run is\n%s\nwant\n%s", got, want)
 	}
-	r.Line([]byte(ev("r", 15, "resume", 0, 0, ``)))
+	r.Take([]byte(ev("r", 15, "resume", 0, 0, ``)))
 	if r.Runs()[0].Suspended {
 		t.Error("the run is suspended after a resume")
 	}
 	// A run that ended is no longer suspended, whatever its log says.
-	r.Line([]byte(ev("r", 16, "suspend", 0, 0, ``)))
-	r.Line([]byte(ev("r", 17, "end", 1, 0, `"kind":"command","name":"c","state":"ended","status":"ok"`)))
+	r.Take([]byte(ev("r", 16, "suspend", 0, 0, ``)))
+	r.Take([]byte(ev("r", 17, "end", 1, 0, `"kind":"command","name":"c","state":"ended","status":"ok"`)))
 	if ru := r.Runs()[0]; ru.Suspended || !ru.Done() || ru.Last != time.Date(2026, 9, 25, 12, 0, 17, 0, time.UTC) {
 		t.Errorf("the ended run = %+v", ru)
 	}
@@ -297,10 +377,10 @@ command "c" running queued=01.0 started=01.0
 // A Run, once returned, is never changed: a run is built anew when it
 // changes.
 func TestReducerRunsStand(t *testing.T) {
-	r := reduce(eventlog.Options{}, command("r", "c", "")...)
-	r.Line([]byte(ev("r", 2, "start", 2, 1, `"kind":"step","name":"s","state":"running"`)))
+	r := reduce(eventlog.ReducerOptions{}, command("r", "c", "")...)
+	r.Take([]byte(ev("r", 2, "start", 2, 1, `"kind":"step","name":"s","state":"running"`)))
 	first := r.Runs()
-	r.Line([]byte(ev("r", 3, "end", 2, 1, `"kind":"step","name":"s","state":"ended","status":"ok"`)))
+	r.Take([]byte(ev("r", 3, "end", 2, 1, `"kind":"step","name":"s","state":"ended","status":"ok"`)))
 	if first[0].Root.Children[0].Done() || !r.Runs()[0].Root.Children[0].Done() {
 		t.Error("a Run returned changed with the Reducer, or the Reducer did not")
 	}
@@ -308,7 +388,7 @@ func TestReducerRunsStand(t *testing.T) {
 
 // A Reset forgets every run, and Changed reports them.
 func TestReducerReset(t *testing.T) {
-	r := reduce(eventlog.Options{Keep: 1}, append(command("aaaa", "a", "ok"), command("bbbb", "b", "")...)...)
+	r := reduce(eventlog.ReducerOptions{KeepRuns: 1}, append(command("aaaa", "a", "ok"), command("bbbb", "b", "")...)...)
 	r.Changed()
 	r.Reset()
 	if got := r.Changed(); !slices.Equal(got, []string{"bbbb"}) {
@@ -318,7 +398,7 @@ func TestReducerReset(t *testing.T) {
 		t.Errorf("Runs() = %+v, want none", got)
 	}
 	// A run that had gone may come back once the log is read again.
-	r.Line([]byte(command("aaaa", "a", "ok")[1]))
+	r.Take([]byte(command("aaaa", "a", "ok")[1]))
 	if got := names(r); !slices.Equal(got, []string{"a"}) {
 		t.Errorf("the runs = %q", got)
 	}

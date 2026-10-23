@@ -5,6 +5,7 @@ package eventlog_test
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"math"
 	"os"
@@ -95,14 +96,35 @@ func TestDecodeReadsTheGoldenLog(t *testing.T) {
 	}
 }
 
+// A line of another version is refused with a *VersionError, which is
+// ErrVersion, so that a reader can say why it shows nothing; a line that
+// is not one of a log is no VersionError.
+func TestDecodeTellsAnotherVersion(t *testing.T) {
+	for _, tc := range []struct {
+		line string
+		got  int
+	}{
+		{`{"v":2,"type":"trace","run":"r"}`, 2},
+		{`{"v":-1,"run":"r","type":"start"}`, -1},
+		{`{"type":"trace","run":"r"}`, 0},
+		{`not a line`, 0},
+	} {
+		_, err := eventlog.Decode([]byte(tc.line))
+		var ve *eventlog.VersionError
+		if as := errors.As(err, &ve); as != errors.Is(err, eventlog.ErrVersion) || as != (tc.got != 0) || as && ve.Got != tc.got {
+			t.Errorf("Decode(%s) = %v, want a VersionError of %d, ErrVersion, or neither for 0", tc.line, err, tc.got)
+		}
+	}
+}
+
 func TestDecodeRefuses(t *testing.T) {
 	for _, tc := range []struct {
 		name, line, err string
 	}{
 		{"not JSON", `{"v":1,`, "not a line of an event log"},
-		{"not an object", `[1]`, "version 0"},
+		{"not an object", `[1]`, "names no version"},
 		{"another version", `{"v":2,"type":"trace","run":"r"}`, "version 2"},
-		{"no version", `{"type":"trace","run":"r"}`, "version 0"},
+		{"no version", `{"type":"trace","run":"r"}`, "names no version"},
 		{"no run", `{"v":1,"type":"trace"}`, "without a run"},
 		{"a type not known", `{"v":1,"run":"r","type":"fork","time":"2026-09-25T12:00:00Z","span":"0000000000000001"}`, `"fork"`},
 		{"no type", `{"v":1,"run":"r","time":"2026-09-25T12:00:00Z","span":"0000000000000001"}`, `type ""`},

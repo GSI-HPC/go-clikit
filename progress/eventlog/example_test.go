@@ -47,10 +47,12 @@ func ExampleDecode() {
 
 // A server runs a tool call's command as a child, with the child's event
 // log in a file of its own, and sends on the child's progress as it
-// polls the log, to an mcpprogress.Notifier. Here the child's Bus runs in
-// the example, and the server polls once, after it has ended; a server
-// polls every so often while the child runs, and once more after it.
-func ExampleForward() {
+// polls the log, to an mcpprogress.Notifier. It hands the child the trace
+// context of the call's span, in its TRACEPARENT, and forwards the run of
+// that trace alone. Here the child's Bus runs in the example, and the
+// server polls once, after it has ended; a server polls every so often
+// while the child runs, and once more after it.
+func ExampleNewForwarder() {
 	dir, err := os.MkdirTemp("", "child")
 	if err != nil {
 		panic(err)
@@ -58,13 +60,19 @@ func ExampleForward() {
 	defer func() { _ = os.RemoveAll(dir) }()
 	path := filepath.Join(dir, "progress.jsonl")
 
-	// The child, run with its event log in path.
+	// The server, in the span of the call, hands the child its trace.
+	server := progress.NewBus(progress.BusOptions{Program: "server"})
+	_, call := progress.Start(progress.WithBus(context.Background(), server), progress.KindCall, "tool call")
+	traceparent := call.TraceContext().Traceparent()
+
+	// The child, run with its event log in path and TRACEPARENT set.
+	trace, _ := progress.ParseTraceContext(traceparent, "")
 	f, err := os.Create(path)
 	if err != nil {
 		panic(err)
 	}
 	log := progress.NewLog(f, progress.LogOptions{})
-	bus := progress.NewBus(progress.BusOptions{Sinks: []progress.Sink{log}, Program: "prog"})
+	bus := progress.NewBus(progress.BusOptions{Sinks: []progress.Sink{log}, Program: "prog", Trace: trace})
 	fanout.Map(progress.WithBus(context.Background(), bus), []string{"exe1", "exe2", "exe3"},
 		fanout.MapOptions[string]{Step: "probe the nodes"},
 		func(context.Context, string) (struct{}, error) { return struct{}{}, nil })
@@ -74,21 +82,23 @@ func ExampleForward() {
 	}
 	_ = f.Close()
 
-	// The server; Send would send the notification on the call's
+	// The server again; Send would send the notification on the call's
 	// session, and here keeps the last.
 	var last string
 	n := mcpprogress.New(mcpprogress.Options{
-		Program: "prog",
+		Program: "server",
 		Send: func(progress, total float64, message string) error {
 			last = fmt.Sprintf("%v/%v %s", progress, total, message)
 			return nil
 		},
 	})
-	tail := eventlog.NewTail(path, eventlog.Forward(n))
+	tail := eventlog.NewTail(path, eventlog.NewForwarder(n, server.TraceID()))
 	if _, err := tail.Poll(); err != nil {
 		panic(err)
 	}
 	n.Close()
+	call.End(nil)
+	server.Close()
 	fmt.Println(last)
 	// Output:
 	// 3/3 probe the nodes: 3/3 done
@@ -128,7 +138,7 @@ func ExampleReducer() {
 	_ = f.Close()
 
 	// The view.
-	red := eventlog.NewReducer(eventlog.Options{})
+	red := eventlog.NewReducer(eventlog.ReducerOptions{})
 	tail := eventlog.NewTail(path, red)
 	if _, err := tail.Poll(); err != nil {
 		panic(err)

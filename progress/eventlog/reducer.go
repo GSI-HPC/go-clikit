@@ -14,23 +14,39 @@ import (
 
 const (
 	// DefaultKeepRuns is how many runs a Reducer keeps unless
-	// Options.Keep says otherwise.
+	// ReducerOptions.KeepRuns says otherwise.
 	DefaultKeepRuns = 100
 	// DefaultMaxSpans is how many spans of a run a Reducer keeps unless
-	// Options.MaxSpans says otherwise.
+	// ReducerOptions.MaxSpans says otherwise.
 	DefaultMaxSpans = 1 << 17
 )
 
-// Options configure a Reducer.
-type Options struct {
-	// Keep is how many runs the Reducer keeps: the newest, and of the
-	// older ones those that have not ended. 0 is DefaultKeepRuns.
-	Keep int
+// goneRuns is how many times KeepRuns the Reducer remembers of the runs it
+// dropped.
+const goneRuns = 16
+
+// ReducerOptions configure a Reducer. A value of 0 or less is the default
+// the field names.
+type ReducerOptions struct {
+	// KeepRuns is how many runs the Reducer keeps. Past it, the oldest run
+	// that has ended goes first, else the oldest; a run whose command has
+	// not started counts as one that has not ended. 0 is DefaultKeepRuns.
+	KeepRuns int
 	// MaxSpans is how many spans of a run the Reducer keeps; the spans
 	// that start after them are left out, and so are their events. 0 is
 	// DefaultMaxSpans.
 	MaxSpans int
+	// Keep is the old name of KeepRuns, read when KeepRuns is 0.
+	//
+	// Deprecated: Use KeepRuns, which says what it keeps (decision 36).
+	Keep int
 }
+
+// Options is the old name of ReducerOptions.
+//
+// Deprecated: Use ReducerOptions; only the Reducer takes these options
+// (decision 36).
+type Options = ReducerOptions
 
 // Run is one run of a log as a Reducer folds it: what its first line
 // says, and the tree of the spans of its command.
@@ -85,7 +101,7 @@ type Span struct {
 	Lines, Dropped int
 	// Children are the spans started under this one, in the order they
 	// started. A span whose parent the log does not hold, such as one
-	// left out by Options.MaxSpans, is the root's.
+	// left out by ReducerOptions.MaxSpans, is the root's.
 	Children []Span
 }
 
@@ -102,13 +118,19 @@ type Reducer struct {
 	runs           map[string]*run
 	// order lists the runs as their first line came, oldest first.
 	order []*run
-	// gone holds the runs that were dropped, so that a late line of one
-	// does not bring it back without its start.
-	gone map[string]struct{}
+	// gone holds the runs that were dropped, the last goneRuns times keep
+	// of them, so that a late line of one does not bring it back without
+	// its start. buried lists them in the order they went: a ring, whose
+	// oldest entry is at the index oldest once it is full.
+	gone   map[string]struct{}
+	buried []string
+	oldest int
 	// changed holds the runs that changed since Changed was last called,
 	// each by the place it came in, and next is the place of the next.
 	changed map[string]int
 	next    int
+	// skipped counts the lines Decode refused.
+	skipped int
 }
 
 // run is a run as the Reducer builds it: its spans without their
@@ -130,9 +152,9 @@ type run struct {
 }
 
 // NewReducer returns a Reducer that holds no run.
-func NewReducer(o Options) *Reducer {
+func NewReducer(o ReducerOptions) *Reducer {
 	return &Reducer{
-		keep:     cmp.Or(max(o.Keep, 0), DefaultKeepRuns),
+		keep:     cmp.Or(max(o.KeepRuns, 0), max(o.Keep, 0), DefaultKeepRuns),
 		maxSpans: cmp.Or(max(o.MaxSpans, 0), DefaultMaxSpans),
 		runs:     map[string]*run{},
 		gone:     map[string]struct{}{},
@@ -140,12 +162,13 @@ func NewReducer(o Options) *Reducer {
 	}
 }
 
-// Line folds one line of a log in. A line Decode refuses is left out, and
-// so is a line of a run the Reducer has dropped, and an event of a span
-// that has ended.
-func (r *Reducer) Line(b []byte) {
+// Take folds one line of a log in. A line Decode refuses is left out, and
+// counted by Skipped, and so is a line of a run the Reducer has dropped,
+// and an event of a span that has ended.
+func (r *Reducer) Take(b []byte) {
 	l, err := Decode(b)
 	if err != nil {
+		r.skipped++
 		return
 	}
 	if _, dropped := r.gone[l.RunID]; dropped {
@@ -178,19 +201,35 @@ func (r *Reducer) Line(b []byte) {
 	}
 }
 
-// Reset forgets every run, as when the log was cut short and is read
-// again from its start; Changed reports each of them.
+// Line folds one line of a log in, as Take does.
+//
+// Deprecated: Use Take, the method of Feed; Line names the decoded struct
+// too (decision 36).
+func (r *Reducer) Line(b []byte) { r.Take(b) }
+
+// Skipped counts the lines the Reducer could not read, those Decode
+// refused, since it was made: a view that shows no run can say why, as a
+// line of a newer version of the log is one of them. A Reset does not
+// change it.
+func (r *Reducer) Skipped() int { return r.skipped }
+
+// Reset is the notice that the log was cut short or made again, and is
+// read again from its start: the Reducer forgets every run, the runs it
+// dropped too, and Changed reports each run it held.
 func (r *Reducer) Reset() {
 	for _, ru := range r.order {
 		r.changed[ru.id] = ru.place
 	}
 	clear(r.runs)
 	clear(r.gone)
+	r.buried, r.oldest = r.buried[:0], 0
 	r.order = nil
 }
 
 // Changed returns the IDs of the runs that changed, or were dropped,
-// since the last call, the oldest run first, and forgets them.
+// since the last call, and forgets them. They come the oldest run first,
+// in the order the runs came, as a view that keeps its own list of runs
+// adds a new one after those it has; Runs lists them the other way.
 func (r *Reducer) Changed() []string {
 	ids := slices.SortedFunc(maps.Keys(r.changed), func(a, b string) int {
 		return cmp.Compare(r.changed[a], r.changed[b])
@@ -199,23 +238,41 @@ func (r *Reducer) Changed() []string {
 	return ids
 }
 
-// Runs returns the runs that have a command, the newest first. The
-// Reducer never changes a Run it returned, but builds a run anew once it
-// changes, so a Run may be kept and read from another goroutine; Runs
-// returns the same Run again while it has not changed, its children
-// shared, so a caller does not change what it was given.
+// Runs returns the runs that have a command, the newest first, as a view
+// lists them; Changed gives the oldest first. The Reducer never changes a
+// Run it returned, but builds a run anew once it changes, so a Run may be
+// kept and read from another goroutine; Runs returns the same Run again
+// while it has not changed, its children shared, so a caller does not
+// change what it was given.
 func (r *Reducer) Runs() []Run {
 	var out []Run
 	for _, ru := range slices.Backward(r.order) {
-		if ru.root == nil {
-			continue
+		if ru.root != nil {
+			out = append(out, ru.snapshot())
 		}
-		if ru.dirty {
-			ru.snap, ru.dirty = ru.build(), false
-		}
-		out = append(out, ru.snap)
 	}
 	return out
+}
+
+// Run returns the run id names, as Runs would, and false when the Reducer
+// holds no such run: one it dropped, or one it never had a line of. A run
+// whose command has not started yet is held, with a zero Root, so that a
+// view that looks up each ID Changed gives can tell it from one that went.
+func (r *Reducer) Run(id string) (Run, bool) {
+	ru := r.runs[id]
+	if ru == nil {
+		return Run{}, false
+	}
+	return ru.snapshot(), true
+}
+
+// snapshot returns the run as Runs and Run return it, built anew when it
+// changed.
+func (ru *run) snapshot() Run {
+	if ru.dirty {
+		ru.snap, ru.dirty = ru.build(), false
+	}
+	return ru.snap
 }
 
 // add adds a run, and drops the runs beyond the limit.
@@ -231,12 +288,22 @@ func (r *Reducer) add(id string) *run {
 		r.order = slices.Delete(r.order, i, i+1)
 		delete(r.runs, gone.id)
 		r.changed[gone.id] = gone.place
-		if len(r.gone) >= 16*r.keep {
-			clear(r.gone)
-		}
-		r.gone[gone.id] = struct{}{}
+		r.bury(gone.id)
 	}
 	return ru
+}
+
+// bury remembers that the run id was dropped, and forgets the oldest run
+// it remembers once it remembers goneRuns times keep of them.
+func (r *Reducer) bury(id string) {
+	if len(r.buried) < goneRuns*r.keep {
+		r.buried = append(r.buried, id)
+	} else {
+		delete(r.gone, r.buried[r.oldest])
+		r.buried[r.oldest] = id
+		r.oldest = (r.oldest + 1) % len(r.buried)
+	}
+	r.gone[id] = struct{}{}
 }
 
 // event folds an event of a span into the run.
@@ -277,8 +344,12 @@ func (ru *run) event(e progress.Event, maxSpans int) {
 
 // build makes the Run of the spans the run holds: their tree by parent,
 // children in the order they started, and the spans whose parent it does
-// not hold below the root.
+// not hold below the root. A run without a command has a zero Root.
 func (ru *run) build() Run {
+	out := Run{ID: ru.id, Trace: ru.trace, Program: ru.program, Version: ru.version, Last: ru.last}
+	if ru.root == nil {
+		return out
+	}
 	kids := make(map[progress.SpanID][]*Span, len(ru.started))
 	for _, sp := range ru.started {
 		if sp == ru.root {
@@ -290,8 +361,8 @@ func (ru *run) build() Run {
 		}
 		kids[parent] = append(kids[parent], sp)
 	}
-	return Run{ID: ru.id, Trace: ru.trace, Program: ru.program, Version: ru.version,
-		Root: tree(ru.root, kids), Last: ru.last, Suspended: ru.suspended && !ru.root.Done()}
+	out.Root, out.Suspended = tree(ru.root, kids), ru.suspended && !ru.root.Done()
+	return out
 }
 
 // tree returns a copy of sp with the spans below it as its children.
