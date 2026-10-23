@@ -209,22 +209,20 @@ func (l *line) event() (progress.Event, error) {
 		Cache:      progress.Sanitize(l.Cache, progress.MaxField),
 		Source:     progress.Sanitize(l.Source, progress.MaxField),
 		Timeout:    seconds(l.Timeout),
-		Exit:       exitStatus(l.Exit),
 		Amount:     max(l.Amount, 0),
 		Size:       max(l.Size, 0),
 	}
+	e.Exit, e.HasExit = exitStatus(l.Exit)
 	e.Unit = units[l.Unit]
 	return e, nil
 }
 
-// exitStatus is the exit status of the log, none when the key is absent,
-// null or not a whole number: a wrong-typed value must not read as exit 0.
-func exitStatus(raw json.RawMessage) *int {
+// exitStatus is the exit status of the log, and false for none when the
+// key is absent, null or not a whole number: a wrong-typed value must not
+// read as exit 0.
+func exitStatus(raw json.RawMessage) (int, bool) {
 	n, err := strconv.Atoi(string(raw))
-	if err != nil {
-		return nil
-	}
-	return &n
+	return n, err == nil
 }
 
 // seconds is a timeout of the log as a duration: none below zero, and at

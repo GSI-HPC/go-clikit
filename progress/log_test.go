@@ -356,7 +356,7 @@ var loggedAs = map[string]string{
 	"Node": "node", "Host": "host", "Role": "role", "Total": "total", "Limit": "limit",
 	"Batch": "batch", "Message": "message", "Method": "method", "Path": "path",
 	"HTTPStatus": "httpStatus", "Cache": "cache", "Source": "source", "Timeout": "timeout",
-	"Exit": "exit", "Status": "status", "Class": "class", "Err": "err",
+	"Exit": "exit", "HasExit": "exit", "Status": "status", "Class": "class", "Err": "err",
 	"Stream": "stream", "Dropped": "dropped",
 	"Amount": "amount", "Size": "size", "Unit": "unit",
 	// The text of a line of output never leaves the process.
@@ -467,7 +467,9 @@ func TestEveryPartOfAnEventIsLoggedOrLeftOutOnPurpose(t *testing.T) {
 			want = append(want, key)
 		}
 	}
+	// Exit and HasExit are one key.
 	slices.Sort(want)
+	want = slices.Compact(want)
 	if got := slices.Sorted(maps.Keys(line)); !slices.Equal(got, want) {
 		t.Errorf("an event with every member set is logged with the keys\n%v\nwant\n%v", got, want)
 	}
@@ -495,8 +497,8 @@ func fill(t *testing.T, v reflect.Value, names *[]string) {
 			f.SetInt(1)
 		case f.CanUint():
 			f.SetUint(1)
-		case f.Kind() == reflect.Pointer && f.Type().Elem().Kind() == reflect.Int:
-			f.Set(reflect.New(f.Type().Elem()))
+		case f.Kind() == reflect.Bool:
+			f.SetBool(true)
 		default:
 			t.Fatalf("Event.%s is a %s, which this test cannot set; teach fill how", field.Name, field.Type)
 		}
