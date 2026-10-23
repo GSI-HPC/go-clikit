@@ -78,7 +78,11 @@ func NewToken() string {
 	return base64.RawURLEncoding.EncodeToString(b[:])
 }
 
-// Options configures New.
+// Options configures New. A zero MaxBody is its default, and a negative
+// one is refused: unlike a negative duration of localweb.ServeOptions,
+// which turns its limit off, no cap on what a client sends would let any
+// page in the user's browser fill the program's memory (doc/decisions.md,
+// decision 40).
 type Options struct {
 	// Token is the launch token, from NewToken.
 	Token string
@@ -92,7 +96,8 @@ type Options struct {
 	// a browser sends without script; "" is DefaultCSRFField.
 	CSRFField string
 	// MaxBody is the most bytes the body of a request that may change
-	// something holds; 0 is DefaultMaxBody.
+	// something holds; 0 is DefaultMaxBody, and New refuses a negative
+	// MaxBody.
 	MaxBody int64
 	// Refuse answers a refused request; nil is localweb.Refuse. A program
 	// that serves pages adds the line that tells the user where to find
@@ -128,10 +133,13 @@ type Manager struct {
 }
 
 // New returns the Manager of the launch o.Token. It refuses an Options
-// without a token, a cookie prefix or a CSRF header, a cookie prefix that
-// does not make a valid cookie name with a port after it, and a CSRF
-// header that is not a valid header name: net/http would not send either
-// (doc/decisions.md, decision 40).
+// (doc/decisions.md, decision 40):
+//
+//   - without a Token, a CookiePrefix or a CSRFHeader;
+//   - whose CookiePrefix does not make a valid cookie name with a port
+//     after it, or whose CSRFHeader is not a valid header name, as
+//     net/http would send neither;
+//   - with a negative MaxBody.
 func New(o Options) (*Manager, error) {
 	o.CookiePrefix = cmp.Or(o.CookiePrefix, o.Cookie)
 	o.CSRFHeader = cmp.Or(o.CSRFHeader, o.Header)
@@ -144,6 +152,9 @@ func New(o Options) (*Manager, error) {
 	}
 	if !isToken(o.CSRFHeader) {
 		return nil, fmt.Errorf("session: Options.CSRFHeader %q is no valid header name", o.CSRFHeader)
+	}
+	if o.MaxBody < 0 {
+		return nil, fmt.Errorf("session: Options.MaxBody is %d; a body needs a limit", o.MaxBody)
 	}
 	if o.MaxBody == 0 {
 		o.MaxBody = DefaultMaxBody

@@ -86,7 +86,7 @@ func TestNewNeedsATokenACookieAndAHeader(t *testing.T) {
 }
 
 // New refuses a cookie prefix and a CSRF header that net/http would not
-// send, and says which.
+// send, and a negative MaxBody, and says which.
 func TestNewRefusesNamesThatAreNoTokens(t *testing.T) {
 	t.Parallel()
 
@@ -98,6 +98,7 @@ func TestNewRefusesNamesThatAreNoTokens(t *testing.T) {
 		{session.Options{Token: token, CookiePrefix: "prog;ui", CSRFHeader: header}, `Options.CookiePrefix "prog;ui"`},
 		{session.Options{Token: token, CookiePrefix: "prog_ui_", CSRFHeader: "X-Prog CSRF"}, `Options.CSRFHeader "X-Prog CSRF"`},
 		{session.Options{Token: token, CookiePrefix: "prog_ui_", CSRFHeader: "X-Prog:CSRF"}, `Options.CSRFHeader "X-Prog:CSRF"`},
+		{session.Options{Token: token, CookiePrefix: "prog_ui_", CSRFHeader: header, MaxBody: -1}, "Options.MaxBody is -1"},
 	}
 	for _, tt := range tests {
 		if _, err := session.New(tt.o); err == nil || !strings.Contains(err.Error(), tt.want) {
