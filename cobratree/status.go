@@ -21,12 +21,16 @@ func (e *codedError) Unwrap() error { return e.err }
 // status already keeps it, since the code nearer its cause gave it; a nil
 // err stays nil.
 //
+// A status of 0 or less is no status: Coded returns err as it is, so that
+// Status gives the default for it, and a command that failed does not exit
+// with success (decision 39).
+//
 // The package names no status: a program gives its own, such as 3 for a
 // host it could not reach, where the cause is known, and maps the errors
 // that carry none at the top, in main.
 func Coded(status int, err error) error {
-	if err == nil {
-		return nil
+	if err == nil || status <= 0 {
+		return err
 	}
 	if _, ok := errors.AsType[*codedError](err); ok {
 		return err
