@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"slices"
@@ -15,6 +16,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/GSI-HPC/go-clikit/localweb"
 	"github.com/GSI-HPC/go-clikit/localweb/localwebtest"
 	"github.com/GSI-HPC/go-clikit/localweb/sse"
 )
@@ -293,6 +295,46 @@ func TestAStreamEndsWithItsClientOrItsServer(t *testing.T) {
 	}
 	if _, err := io.ReadAll(resp.Body); err != nil {
 		t.Errorf("the stream did not end cleanly: %v", err)
+	}
+}
+
+// Without Done, a stream ends when the localweb.Serve that serves it
+// starts to stop, and does not hold the stop for the grace period.
+func TestAStreamEndsWhenLocalwebServeStops(t *testing.T) {
+	t.Parallel()
+
+	p := newPage()
+	l, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	errc := make(chan error, 1)
+	h := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		errc <- sse.Serve(w, r, &p.n, p.render, sse.Options{})
+	})
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	served := make(chan error, 1)
+	go func() { served <- localweb.Serve(ctx, []net.Listener{l}, h, localweb.ServeOptions{Grace: time.Hour}) }()
+
+	req, _ := http.NewRequestWithContext(t.Context(), http.MethodGet, "http://"+l.Addr().String(), nil)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	next(t, localwebtest.NewReader(resp.Body))
+	cancel()
+	select {
+	case err := <-served:
+		if err != nil {
+			t.Errorf("localweb.Serve = %v, want nil", err)
+		}
+	case <-time.After(10 * time.Second):
+		t.Fatal("the stream held the stop")
+	}
+	if err := <-errc; err != nil {
+		t.Errorf("sse.Serve = %v, want nil", err)
 	}
 }
 
