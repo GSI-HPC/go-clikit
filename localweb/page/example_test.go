@@ -55,3 +55,19 @@ func ExampleRedirect() {
 	// 204 HX-Redirect="/jobs/7" Location=""
 	// 303 HX-Redirect="" Location="/jobs/7"
 }
+
+// A block that includes itself fails the render past MaxIncludeDepth, in
+// place of a stack overflow that would end the program.
+func ExampleSet_Render_includeCycle() {
+	fsys := fstest.MapFS{"ui.html": &fstest.MapFile{Data: []byte(
+		`{{define "loop"}}x{{include "loop" .}}{{end}}`)}}
+	set, err := page.Parse(fsys, page.Options{}, "*.html")
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	_, err = set.Render("loop", nil)
+	fmt.Println(err)
+	// Output:
+	// page: render loop: include loop: nested more than 100 deep
+}
