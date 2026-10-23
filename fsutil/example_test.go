@@ -6,10 +6,13 @@
 package fsutil_test
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
+	"time"
 
 	"github.com/GSI-HPC/go-clikit/fsutil"
 )
@@ -28,6 +31,54 @@ func ExampleWriteAtomic() {
 	data, _ := os.ReadFile(path)
 	fmt.Println(string(data))
 	// Output: {"runs":1}
+}
+
+// Several runs of a program count in one shared file, under its lock, and
+// none of their counts is lost.
+func ExampleUpdate() {
+	dir, _ := os.MkdirTemp("", "prog-")
+	defer func() { _ = os.RemoveAll(dir) }()
+	path := filepath.Join(dir, "runs")
+
+	count := func(current []byte) ([]byte, error) {
+		n := 0
+		if current != nil { // nil: there is no file yet
+			var err error
+			if n, err = strconv.Atoi(string(current)); err != nil {
+				return nil, err // nothing is written
+			}
+		}
+		return []byte(strconv.Itoa(n + 1)), nil
+	}
+	for range 3 {
+		if err := fsutil.Update(context.Background(), path, 0o644, count); err != nil {
+			fmt.Println(err)
+			return
+		}
+	}
+	data, _ := os.ReadFile(path)
+	fmt.Println(string(data))
+	// Output: 3
+}
+
+// A program holds the lock of a file while it works on it; another run
+// gives up once the wait has passed, with an error that is a timeout and
+// names the holder.
+func ExampleLock() {
+	dir, _ := os.MkdirTemp("", "prog-")
+	defer func() { _ = os.RemoveAll(dir) }()
+	path := filepath.Join(dir, "inventory")
+
+	unlock, err := fsutil.Lock(context.Background(), path, fsutil.DefaultLockWait)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	defer unlock()
+
+	_, err = fsutil.Lock(context.Background(), path, 100*time.Millisecond) // another run
+	fmt.Println(errors.Is(err, context.DeadlineExceeded))
+	// Output: true
 }
 
 // A program keeps its private state in a directory that only its user

@@ -1,28 +1,33 @@
 // SPDX-FileCopyrightText: 2026 GSI Helmholtz Centre for Heavy Ion Research GmbH <http://www.gsi.de>
 // SPDX-License-Identifier: Apache-2.0
 
-// Package fsutil writes and checks the files of a program the way a tool
-// that several users, or several runs of it, share has to (decision 37):
-// a file is replaced whole or not at all, and a file or directory that
-// another user could have written is refused.
+// Package fsutil writes, locks and checks the files of a program the way a
+// tool that several users, or several runs of it, share has to (decision
+// 37): a file is replaced whole or not at all, a shared file is changed
+// under a lock beside it, and a file or directory that another user could
+// have written is refused.
 //
 // [WriteAtomic] replaces a file through a temporary file and a rename.
-// [EnsureDir] makes a private directory of the user's, and
+// [Lock] takes an exclusive lock of a file, and [Update] changes a file
+// under that lock. [EnsureDir] makes a private directory of the user's, and
 // [CheckTrusted] refuses a file that a user other than this one or root
 // could have written; both refuse with an error that matches
 // [ErrUntrusted].
 //
-// [ErrUntrusted] is an interface of the kit; the texts of the errors are
-// not. The package reads no environment and keeps no state.
+// The name and the mode of the lock file, and [ErrUntrusted], are
+// interfaces of the kit; the texts of the errors are not. The package
+// reads no environment and keeps no state.
 package fsutil
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 )
 
 // ErrUntrusted is matched by errors.Is for every file or directory that
@@ -41,6 +46,10 @@ func (e *untrustedError) Is(target error) bool { return target == ErrUntrusted }
 func untrusted(format string, args ...any) error {
 	return &untrustedError{fmt.Sprintf(format, args...)}
 }
+
+// DefaultLockWait is how long [Update] waits for the holder of a lock to
+// let go of it, and a fair wait to pass [Lock].
+const DefaultLockWait = 30 * time.Second
 
 // maxLinks bounds how many symbolic links a lookup follows, as the system
 // bounds the lookup of a path.
@@ -176,6 +185,39 @@ func linkTarget(path string) (string, error) {
 	}
 	dir, err := filepath.EvalSymlinks(filepath.Dir(path))
 	return filepath.Join(dir, link), err
+}
+
+// Update changes the file at path under [Lock], with [DefaultLockWait]: it
+// reads the file, hands its content to change, which gets nil when there
+// is no file yet, and writes what change returns with [WriteAtomic], with
+// perm for a new file. When change returns an error, nothing is written
+// and Update returns that error.
+//
+// The lock is the lock of the file a symbolic link at path points at, so
+// that writers that go through the link and around it take the same one.
+func Update(ctx context.Context, path string, perm os.FileMode, change func([]byte) ([]byte, error)) error {
+	me := os.Geteuid()
+	file, _, err := resolve(path, me)
+	if err != nil {
+		return fmt.Errorf("update %s: %w", path, err)
+	}
+	unlock, err := Lock(ctx, file, DefaultLockWait)
+	if err != nil {
+		return err
+	}
+	defer unlock()
+
+	data, err := os.ReadFile(file)
+	if errors.Is(err, fs.ErrNotExist) {
+		data, err = nil, nil
+	}
+	if err == nil {
+		data, err = change(data)
+	}
+	if err == nil {
+		err = writeAtomic(file, data, perm, me, os.Rename)
+	}
+	return err
 }
 
 // EnsureDir makes the directory dir, and the directories above it that
