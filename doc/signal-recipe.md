@@ -40,7 +40,7 @@ func main() {
   An interrupt exits with the number the program documents, `130` by
   convention.
 - **Deferred work runs.** `os.Exit` skips deferred calls, so `run` returns
-  first and closes the display and the event log, as `cliprogress.Run`
+  first and closes the display and the event log, as `cliprogress.Session`
   does, and only then does `main` exit.
 - **A server shuts down gracefully.** A program with a local web server
   calls `Shutdown` with a short deadline when `ctx` is done, then closes
