@@ -5,11 +5,14 @@ package page
 
 import "net/http"
 
-// IsHTMX reports whether htmx sent r, which it marks with the header
-// HX-Request: true. A handler answers htmx with a fragment, and a browser
-// that sent a plain form or followed a link with a whole page.
+// IsHTMX reports whether htmx sent r for a fragment, which it marks with
+// the header HX-Request: true. A handler answers htmx with a fragment, and
+// a browser that sent a plain form or followed a link with a whole page.
+// A history restore, which htmx sends for the back and forward buttons
+// with the header HX-History-Restore-Request: true, wants a whole page
+// too, so IsHTMX is false for it (decision 41).
 func IsHTMX(r *http.Request) bool {
-	return r.Header.Get("HX-Request") == "true"
+	return r.Header.Get("HX-Request") == "true" && r.Header.Get("HX-History-Restore-Request") != "true"
 }
 
 // Redirect sends the browser to the path to of this server after a
