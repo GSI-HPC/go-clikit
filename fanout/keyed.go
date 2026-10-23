@@ -43,8 +43,13 @@ type Keyed struct {
 // other; a key given twice takes no second place, and an empty key takes
 // none, so that work that goes to no key of its own is bounded by the pool
 // alone. Once ctx has ended nothing is taken: what was taken is given back,
-// and the context's error returned, with no release.
+// and the context's error returned, with no release. That holds for no key
+// and for an empty one too, so that work that goes to no key does not start
+// once ctx has ended.
 func (k *Keyed) Acquire(ctx context.Context, keys ...string) (release func(), err error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	names := slices.Compact(slices.Sorted(slices.Values(keys)))
 	var held []chan struct{}
 	var once sync.Once

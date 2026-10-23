@@ -113,9 +113,7 @@ func TestKeyedTakesItsPlacesInOneOrder(t *testing.T) {
 
 // Once the context ends, a holder waiting for a place stops waiting and
 // gives back the places it took, and nothing is taken any more, though a
-// place is free: when a place and the end are both ready, select picks
-// either, so the test tosses it often enough that both sides come up, and
-// each must leave the places as they were.
+// place is free.
 func TestKeyedGivesBackWhatItTookWhenTheContextEnds(t *testing.T) {
 	t.Parallel()
 
@@ -138,10 +136,8 @@ func TestKeyedGivesBackWhatItTookWhenTheContextEnds(t *testing.T) {
 			t.Fatalf("the place on a.example.org was not given back: %v", err)
 		}
 		release()
-		for range 200 {
-			if _, err := keys.Acquire(ctx, "c.example.org"); !errors.Is(err, context.Canceled) {
-				t.Fatalf("Acquire after the context ended = %v, want the context's error", err)
-			}
+		if _, err := keys.Acquire(ctx, "c.example.org"); !errors.Is(err, context.Canceled) {
+			t.Fatalf("Acquire after the context ended = %v, want the context's error", err)
 		}
 		release, err = keys.Acquire(quick, "c.example.org")
 		if err != nil {
@@ -149,6 +145,41 @@ func TestKeyedGivesBackWhatItTookWhenTheContextEnds(t *testing.T) {
 		}
 		release()
 	})
+}
+
+// Once the context has ended, Acquire takes nothing and returns the
+// context's error, with no release, whatever keys it is given: also none,
+// and an empty one, which take no place, so that work that goes to no key
+// does not start either.
+func TestKeyedRefusesAnEndedContextForAnyKeys(t *testing.T) {
+	t.Parallel()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	for _, tc := range []struct {
+		name string
+		keys []string
+	}{
+		{"no keys", nil},
+		{"an empty key", []string{""}},
+		{"a free key", []string{"gw.example.org"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			keys := &fanout.Keyed{Limit: 1}
+			if release, err := keys.Acquire(ctx, tc.keys...); !errors.Is(err, context.Canceled) || release != nil {
+				t.Fatalf("Acquire(%q) = %p, %v, want no release and the context's error", tc.keys, release, err)
+			}
+			// Nothing was taken: the key is free.
+			quick, stop := context.WithTimeout(context.Background(), time.Second)
+			defer stop()
+			release, err := keys.Acquire(quick, "gw.example.org")
+			if err != nil {
+				t.Fatalf("a place on gw.example.org was taken: %v", err)
+			}
+			release()
+		})
+	}
 }
 
 // A key with no name takes no place, and nor does one given twice: work
