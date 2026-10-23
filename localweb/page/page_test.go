@@ -112,7 +112,7 @@ func TestIncludeErrors(t *testing.T) {
 }
 
 // A block that includes itself, or blocks that include each other, fail
-// the render past MaxIncludeDepth, with and without Reload, and the set
+// the render past MaxIncludeDepth, with and without Dev, and the set
 // renders as before afterwards.
 func TestIncludeCycle(t *testing.T) {
 	t.Parallel()
@@ -122,10 +122,10 @@ func TestIncludeCycle(t *testing.T) {
 		`{{define "c"}}{{include "b" .}}{{end}}` +
 		`{{define "ok"}}<p>{{include "frag" .}}</p>{{end}}` +
 		`{{define "frag"}}{{.}}{{end}}`
-	for _, reload := range []bool{false, true} {
-		t.Run(fmt.Sprint("reload=", reload), func(t *testing.T) {
+	for _, dev := range []bool{false, true} {
+		t.Run(fmt.Sprint("dev=", dev), func(t *testing.T) {
 			t.Parallel()
-			s := mustParse(t, src, page.Options{Reload: reload})
+			s := mustParse(t, src, page.Options{Dev: dev})
 			for _, tc := range []struct{ name, want string }{
 				{"a", "page: render a: include a: nested more than 100 deep"},
 				{"b", "page: render b: include c: nested more than 100 deep"},
@@ -229,40 +229,56 @@ func TestRespondFailure(t *testing.T) {
 	}
 }
 
-// Without Reload the first parse stays; with it, the files are read anew.
-func TestReload(t *testing.T) {
+// Without Dev the first parse stays; with it, the files are read anew.
+func TestDev(t *testing.T) {
 	t.Parallel()
 
-	for _, reload := range []bool{false, true} {
-		name := "fixed"
-		if reload {
-			name = "reload"
-		}
-		t.Run(name, func(t *testing.T) {
+	for _, dev := range []bool{false, true} {
+		t.Run(fmt.Sprint("dev=", dev), func(t *testing.T) {
 			t.Parallel()
-			fsys := files(`{{define "a"}}old{{end}}`)
-			s, err := page.Parse(fsys, page.Options{Reload: reload}, "*.html")
-			if err != nil {
-				t.Fatal(err)
-			}
-			fsys["t.html"] = &fstest.MapFile{Data: []byte(`{{define "a"}}new{{end}}`)}
 			want := "old"
-			if reload {
+			if dev {
 				want = "new"
 			}
-			if got, err := s.Render("a", nil); err != nil || got != want {
-				t.Errorf("Render = %q, %v, want %q", got, err, want)
+			if got := renderAfterEdit(t, page.Options{Dev: dev}); got != want {
+				t.Errorf("Render = %q, want %q", got, want)
 			}
 		})
 	}
 }
 
-// Under Reload a template that stops parsing fails every use of the set.
-func TestReloadBroken(t *testing.T) {
+// The deprecated field Reload reads the files anew, as Dev does.
+func TestReloadIsDev(t *testing.T) {
+	t.Parallel()
+
+	if got := renderAfterEdit(t, page.Options{Reload: true}); got != "new" {
+		t.Errorf("Render = %q, want new", got)
+	}
+}
+
+// renderAfterEdit parses a block a of "old" with o, changes it to "new",
+// and returns what Render renders of it.
+func renderAfterEdit(t *testing.T, o page.Options) string {
+	t.Helper()
+	fsys := files(`{{define "a"}}old{{end}}`)
+	s, err := page.Parse(fsys, o, "*.html")
+	if err != nil {
+		t.Fatal(err)
+	}
+	fsys["t.html"] = &fstest.MapFile{Data: []byte(`{{define "a"}}new{{end}}`)}
+	got, err := s.Render("a", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return got
+}
+
+// Under Dev a template that stops parsing fails every use of the set.
+func TestDevBroken(t *testing.T) {
 	t.Parallel()
 
 	fsys := files(`{{define "a"}}ok{{end}}`)
-	s, err := page.Parse(fsys, page.Options{Reload: true}, "*.html")
+	s, err := page.Parse(fsys, page.Options{Dev: true}, "*.html")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -280,12 +296,12 @@ func TestReloadBroken(t *testing.T) {
 	}
 }
 
-// Render is safe for concurrent use, under Reload too.
+// Render is safe for concurrent use, under Dev too.
 func TestConcurrentRender(t *testing.T) {
 	t.Parallel()
 
-	for _, reload := range []bool{false, true} {
-		s := mustParse(t, blocks, page.Options{Reload: reload})
+	for _, dev := range []bool{false, true} {
+		s := mustParse(t, blocks, page.Options{Dev: dev})
 		var wg sync.WaitGroup
 		for range 8 {
 			wg.Add(1)
