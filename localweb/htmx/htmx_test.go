@@ -79,13 +79,34 @@ func TestConfig(t *testing.T) {
 		t.Fatalf("Config is not JSON: %v", err)
 	}
 	want := map[string]any{
-		"allowEval":              false,
-		"allowScriptTags":        false,
-		"includeIndicatorStyles": false,
-		"selfRequestsOnly":       true,
-		"historyCacheSize":       float64(0),
+		"allowEval":                 false,
+		"allowScriptTags":           false,
+		"includeIndicatorStyles":    false,
+		"selfRequestsOnly":          true,
+		"historyCacheSize":          float64(0),
+		"historyRestoreAsHxRequest": false,
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("Config = %v, want %v (keys %v)", got, want, slices.Sorted(maps.Keys(want)))
+	}
+}
+
+// Every key of Config is a setting of the htmx in Files, so that a new
+// htmx that drops one fails here and not in a browser.
+func TestConfigKeysAreSettingsOfTheScript(t *testing.T) {
+	t.Parallel()
+
+	data, err := fs.ReadFile(htmx.Files(), htmx.Script)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var config map[string]any
+	if err := json.Unmarshal([]byte(htmx.Config), &config); err != nil {
+		t.Fatalf("Config is not JSON: %v", err)
+	}
+	for key := range config {
+		if !strings.Contains(string(data), ","+key+":") && !strings.Contains(string(data), "{"+key+":") {
+			t.Errorf("%s has no setting %s", htmx.Script, key)
+		}
 	}
 }

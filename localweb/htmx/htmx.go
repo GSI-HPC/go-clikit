@@ -51,8 +51,11 @@ const (
 // in, which the Content-Security-Policy refuses anyway; it adds no style
 // of its own, which the policy refuses too; it sends requests to its own
 // origin only; and it keeps no copy of a page for its history, as what a
-// page shows of the user's machine must not outlive the session.
-const Config = `{"allowEval":false,"allowScriptTags":false,"includeIndicatorStyles":false,"selfRequestsOnly":true,"historyCacheSize":0}`
+// page shows of the user's machine must not outlive the session. As the
+// back and forward buttons then ask the server for the page, htmx does not
+// mark that request with HX-Request, so that a handler answers it with the
+// whole page (decision 41).
+const Config = `{"allowEval":false,"allowScriptTags":false,"includeIndicatorStyles":false,"selfRequestsOnly":true,"historyCacheSize":0,"historyRestoreAsHxRequest":false}`
 
 //go:embed htmx.min.js htmx-ext-sse.js idiomorph-ext.min.js
 var files embed.FS
