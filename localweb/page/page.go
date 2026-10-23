@@ -24,9 +24,9 @@
 //	}
 //
 // A program checks at its start that every block it names is there, with
-// Has. With Options.Reload the templates are parsed anew for each render,
+// Has. With Options.Dev the templates are parsed anew for each render,
 // from a directory the program names, for working on them without
-// building the program again.
+// building the program again, as with the Dev of localweb/assets.
 package page
 
 import (
@@ -50,9 +50,14 @@ const MaxIncludeDepth = 100
 type Options struct {
 	// Funcs are the functions the templates call, besides include.
 	Funcs template.FuncMap
-	// Reload parses the templates anew for each render, for a program run
+	// Dev parses the templates anew for each render, for a program run
 	// on the files of a directory, such as os.DirFS(dir). A template that
 	// no longer parses fails the render.
+	Dev bool
+	// Reload is the former name of Dev, read while Dev is false.
+	//
+	// Deprecated: Use Dev, the name of the same switch in
+	// localweb/assets (decision 36).
 	Reload bool
 }
 
@@ -61,7 +66,8 @@ type Options struct {
 type Set struct {
 	fsys     fs.FS
 	patterns []string
-	o        Options
+	funcs    template.FuncMap
+	dev      bool
 	// set is the templates as parsed, which no render executes: each
 	// render executes a clone of them from runs, which counts its
 	// includes.
@@ -83,7 +89,7 @@ type run struct {
 // with DATA and returns its HTML, so that the name of a block can be a
 // value. include nests at most MaxIncludeDepth deep in one render.
 func Parse(fsys fs.FS, o Options, patterns ...string) (*Set, error) {
-	s := &Set{fsys: fsys, patterns: patterns, o: o}
+	s := &Set{fsys: fsys, patterns: patterns, funcs: o.Funcs, dev: o.Dev || o.Reload}
 	set, err := s.parse(&run{})
 	if err != nil {
 		return nil, err
@@ -100,7 +106,7 @@ func Parse(fsys fs.FS, o Options, patterns ...string) (*Set, error) {
 // parse parses the templates, with the include of r.
 func (s *Set) parse(r *run) (*template.Template, error) {
 	funcs := template.FuncMap{}
-	for name, fn := range s.o.Funcs {
+	for name, fn := range s.funcs {
 		funcs[name] = fn
 	}
 	funcs["include"] = r.include
@@ -135,7 +141,7 @@ func (r *run) render(name string, data any) (string, error) {
 // Has reports whether the block name is in the set.
 func (s *Set) Has(name string) bool {
 	set := s.set
-	if s.o.Reload {
+	if s.dev {
 		var err error
 		if set, err = s.parse(&run{}); err != nil {
 			return false
@@ -150,7 +156,7 @@ func (s *Set) Has(name string) bool {
 // block of the include that went too deep.
 func (s *Set) Render(name string, data any) (string, error) {
 	var r *run
-	if s.o.Reload {
+	if s.dev {
 		r = &run{}
 		set, err := s.parse(r)
 		if err != nil {
