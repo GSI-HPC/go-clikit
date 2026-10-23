@@ -36,7 +36,7 @@
 // program puts them in this order, outermost first:
 //
 //	h := localweb.Headers("")(localweb.Hosts(b.Answers, localweb.HostsOptions{})(
-//		localweb.SameOrigin(localweb.Origin{Navigate: true})(sessions.Middleware(mux))))
+//		localweb.SameOrigin(localweb.OriginPolicy{Navigate: true})(sessions.Middleware(mux))))
 //
 // A check that refuses a request answers it with a Refusal: a status, a
 // message the client reads, and a reason for the program's log. The

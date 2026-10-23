@@ -14,7 +14,7 @@
 //
 //	sessions, err := session.New(session.Options{Token: token, Cookie: "prog_ui_", Header: "X-Prog-CSRF"})
 //	h := localweb.Headers("")(localweb.Hosts(b.Answers, localweb.HostsOptions{})(
-//		localweb.SameOrigin(localweb.Origin{Navigate: true})(sessions.Middleware(mux))))
+//		localweb.SameOrigin(localweb.OriginPolicy{Navigate: true})(sessions.Middleware(mux))))
 //
 // A page puts CSRF(r.Context()) into its forms, in the field Options.Field,
 // and into the header Options.Header of the requests its script sends,

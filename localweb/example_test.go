@@ -32,7 +32,7 @@ func ExampleListen() {
 		fmt.Fprintln(w, "Hello from the user's machine.")
 	})
 	h := localweb.Headers("")(localweb.Hosts(b.Answers, localweb.HostsOptions{})(
-		localweb.SameOrigin(localweb.Origin{Navigate: true})(mux)))
+		localweb.SameOrigin(localweb.OriginPolicy{Navigate: true})(mux)))
 	done := make(chan error, 1)
 	go func() { done <- localweb.Serve(ctx, b.Listeners, h, localweb.ServeOptions{}) }()
 
@@ -63,7 +63,7 @@ func ExampleListen() {
 // CrossSite gives the reason a request came from another site, for the
 // program's log.
 func ExampleCrossSite() {
-	page := localweb.Origin{Navigate: true}
+	page := localweb.OriginPolicy{Navigate: true}
 	for _, r := range []struct {
 		method string
 		header map[string]string

@@ -91,7 +91,7 @@ func server(t *testing.T) *httptest.Server {
 	})
 	srv := httptest.NewServer(nil)
 	b := &localweb.Bound{Addrs: []netip.AddrPort{srv.Listener.Addr().(*net.TCPAddr).AddrPort()}}
-	srv.Config.Handler = localweb.Hosts(b.Answers, localweb.HostsOptions{})(localweb.SameOrigin(localweb.Origin{Navigate: true})(sessions.Middleware(mux)))
+	srv.Config.Handler = localweb.Hosts(b.Answers, localweb.HostsOptions{})(localweb.SameOrigin(localweb.OriginPolicy{Navigate: true})(sessions.Middleware(mux)))
 	t.Cleanup(srv.Close)
 	return srv
 }

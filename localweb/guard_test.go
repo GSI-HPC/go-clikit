@@ -45,14 +45,14 @@ func TestCrossSite(t *testing.T) {
 		return h
 	}
 	origin := func(v ...string) map[string][]string { return map[string][]string{"Origin": v} }
-	navigate := Origin{Navigate: true}
-	others := Origin{Others: []string{"http://127.0.0.1:5173", "http://localhost:5173"}}
+	navigate := OriginPolicy{Navigate: true}
+	others := OriginPolicy{Others: []string{"http://127.0.0.1:5173", "http://localhost:5173"}}
 
 	tests := []struct {
 		name   string
 		method string
 		h      map[string][]string
-		o      Origin
+		o      OriginPolicy
 		want   string
 	}{
 		// Sec-Fetch-Site absent: no browser, or an old one.
@@ -161,7 +161,7 @@ func TestCrossSiteOnTLS(t *testing.T) {
 			r := request("POST", map[string][]string{"Origin": {tt.origin}})
 			r.TLS = &tls.ConnectionState{}
 
-			if got := CrossSite(r, Origin{}); got != tt.want {
+			if got := CrossSite(r, OriginPolicy{}); got != tt.want {
 				t.Errorf("CrossSite = %q, want %q", got, tt.want)
 			}
 		})
@@ -309,6 +309,19 @@ func TestHosts(t *testing.T) {
 	}
 }
 
+// Origin is still the policy, under its former name.
+func TestOriginIsOriginPolicy(t *testing.T) {
+	t.Parallel()
+
+	o := Origin{Navigate: true}
+	r := request("GET", map[string][]string{
+		"Sec-Fetch-Site": {"cross-site"}, "Sec-Fetch-Mode": {"navigate"}, "Sec-Fetch-Dest": {"document"},
+	})
+	if got := CrossSite(r, o); got != "" {
+		t.Errorf("CrossSite with an Origin: %q, want a navigation let in", got)
+	}
+}
+
 // Hosts refuses a nil answers when it is made, not on the first request.
 func TestHostsPanicsWithoutAnswers(t *testing.T) {
 	t.Parallel()
@@ -352,7 +365,7 @@ func TestSameOrigin(t *testing.T) {
 				next := &reached{}
 				w := httptest.NewRecorder()
 
-				SameOrigin(Origin{})(next).ServeHTTP(w, request(tt.method, tt.h))
+				SameOrigin(OriginPolicy{})(next).ServeHTTP(w, request(tt.method, tt.h))
 
 				if tt.wantReason == "" {
 					if next.n != 1 {
@@ -381,7 +394,7 @@ func TestSameOrigin(t *testing.T) {
 				rr := &refusalRecorder{}
 				w := httptest.NewRecorder()
 
-				SameOrigin(Origin{Refuse: rr.refuse})(next).ServeHTTP(w, request(tt.method, tt.h))
+				SameOrigin(OriginPolicy{Refuse: rr.refuse})(next).ServeHTTP(w, request(tt.method, tt.h))
 
 				if tt.wantReason == "" {
 					if next.n != 1 || len(rr.got) != 0 {
