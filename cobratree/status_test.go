@@ -28,7 +28,9 @@ func TestCoded(t *testing.T) {
 		{"wrapped", fmt.Errorf("n1: %w", cobratree.Coded(3, fs.ErrNotExist)), 3, "n1: file does not exist"},
 		{"coded again", cobratree.Coded(4, fmt.Errorf("n1: %w", cobratree.Coded(3, fs.ErrNotExist))), 3, "n1: file does not exist"},
 		{"joined", errors.Join(fs.ErrClosed, cobratree.Coded(3, fs.ErrNotExist)), 3, "file already closed\nfile does not exist"},
-		{"zero", cobratree.Coded(0, fs.ErrNotExist), 0, "file does not exist"},
+		{"zero", cobratree.Coded(0, fs.ErrNotExist), 1, "file does not exist"},
+		{"negative", cobratree.Coded(-1, fs.ErrNotExist), 1, "file does not exist"},
+		{"zero over a status", cobratree.Coded(0, cobratree.Coded(3, fs.ErrNotExist)), 3, "file does not exist"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			if got := cobratree.Status(tc.err, 1); got != tc.status {
@@ -38,6 +40,15 @@ func TestCoded(t *testing.T) {
 				t.Errorf("text %q, want %q", tc.err.Error(), tc.text)
 			}
 		})
+	}
+}
+
+// A status of 0 or less is no status: Coded returns the error as it is.
+func TestCodedWithoutAStatus(t *testing.T) {
+	for _, status := range []int{0, -1} {
+		if err := cobratree.Coded(status, fs.ErrNotExist); errors.Unwrap(err) != nil || !errors.Is(err, fs.ErrNotExist) {
+			t.Errorf("Coded(%d, %v) = %#v, want the error as it is", status, fs.ErrNotExist, err)
+		}
 	}
 }
 
