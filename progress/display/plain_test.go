@@ -141,7 +141,7 @@ func testPlainLinesOfAPowerOnInBatches(t *testing.T) {
 		Size:  2,
 		Pause: 5 * time.Second,
 	}, func(d time.Duration) { f.draw(d) })
-	batches := fanout.Batches(f.ctx, nodes, o, func(ctx context.Context, batch *nodeset.NodeSet) error {
+	batches, err := fanout.Batches(f.ctx, nodes, o, func(ctx context.Context, batch *nodeset.NodeSet) error {
 		names := batch.Expand()
 		spans := make([]*progress.Span, len(names))
 		for i, node := range names {
@@ -163,7 +163,7 @@ func testPlainLinesOfAPowerOnInBatches(t *testing.T) {
 	if batches[2].Started {
 		t.Fatal("the batch after the one that failed was run")
 	}
-	checkScreen(t, f.end(batches[1].Err), `
+	checkScreen(t, f.end(err), `
 [0:00] bmc power on › power on: start, 6 targets
 [0:00] bmc power on › power on › batch 1/3: start, 2 targets
 [0:04] bmc power on › power on › batch 1/3: done in 4.0s: 2 ok
@@ -205,7 +205,7 @@ exec: failed in 12s: 3 ok, 1 failed
 	t.Run("in batches", func(t *testing.T) {
 		t.Parallel()
 		f := newPlainFixture(t, "exec")
-		batches := fanout.Batches(f.ctx, nodeset.MustParse("exe[1-4]"), fanout.BatchOptions{Step: "power on", Size: 2, Limit: 1},
+		_, err := fanout.Batches(f.ctx, nodeset.MustParse("exe[1-4]"), fanout.BatchOptions{Step: "power on", Size: 2, Limit: 1},
 			func(ctx context.Context, batch *nodeset.NodeSet) error {
 				outcomes, _ := fanout.Map(ctx, batch.Expand(), fanout.MapOptions[string]{Limit: 1},
 					func(_ context.Context, node string) (struct{}, error) {
@@ -217,7 +217,7 @@ exec: failed in 12s: 3 ok, 1 failed
 					})
 				return outcomes[0].Err
 			})
-		checkScreen(t, f.end(batches[0].Err), `
+		checkScreen(t, f.end(err), `
 [0:00] exec › power on: start, 4 targets
 [0:00] exec › power on › batch 1/2: start, 2 targets, 1 at a time
 [0:01] exec › power on › batch 1/2 › exe1 failed (transport): dial tcp: i/o timeout
