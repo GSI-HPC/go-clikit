@@ -14,11 +14,11 @@ import (
 // holds back before it writes them out.
 const maxHeld = 64 << 10
 
-// NewEscapeWriter returns a writer that passes what it is given on to w,
-// escaped, as a stream: the output of a child program or of a command on a
-// remote host, say, which is shown on a terminal as it arrives. Each line is
-// escaped with EscapeLines, so newline and tab are kept and every other
-// control character is shown as an escape, a carriage return too.
+// NewEscapeWriter returns an EscapeWriter that passes what it is given on
+// to w, escaped, as a stream: the output of a child program or of a command
+// on a remote host, say, which is shown on a terminal as it arrives. Each
+// line is escaped with EscapeLines, so newline and tab are kept and every
+// other control character is shown as an escape, a carriage return too.
 //
 // The writer holds a line back until its newline comes, or until Close, so
 // that a rune that arrives in two writes is not cut in two and escaped as
@@ -28,19 +28,18 @@ const maxHeld = 64 << 10
 // whole yet, three at most, are held back. The text written to w is the
 // same whatever the writes were cut as.
 //
-// Write returns len(p) and the first error of w it met in that call: a
-// write that fails has still consumed p, and the lines after the one that
-// failed are written to w as well. The writer is safe for concurrent use,
-// and calls w one at a time.
-//
-// Close writes the line that has not ended, escaped, followed by a newline,
-// and does not close w. A second Close does nothing. Write after Close
-// writes nothing and returns io.ErrClosedPipe.
-func NewEscapeWriter(w io.Writer) io.WriteCloser {
-	return &escapeWriter{w: w}
+// The writer is safe for concurrent use, and calls w one at a time.
+func NewEscapeWriter(w io.Writer) *EscapeWriter {
+	return &EscapeWriter{w: w}
 }
 
-type escapeWriter struct {
+var _ io.WriteCloser = (*EscapeWriter)(nil)
+
+// EscapeWriter is the writer NewEscapeWriter returns, which escapes a
+// stream line by line. It is an io.WriteCloser. The zero EscapeWriter is
+// not ready to use, since it has no writer to pass the lines on to:
+// NewEscapeWriter makes one.
+type EscapeWriter struct {
 	mu     sync.Mutex
 	w      io.Writer
 	part   []byte // the bytes of the line that has not ended, held back
@@ -48,7 +47,12 @@ type escapeWriter struct {
 	closed bool
 }
 
-func (e *escapeWriter) Write(p []byte) (int, error) {
+// Write passes the lines in p that end on to w, escaped, and holds the
+// rest back, as NewEscapeWriter says. It returns len(p) and the first error
+// of w it met in that call: a write that fails has still consumed p, and
+// the lines after the one that failed are written to w as well. Write after
+// Close writes nothing and returns io.ErrClosedPipe.
+func (e *EscapeWriter) Write(p []byte) (int, error) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	if e.closed {
@@ -83,7 +87,10 @@ func (e *escapeWriter) Write(p []byte) (int, error) {
 	return n, first
 }
 
-func (e *escapeWriter) Close() error {
+// Close writes the line that has not ended, escaped, followed by a
+// newline, and does not close w. It returns the error of w. A second Close
+// does nothing.
+func (e *EscapeWriter) Close() error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	if e.closed {
@@ -99,7 +106,7 @@ func (e *escapeWriter) Close() error {
 }
 
 // write escapes text and writes it, with end, to w in one call.
-func (e *escapeWriter) write(text, end string) error {
+func (e *EscapeWriter) write(text, end string) error {
 	_, err := io.WriteString(e.w, EscapeLines(text)+end)
 	return err
 }
