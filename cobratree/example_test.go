@@ -144,14 +144,30 @@ func ExampleHelpTopics() {
 // A program whose release builds inject their version and commit with
 // -ldflags falls back to what the toolchain recorded, and words a build
 // that is no release as it likes.
-func ExampleResolve() {
+func ExampleBuildInfo_Resolve() {
 	var version, commit string // set with -ldflags "-X main.version=v1.2.3 -X main.commit=…"
-	bi := cobratree.Resolve(version, commit)
+	bi := cobratree.ReadBuildInfo().Resolve(version, commit)
 	line := "prog " + cmp.Or(bi.Version, "dev")
 	if rev := bi.Short(7); rev != "" {
 		line += " (" + rev + ")"
 	}
 	fmt.Println(line)
+}
+
+// A test applies the rules of Resolve to the build info of a checkout it
+// builds: a release build's version wins, and a commit that is not the
+// checkout's drops what was recorded about the checkout.
+func ExampleBuildInfo_Resolve_checkout() {
+	checkout := cobratree.BuildInfo{
+		Commit: "ebed4872343d0123456789abcdef0123456789ab",
+		Time:   "2026-09-23T18:09:18Z",
+		Dirty:  true,
+	}
+	fmt.Printf("%+v\n", checkout.Resolve("v1.2.3", "ebed487"))
+	fmt.Printf("%+v\n", checkout.Resolve("", "0123456"))
+	// Output:
+	// {Version:v1.2.3 Commit:ebed487 Time:2026-09-23T18:09:18Z Dirty:true}
+	// {Version: Commit:0123456 Time: Dirty:false}
 }
 
 func ExampleBuildInfo_Short() {

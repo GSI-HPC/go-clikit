@@ -33,10 +33,10 @@
 //
 // ReadBuildInfo returns the module version, the revision and the time of
 // the commit, and whether the checkout was modified, as the toolchain
-// recorded them, and Resolve puts the version and commit a release build
-// set with -ldflags in their place. How a program shows them, the word it
-// uses for a build that is no release and how much of the revision it
-// prints, BuildInfo.Short, is the program's.
+// recorded them, and BuildInfo.Resolve puts the version and commit a
+// release build set with -ldflags in their place. How a program shows
+// them, the word it uses for a build that is no release and how much of
+// the revision it prints, BuildInfo.Short, is the program's.
 //
 // The package knows no program: the names in its errors are those of the
 // commands in the tree, and the commands a program renamed are its data.
