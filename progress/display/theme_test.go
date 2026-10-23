@@ -98,6 +98,23 @@ func TestThemeIn(t *testing.T) {
 	}
 }
 
+// The variables of the themes are copies: a program or library that
+// assigns one changes neither Themes nor what ParseTheme reads (decision
+// 46). The test is not parallel, as it assigns a package variable, and puts
+// it back before the parallel tests run.
+func TestAnAssignedThemeChangesNeitherThemesNorParseTheme(t *testing.T) {
+	was := display.Classic
+	t.Cleanup(func() { display.Classic = was })
+	display.Classic = display.Neon.In(display.Colors16)
+	themes := display.Themes()
+	if themes[0] != was || themes[0].String() != "classic" {
+		t.Errorf("Themes()[0] is %v in %v after an assignment to Classic, want classic in 256", themes[0], themes[0].Colors())
+	}
+	if got, err := display.ParseTheme("classic"); err != nil || got != was {
+		t.Errorf("ParseTheme(classic) = %v in %v, %v after an assignment to Classic; want classic in 256", got, got.Colors(), err)
+	}
+}
+
 // Colors names how many colours it draws in.
 func TestColorsString(t *testing.T) {
 	t.Parallel()

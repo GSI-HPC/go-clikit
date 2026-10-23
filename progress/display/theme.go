@@ -19,8 +19,10 @@ import (
 // The zero Theme is none: a display draws as it always has, plain text with
 // no escape code, which is the text a program's tests compare. The five
 // themes, Classic, Aurora, Ember, Neon and Tide, each have a name, which
-// Themes lists and ParseTheme reads, for a flag such as --theme. Assign to
-// none of their variables: they are values to pass, as io.EOF is.
+// Themes lists and ParseTheme reads, for a flag such as --theme. Their
+// variables are copies, to pass: Themes and ParseTheme read the kit's own
+// values, so a program or library that assigns one of the variables
+// changes that variable alone (decision 46).
 //
 // A theme only adds to what a display says. The tree and the counter draw
 // its marks, separators, spinner, bar and guides; plain lines and the
@@ -43,7 +45,9 @@ type Theme struct {
 	colors Colors
 }
 
-// The themes. Each is drawn in 256 colours; In draws it in others.
+// The themes. Each is drawn in 256 colours; In draws it in others. Each
+// variable is a copy of a theme: Themes and ParseTheme do not read it, so
+// an assignment to it changes nothing else (decision 46).
 var (
 	// Classic draws the marks of the zero Theme in green, red, amber and
 	// blue, with a minus for what was skipped, and separators that take one
@@ -51,34 +55,45 @@ var (
 	// It has no bar or guide, and its running mark, ▸, stands still; it
 	// starts the counter's line too, which the zero Theme starts with no
 	// mark.
-	Classic = Theme{art: &classicArt}
+	Classic = classicTheme
 	// Aurora draws in dots, as night lights: a braille spinner, a braille
 	// bar that runs from teal through blue to violet, and a dotted guide,
 	// with red for what failed.
-	Aurora = Theme{art: &auroraArt}
+	Aurora = auroraTheme
 	// Ember draws a warm instrument panel: a lamp that turns round a
 	// square, a bar of segments in orange, dashed panel lines, ok in the
 	// terminal's own colour, bold, and what failed in raspberry, which
 	// stands apart from the orange of what runs for the readers who tell
 	// red from green poorly too.
-	Ember = Theme{art: &emberArt}
+	Ember = emberTheme
 	// Neon draws an arcade at night: a sweeping quadrant, chevrons, and a
 	// bar of slanted segments in a gradient from electric blue to orchid,
 	// with hot pink for what failed.
-	Neon = Theme{art: &neonArt}
+	Neon = neonTheme
 	// Tide draws the sea: a turning arc and a bar of bubbles, with ok in
 	// blue and failed in orange, which stay apart for the readers who tell
 	// red from green poorly.
-	Tide = Theme{art: &tideArt}
+	Tide = tideTheme
+)
+
+// The kit's own values of the themes, which Themes and ParseTheme read.
+var (
+	classicTheme = Theme{art: &classicArt}
+	auroraTheme  = Theme{art: &auroraArt}
+	emberTheme   = Theme{art: &emberArt}
+	neonTheme    = Theme{art: &neonArt}
+	tideTheme    = Theme{art: &tideArt}
 )
 
 // Themes returns every Theme but the zero one, in a new slice: Classic,
-// Aurora, Ember, Neon and Tide, each named by its String.
-func Themes() []Theme { return []Theme{Classic, Aurora, Ember, Neon, Tide} }
+// Aurora, Ember, Neon and Tide, each named by its String. It reads the
+// kit's own values, not the variables, which an assignment can change.
+func Themes() []Theme { return []Theme{classicTheme, auroraTheme, emberTheme, neonTheme, tideTheme} }
 
 // ParseTheme returns the Theme name names, in any case, as String writes it,
-// drawn in 256 colours; "none" and "" are the zero Theme. Any other name is
-// an error that quotes it as given and lists the names.
+// drawn in 256 colours, from the kit's own values, as Themes does; "none"
+// and "" are the zero Theme. Any other name is an error that quotes it as
+// given and lists the names.
 func ParseTheme(name string) (Theme, error) {
 	lower := strings.ToLower(name)
 	if lower == "" || lower == "none" {
