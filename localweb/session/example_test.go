@@ -17,7 +17,7 @@ import (
 // exchanges the token for a cookie; a page puts the session's CSRF token
 // into its forms and into the header its script sends; and a refusal tells
 // the user where the address to open is.
-func ExampleSessions_Middleware() {
+func ExampleManager_Middleware() {
 	token := "LAUNCHTOKEN" // session.NewToken() in a program
 	sessions, err := session.New(session.Options{
 		Token: token, Cookie: "prog_ui_", Header: "X-Prog-CSRF",
