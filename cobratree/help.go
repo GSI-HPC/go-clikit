@@ -4,6 +4,7 @@
 package cobratree
 
 import (
+	"fmt"
 	"io"
 
 	"github.com/spf13/cobra"
@@ -21,10 +22,16 @@ import (
 // on a tree that is not strict, a word that is neither a command nor a
 // topic shows the root's help, as cobra's help does. It returns the help
 // command, whose Short and Long, cobra's, speak of commands alone, for the
-// program to word.
+// program to word. A tree without subcommands has no help command, and
+// HelpTopics panics on it, rather than take the root over.
 func HelpTopics(root *cobra.Command, topic func(name string) (text string, ok bool)) *cobra.Command {
 	root.InitDefaultHelpCmd()
 	help, _, _ := root.Find([]string{"help"})
+	if help == root {
+		// Cobra adds no help command to a root without subcommands, and
+		// Find returns the root itself.
+		panic(fmt.Sprintf("cobratree: help topics need a help command, and %q has no subcommands", root.Name()))
+	}
 	// text returns the topic args name, when they name one and no command.
 	text := func(args []string) (string, bool) {
 		if len(args) != 1 {
