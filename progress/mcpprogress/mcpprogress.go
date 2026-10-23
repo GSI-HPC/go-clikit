@@ -13,6 +13,8 @@
 // result and nothing after it. The package imports no MCP SDK: the server
 // hands it a Send that puts the token in the notification and sends it on
 // the session, so that the kit follows no release of an SDK (decision 3).
+// The Notifier is a progress.RunSink too, and takes the program's name and
+// the panic log from the Bus, as decision 12 asks of every sink.
 //
 // What is expected is the Total of every step or batch that counts its
 // targets with none above it that does, a root of a progress.Tally, that
@@ -38,6 +40,7 @@
 package mcpprogress
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -61,25 +64,43 @@ type Options struct {
 	// goroutine at a time, in the order the notifications are made. An
 	// error, such as that of a session that has gone, stops the Notifier:
 	// nothing more is sent for the call, and the call goes on.
-	Send func(progress, total float64, message string) error
+	//
+	// ctx ends when the context given to Close ends, and Send returns
+	// then, with the session's write cut short, so that a session that
+	// has stalled holds Close no longer than the server allows. Send is
+	// required: New panics without one.
+	Send func(ctx context.Context, progress, total float64, message string) error
 	// PanicLog receives the stack of a panic in Send or in the Notifier,
-	// the server's log; nil is the process's standard error. Nothing more
-	// is sent for the call after one, and the call and the server go on.
+	// the server's log; nil is the Bus's, BusOptions.PanicLog, which the
+	// Bus tells the Notifier as a progress.RunSink, and the process's
+	// standard error before that or without a Bus. Nothing more is sent
+	// for the call after one, and the call and the server go on.
 	PanicLog io.Writer
 	// Program names the program in the line that says the notifications
-	// stopped, "prog: …"; empty leaves the name out.
+	// stopped, "prog: …"; empty is the Bus's, BusOptions.Program, which
+	// the Bus tells the Notifier, and leaves the name out when that is
+	// empty too. Fed by an eventlog.Forwarder, the Notifier is told of the
+	// child's run, and so of the child's program, which a server that
+	// wants its own name in the line sets here.
 	Program string
 }
 
 // Notifier sends the progress of one call, as the package comment says.
 // Its methods are safe for concurrent use.
 type Notifier struct {
-	send     func(progress, total float64, message string) error
+	send func(ctx context.Context, progress, total float64, message string) error
+	// ctx is the context of every Send, which ends once Close's context
+	// ends, or Close returns.
+	ctx    context.Context
+	cancel context.CancelFunc
+
+	mu sync.Mutex
+	// panicLog and program are the options', or else the Bus's, as Begin
+	// tells them; ownLog says the options gave the panic log.
 	panicLog io.Writer
 	program  string
-
-	mu    sync.Mutex
-	tally progress.Tally
+	ownLog   bool
+	tally    progress.Tally
 	// roots are the roots of the tally that are shown and open.
 	roots map[progress.SpanID]bool
 	// ended is the Total of the roots that have ended, and last says how
@@ -110,22 +131,42 @@ type standing struct {
 }
 
 // New returns a Notifier that sends with o.Send, and starts the goroutine
-// it sends from, which Close stops.
+// it sends from, which Close stops. It panics when o.Send is nil, which is
+// a mistake of the program, as a Notifier without one could send nothing.
 func New(o Options) *Notifier {
+	if o.Send == nil {
+		panic("mcpprogress: New needs Options.Send, which sends the notifications")
+	}
 	n := &Notifier{
 		send:     o.Send,
 		panicLog: o.PanicLog,
 		program:  o.Program,
+		ownLog:   o.PanicLog != nil,
 		roots:    map[progress.SpanID]bool{},
 		wake:     make(chan struct{}, 1),
 		stop:     make(chan struct{}),
 		done:     make(chan struct{}),
 	}
-	if n.panicLog == nil {
+	if !n.ownLog {
 		n.panicLog = os.Stderr
 	}
+	n.ctx, n.cancel = context.WithCancel(context.Background())
 	go n.run()
 	return n
+}
+
+// Begin takes the program's name and the panic log from the run the Bus
+// tells the Notifier of, as progress.RunSink, where the Options leave them
+// empty.
+func (n *Notifier) Begin(r progress.RunInfo) {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	if n.program == "" {
+		n.program = r.Program
+	}
+	if !n.ownLog && r.PanicLog != nil {
+		n.panicLog = r.PanicLog
+	}
 }
 
 // Handle counts e in, and has a notification sent if it changed anything.
@@ -180,6 +221,12 @@ func (n *Notifier) run() {
 			later = nil
 		}
 		n.mu.Lock()
+		if n.closed {
+			// Close is under way, and may have stopped waiting: no Send
+			// starts after it.
+			n.mu.Unlock()
+			return
+		}
 		if wait := time.Until(n.sentAt.Add(Interval)); n.dirty && !n.urgent && wait > 0 {
 			if later == nil {
 				later = time.After(wait)
@@ -196,30 +243,55 @@ func (n *Notifier) run() {
 }
 
 // Close stops the Notifier once the Bus it is a sink of has closed, and
-// sends where the call stands then if that is more than was sent last.
-// Nothing is sent once it has returned, so the server answers the call
-// after it. A second Close does nothing.
-func (n *Notifier) Close() {
+// sends where the call stands then if that is more than was sent last. No
+// Send starts once it has returned, so the server answers the call after
+// it. A second Close does nothing, and returns nil.
+//
+// Close waits for a Send under way, and for the last, until ctx ends: it
+// then ends the context of the Send, and returns at once the error of
+// ctx, wrapped, and the last notification is not sent. A Send that does
+// not return when its context ends may still be under way then.
+func (n *Notifier) Close(ctx context.Context) error {
 	n.mu.Lock()
 	if n.closed {
 		n.mu.Unlock()
-		return
+		return nil
 	}
 	n.closed = true
 	n.mu.Unlock()
+	defer n.cancel()
+	defer context.AfterFunc(ctx, n.cancel)()
 	close(n.stop)
-	<-n.done
-	n.mu.Lock()
-	s, ok := n.due()
-	n.mu.Unlock()
-	if ok {
-		n.deliver(s)
+	select {
+	case <-n.done:
+	case <-ctx.Done():
+	}
+	if err := ctx.Err(); err != nil {
+		return fmt.Errorf("the last progress notification was not sent: %w", err)
+	}
+	last := make(chan struct{})
+	go func() {
+		defer close(last)
+		n.mu.Lock()
+		s, ok := n.due()
+		n.mu.Unlock()
+		if ok {
+			n.deliver(s)
+		}
+	}()
+	select {
+	case <-last:
+		return nil
+	case <-ctx.Done():
+		return fmt.Errorf("the last progress notification was cut short: %w", ctx.Err())
 	}
 }
 
-// deliver sends s, unless a Send failed or panicked before. A Send that
-// fails, or panics, stops the Notifier; the stack of a panic goes to the
-// panic log.
+// deliver sends s, unless a Send failed or panicked before, or the
+// context of the Sends has ended: Close ends it before it returns, so
+// that a notification made just before Close gave up waiting is not sent
+// after it. A Send that fails, or panics, stops the Notifier; the stack of
+// a panic goes to the panic log.
 func (n *Notifier) deliver(s standing) {
 	defer func() {
 		p := recover()
@@ -228,15 +300,15 @@ func (n *Notifier) deliver(s standing) {
 		}
 		n.mu.Lock()
 		n.stopped = true
-		n.mu.Unlock()
-		prefix := ""
+		prefix, log := "", n.panicLog
 		if n.program != "" {
 			prefix = n.program + ": "
 		}
+		n.mu.Unlock()
 		// The log is a courtesy; a write that fails changes nothing.
-		_, _ = fmt.Fprintf(n.panicLog, "%sprogress notifications stopped: %v\n%s", prefix, p, debug.Stack())
+		_, _ = fmt.Fprintf(log, "%sprogress notifications stopped: %v\n%s", prefix, p, debug.Stack())
 	}()
-	if err := n.send(float64(s.progress), float64(s.total), s.message); err != nil {
+	if n.ctx.Err() != nil || n.send(n.ctx, float64(s.progress), float64(s.total), s.message) != nil {
 		n.mu.Lock()
 		n.stopped = true
 		n.mu.Unlock()

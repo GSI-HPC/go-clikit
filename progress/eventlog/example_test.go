@@ -87,7 +87,7 @@ func ExampleNewForwarder() {
 	var last string
 	n := mcpprogress.New(mcpprogress.Options{
 		Program: "server",
-		Send: func(progress, total float64, message string) error {
+		Send: func(_ context.Context, progress, total float64, message string) error {
 			last = fmt.Sprintf("%v/%v %s", progress, total, message)
 			return nil
 		},
@@ -96,7 +96,9 @@ func ExampleNewForwarder() {
 	if _, err := tail.Poll(); err != nil {
 		panic(err)
 	}
-	n.Close()
+	if err := n.Close(context.Background()); err != nil {
+		panic(err)
+	}
 	call.End(nil)
 	server.Close()
 	fmt.Println(last)

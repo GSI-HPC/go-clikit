@@ -6,6 +6,7 @@ package mcpprogress_test
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/GSI-HPC/go-clikit/fanout"
 	"github.com/GSI-HPC/go-clikit/progress"
@@ -13,14 +14,15 @@ import (
 )
 
 // A server runs a call that came with a progress token under a Bus of its
-// own, and closes the Notifier after the Bus, before it answers the call.
-// Send would put the token in the notification and send it on the call's
-// session; here it keeps the last.
+// own, and closes the Notifier after the Bus, before it answers the call,
+// waiting a second at most for a session that has stalled. The Notifier
+// takes the program's name from the Bus. Send would put the token in the
+// notification and send it on the call's session, under ctx; here it
+// keeps the last.
 func Example() {
 	var last string
 	n := mcpprogress.New(mcpprogress.Options{
-		Program: "prog",
-		Send: func(progress, total float64, message string) error {
+		Send: func(_ context.Context, progress, total float64, message string) error {
 			last = fmt.Sprintf("%v/%v %s", progress, total, message)
 			return nil
 		},
@@ -32,7 +34,11 @@ func Example() {
 		func(context.Context, string) (struct{}, error) { return struct{}{}, nil })
 
 	bus.Close()
-	n.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	if err := n.Close(ctx); err != nil {
+		fmt.Println(err)
+	}
 	fmt.Println(last)
 	// Output:
 	// 3/3 probe the nodes: 3/3 done

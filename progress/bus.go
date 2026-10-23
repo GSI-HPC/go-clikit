@@ -196,7 +196,7 @@ func (b *Bus) Classify(err error) Class {
 func (b *Bus) begin() {
 	for _, e := range b.sinks {
 		ts, ok := e.sink.(RunSink)
-		if ok && !e.dead.Load() && !b.safely(func() { ts.Begin(RunInfo{Trace: b.trace, Program: b.program}) }) {
+		if ok && !e.dead.Load() && !b.safely(func() { ts.Begin(RunInfo{Trace: b.trace, Program: b.program, PanicLog: b.panicLog}) }) {
 			b.kill(e)
 		}
 	}
