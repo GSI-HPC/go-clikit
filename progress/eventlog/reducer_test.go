@@ -50,8 +50,8 @@ func draw(r eventlog.Run) string {
 				fmt.Fprintf(&b, " %s=%v", f.key, f.value)
 			}
 		}
-		if s.Exit != nil {
-			fmt.Fprintf(&b, " exit=%d", *s.Exit)
+		if s.HasExit {
+			fmt.Fprintf(&b, " exit=%d", s.Exit)
 		}
 		b.WriteString("\n")
 		for _, c := range s.Children {

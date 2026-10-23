@@ -69,8 +69,7 @@ type Span struct {
 	Name  string
 	Flags progress.Flags
 	State progress.State
-	// Fields are the span's fields, as its latest event says. Exit, when
-	// set, points to a value that is never written through.
+	// Fields are the span's fields, as its latest event says.
 	progress.Fields
 	// Status, Class and Err say how the span ended.
 	Status progress.Status

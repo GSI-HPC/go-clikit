@@ -453,10 +453,10 @@ type Fields struct {
 	// Timeout is the bound of a call, or the length of a wait, as the
 	// work gave it; nothing enforces it.
 	Timeout time.Duration
-	// Exit is the exit code of a command, nil when there was none. Exit,
-	// when set, points to a value every sink of the event shares; a sink
-	// never writes through it.
-	Exit *int
+	// Exit is the exit status of a command, and HasExit says there was
+	// one, so that an Exit of 0 is told from none.
+	Exit    int
+	HasExit bool
 	// Amount is how much of the span's own work is done, and Size how much
 	// there is, in Unit; a Size of 0 is one not known. Neither counts the
 	// work of the spans below. Every event of a span carries the Amount
@@ -599,11 +599,6 @@ type options struct {
 	Fields
 	flags  Flags
 	queued bool
-	// exit is Exit's value until a span takes it: taking the address of
-	// the option's argument would cost an allocation even where nobody
-	// watches.
-	exit    int
-	hasExit bool
 	// work, unit and size are Work's, merged into Fields by apply under
 	// the rule that a unit once given stays.
 	work bool
@@ -615,10 +610,6 @@ type options struct {
 func (o *options) apply(opts []Option) {
 	for _, opt := range opts {
 		opt(o)
-	}
-	if o.hasExit {
-		exit := o.exit
-		o.Exit = &exit
 	}
 	if o.work {
 		if o.Unit == 0 {
@@ -695,8 +686,8 @@ func Source(s string) Option { return func(o *options) { o.Source = s } }
 func Timeout(d time.Duration) Option { return func(o *options) { o.Timeout = d } }
 
 // Exit sets Exit, the exit status of a command the span ran, such as a
-// remote one. It records the status, and ends no process.
-func Exit(code int) Option { return func(o *options) { o.exit, o.hasExit = code, true } }
+// remote one, and HasExit. It records the status, and ends no process.
+func Exit(code int) Option { return func(o *options) { o.Exit, o.HasExit = code, true } }
 
 // Work says that a span reports work in u, out of size; a size of 0 or less
 // is one not known, and a zero u is UnitItems. Start and Update take it:

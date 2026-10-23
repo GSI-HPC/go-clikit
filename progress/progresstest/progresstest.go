@@ -315,8 +315,8 @@ func draw(n *node, repl func(string) string) string {
 	if e.Timeout != 0 {
 		field(&b, "timeout", e.Timeout.String())
 	}
-	if e.Exit != nil {
-		field(&b, "exit", fmt.Sprint(*e.Exit))
+	if e.HasExit {
+		field(&b, "exit", fmt.Sprint(e.Exit))
 	}
 	field(&b, "message", repl(e.Message))
 	if e.Amount != 0 {

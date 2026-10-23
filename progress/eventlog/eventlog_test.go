@@ -185,27 +185,27 @@ func TestDecodeSanitises(t *testing.T) {
 // An exit status is a whole number; anything else is no exit status, not
 // exit 0.
 func TestDecodeExit(t *testing.T) {
-	zero, two := 0, 2
 	for _, tc := range []struct {
 		exit string
-		want *int
+		want int
+		has  bool
 	}{
-		{`"exit":0`, &zero},
-		{`"exit":2`, &two},
-		{`"other":1`, nil},
-		{`"exit":null`, nil},
-		{`"exit":"x"`, nil},
-		{`"exit":1.5`, nil},
-		{`"exit":true`, nil},
-		{`"exit":{}`, nil},
+		{`"exit":0`, 0, true},
+		{`"exit":2`, 2, true},
+		{`"other":1`, 0, false},
+		{`"exit":null`, 0, false},
+		{`"exit":"x"`, 0, false},
+		{`"exit":1.5`, 0, false},
+		{`"exit":true`, 0, false},
+		{`"exit":{}`, 0, false},
 	} {
 		l, err := eventlog.Decode([]byte(`{"v":1,"run":"r","time":"2026-09-25T12:00:00Z","type":"end","span":"0000000000000001",` + tc.exit + `}`))
 		if err != nil {
 			t.Errorf("%s: %v", tc.exit, err)
 			continue
 		}
-		if got := l.Event.Exit; !reflect.DeepEqual(got, tc.want) {
-			t.Errorf("%s: Exit = %v, want %v", tc.exit, got, tc.want)
+		if e := l.Event; e.Exit != tc.want || e.HasExit != tc.has {
+			t.Errorf("%s: Exit, HasExit = %d, %t; want %d, %t", tc.exit, e.Exit, e.HasExit, tc.want, tc.has)
 		}
 	}
 }

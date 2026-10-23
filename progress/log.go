@@ -290,7 +290,6 @@ func (l *Log) Handle(e Event) {
 		Cache:      e.Cache,
 		Source:     e.Source,
 		Timeout:    e.Timeout.Seconds(),
-		Exit:       e.Exit,
 		Amount:     e.Amount,
 		Size:       e.Size,
 
@@ -320,6 +319,10 @@ func (l *Log) Handle(e Event) {
 	}
 	if e.Unit != 0 {
 		line.Unit = e.Unit.String()
+	}
+	if e.HasExit {
+		exit := e.Exit
+		line.Exit = &exit
 	}
 	l.mu.Lock()
 	defer l.mu.Unlock()
