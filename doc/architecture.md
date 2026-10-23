@@ -56,7 +56,7 @@ strict and to read the build info
 | `cobratree/cobratreetest` | `Run`, which runs a command tree in a test and keeps its standard output and standard error apart, and `CheckCommandLines`, which checks the command lines of a manual against the tree | `cobratree`, cobra, pflag |
 | `localweb` | `Listen`, which binds a loopback address or a private Unix socket, `PeerListener`, which closes another user's connections, `ListenerOwner`, which names the user of a listening socket, the checks `Hosts`, `SameOrigin` and `Headers`, `Serve`, which serves with every timeout set, and `Stopping`, which tells a handler that waits that the server stops | none |
 | `localweb/session` | `Manager`, which exchanges the launch token for a session cookie and holds each session's CSRF token, and `NewToken` | `localweb` |
-| `localweb/sse` | `Notifier` and `Subscription`, which tell a stream the exact topics that changed, and `Serve`, which streams a page's fragments as Server-Sent Events, every one first and then those that changed | none |
+| `localweb/sse` | `Notifier` and `Subscription`, which tell a stream the exact topics that changed, and `Serve`, which streams a page's fragments as Server-Sent Events, every one first and then those that changed, until `localweb.Serve` starts to stop | `localweb` |
 | `localweb/localwebtest` | `Login`, a client that signs in and sends requests as the server's own pages do, and `Reader`, which reads the events of a stream | `localweb/session`, `localweb/sse` |
 | `localweb/launch` | `Opener`, which opens the browser on an address through a private file, and `Instance`, the lock and the record that keep one server per user | `localweb`, `golang.org/x/sys` |
 | `localweb/assets` | `Set`, which serves a page's static files at addresses with a hash of them all | none |
@@ -349,7 +349,9 @@ fragment of the page first, since the page may be older than a change
 the stream did not hear of, and then each fragment whose topic changed
 and whose HTML differs from what it last sent. A subscriber that falls
 behind keeps the set of topics it missed, so it renders no more than
-changed. The stream is let in from the page's own origin alone.
+changed. The stream is let in from the page's own origin alone, and
+ends when `localweb.Serve` starts to stop, so that it does not hold the
+stop for the grace period.
 
 A program chains them, outermost first: `Headers`, `Hosts`, `SameOrigin`,
 `session.Manager.Middleware` and its handler; `Serve` serves the chain with every timeout set. Each

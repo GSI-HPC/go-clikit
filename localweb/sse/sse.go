@@ -29,10 +29,11 @@
 //
 //	err := sse.Serve(w, r, &store.notifier, func(changed []string) ([]sse.Event, error) {
 //		return renderFragments(names, changed)
-//	}, sse.Options{Done: serverCtx.Done()})
+//	}, sse.Options{})
 //
 // The stream lifts the write deadline of its connection, which
-// localweb.Serve sets for every other answer.
+// localweb.Serve sets for every other answer, and ends when that server
+// starts to stop (localweb.Stopping).
 package sse
 
 import (
@@ -44,6 +45,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/GSI-HPC/go-clikit/localweb"
 )
 
 // The timings Serve uses when Options leaves them zero.
@@ -82,11 +85,15 @@ type Options struct {
 	// Done ends the stream when it closes, as the context of a server
 	// that stops does: http.Server.Shutdown does not end the requests in
 	// flight, and would wait for a stream until its grace period ends.
+	// nil is the stop signal of localweb.Serve, localweb.Stopping of the
+	// request's context, which never closes for a request that another
+	// server serves.
 	Done <-chan struct{}
 }
 
 // Serve streams the events that render returns to the request r, until
-// the client goes, or o.Done closes. render is called with nil first,
+// the client goes, or o.Done closes, or, when o.Done is nil, the
+// localweb.Serve that serves r starts to stop. render is called with nil first,
 // for every event, and then with the topics of n that changed since its
 // last call, in the order of their first change, for the events that
 // depend on them; an event whose data is what the stream sent last under
@@ -101,6 +108,10 @@ func Serve[T comparable](w http.ResponseWriter, r *http.Request, n *Notifier[T],
 	render func(changed []T) ([]Event, error), o Options,
 ) error {
 	o = o.withDefaults()
+	done := o.Done
+	if done == nil {
+		done = localweb.Stopping(r.Context())
+	}
 	sub := n.Subscribe()
 	defer sub.Close()
 	first, err := render(nil)
@@ -135,7 +146,7 @@ func Serve[T comparable](w http.ResponseWriter, r *http.Request, n *Notifier[T],
 		select {
 		case <-r.Context().Done():
 			return nil
-		case <-o.Done:
+		case <-done:
 			return nil
 		case <-sub.Changed():
 			if timer == nil {
