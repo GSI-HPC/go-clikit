@@ -12,7 +12,7 @@ names it.
 | --- | --- | --- |
 | [1](#1-apache-20-and-gsi-holds-the-copyright) | Apache-2.0, and GSI holds the copyright | accepted, refined by [28](#28-code-of-the-programs-may-move-into-the-kit-under-the-kits-licence) |
 | [2](#2-the-go-line-is-the-oldest-go-release-still-supported) | The go line is the oldest Go release still supported | accepted |
-| [3](#3-what-the-kit-may-require) | What the kit may require | accepted, refined by [22](#22-the-kit-may-require-golangorgxsys-in-cliprogress-alone), [26](#26-golangorgxsys-also-in-fsutil-and-localweb) and [24](#24-the-strict-command-tree-is-the-kits-in-cobratree) |
+| [3](#3-what-the-kit-may-require) | What the kit may require | accepted, refined by [22](#22-the-kit-may-require-golangorgxsys-in-cliprogress-alone), [24](#24-the-strict-command-tree-is-the-kits-in-cobratree), [26](#26-golangorgxsys-also-in-fsutil-and-localweb) and [43](#43-fanout-returns-the-error-of-batches-names-its-limits-and-commits-to-go-nodeset) |
 | [4](#4-a-release-is-a-signed-tag) | A release is a signed tag | accepted, superseded in part by [10](#10-a-daily-audit-holds-the-releases-to-their-record) |
 | [5](#5-progress-and-its-displays-are-the-kits-own) | Progress and its displays are the kit's own | accepted |
 | [6](#6-the-pools-are-the-kits-own) | The pools are the kit's own | accepted, refined by [12](#12-the-programs-identity-lives-on-the-bus) |
@@ -21,30 +21,41 @@ names it.
 | [9](#9-the-region-comes-off-one-line-a-row) | The region comes off one line a row | accepted |
 | [10](#10-a-daily-audit-holds-the-releases-to-their-record) | A daily audit holds the releases to their record | accepted |
 | [11](#11-a-deadline-ends-a-pools-items-as-an-interrupt-does) | A deadline ends a pool's items as an interrupt does | accepted, refined by [12](#12-the-programs-identity-lives-on-the-bus) and [13](#13-the-skip-error-lives-in-progress) |
-| [12](#12-the-programs-identity-lives-on-the-bus) | The program's identity lives on the Bus | accepted |
+| [12](#12-the-programs-identity-lives-on-the-bus) | The program's identity lives on the Bus | accepted, refined by [43](#43-fanout-returns-the-error-of-batches-names-its-limits-and-commits-to-go-nodeset) |
 | [13](#13-the-skip-error-lives-in-progress) | The skip error lives in progress | accepted |
-| [14](#14-the-escape-deny-list-may-grow-in-a-minor-release) | The escape deny-list may grow in a minor release | accepted |
+| [14](#14-the-escape-deny-list-may-grow-in-a-minor-release) | The escape deny-list may grow in a minor release | accepted, refined by [42](#42-termtext-keeps-a-crlf-line-end-and-its-writer-and-limits-take-one-shape) |
 | [15](#15-a-new-or-stricter-check-rule-is-a-breaking-change) | A new or stricter Check rule is a breaking change | accepted |
 | [16](#16-a-large-set-of-targets-is-folded-again-once-a-second) | A large set of targets is folded again once a second | accepted |
 | [17](#17-the-cost-tests-run-in-ci-alone) | The cost tests run in CI, alone | accepted |
 | [18](#18-the-live-clocks-tick-in-tenths-of-a-second) | The live clocks tick in tenths of a second | accepted |
-| [19](#19-the-displays-draw-in-themes-the-program-picks) | The displays draw in themes the program picks | accepted |
-| [20](#20-a-themes-look-may-change-in-a-minor-release) | A theme's look may change in a minor release | accepted |
+| [19](#19-the-displays-draw-in-themes-the-program-picks) | The displays draw in themes the program picks | accepted, refined by [31](#31-cliprogress-keeps-a-default-log-picks-colours-and-asks-questions), [36](#36-the-shapes-and-names-of-the-api-are-settled-before-v1) and [46](#46-displays-themes-cannot-be-changed-and-its-names-follow-decision-36) |
+| [20](#20-a-themes-look-may-change-in-a-minor-release) | A theme's look may change in a minor release | accepted, refined by [46](#46-displays-themes-cannot-be-changed-and-its-names-follow-decision-36) |
 | [21](#21-the-command-lines-glue-for-progress-is-the-kits) | The command line's glue for progress is the kit's | accepted |
 | [22](#22-the-kit-may-require-golangorgxsys-in-cliprogress-alone) | The kit may require golang.org/x/sys, in cliprogress alone | accepted, refined by [26](#26-golangorgxsys-also-in-fsutil-and-localweb) |
-| [23](#23-a-span-reports-its-work-sampled-and-a-sink-rolls-it-up) | A span reports its work, sampled, and a sink rolls it up | accepted |
-| [24](#24-the-strict-command-tree-is-the-kits-in-cobratree) | The strict command tree is the kit's, in cobratree | accepted, refined by [29](#29-cobratree-words-flag-values-carries-exit-statuses-and-shows-help-topics) |
+| [23](#23-a-span-reports-its-work-sampled-and-a-sink-rolls-it-up) | A span reports its work, sampled, and a sink rolls it up | accepted, refined by [44](#44-progress-names-each-thing-once-and-a-nil-bus-is-safe) |
+| [24](#24-the-strict-command-tree-is-the-kits-in-cobratree) | The strict command tree is the kit's, in cobratree | accepted, refined by [29](#29-cobratree-words-flag-values-carries-exit-statuses-and-shows-help-topics) and [39](#39-cobratree-marks-every-error-of-the-command-line-and-strict-takes-options) |
 | [25](#25-the-local-web-server-is-the-kits-in-localweb) | The local web server is the kit's, in localweb | accepted, refined by [34](#34-localweb-guards-a-local-web-server-keeps-its-sessions-and-streams-its-pages) and [35](#35-localweb-starts-a-server-once-opens-the-browser-on-it-and-serves-its-files-and-pages) |
-| [26](#26-golangorgxsys-also-in-fsutil-and-localweb) | golang.org/x/sys also in fsutil and localweb | accepted |
-| [27](#27-progress-over-mcp-is-built-now-in-mcpprogress) | Progress over MCP is built now, in mcpprogress | accepted, refined by [32](#32-mcpprogress-sends-a-line-that-counts-targets-and-stops-on-the-first-failure) and [33](#33-the-kit-reads-its-event-log-back-in-eventlog) |
+| [26](#26-golangorgxsys-also-in-fsutil-and-localweb) | golang.org/x/sys also in fsutil and localweb | accepted, refined by [35](#35-localweb-starts-a-server-once-opens-the-browser-on-it-and-serves-its-files-and-pages) and [37](#37-fsutil-writes-locks-and-checks-the-files-of-a-program) |
+| [27](#27-progress-over-mcp-is-built-now-in-mcpprogress) | Progress over MCP is built now, in mcpprogress | accepted, refined by [32](#32-mcpprogress-sends-a-line-that-counts-targets-and-stops-on-the-first-failure), [33](#33-the-kit-reads-its-event-log-back-in-eventlog) and [44](#44-progress-names-each-thing-once-and-a-nil-bus-is-safe) |
 | [28](#28-code-of-the-programs-may-move-into-the-kit-under-the-kits-licence) | Code of the programs may move into the kit, under the kit's licence | accepted |
-| [29](#29-cobratree-words-flag-values-carries-exit-statuses-and-shows-help-topics) | cobratree words flag values, carries exit statuses and shows help topics | accepted |
-| [30](#30-a-commands-result-is-written-by-cliout-as-a-table-or-as-json-escaped) | A command's result is written by cliout, as a table or as JSON, escaped | accepted |
+| [29](#29-cobratree-words-flag-values-carries-exit-statuses-and-shows-help-topics) | cobratree words flag values, carries exit statuses and shows help topics | accepted, refined by [39](#39-cobratree-marks-every-error-of-the-command-line-and-strict-takes-options) |
+| [30](#30-a-commands-result-is-written-by-cliout-as-a-table-or-as-json-escaped) | A command's result is written by cliout, as a table or as JSON, escaped | accepted, refined by [42](#42-termtext-keeps-a-crlf-line-end-and-its-writer-and-limits-take-one-shape) |
 | [31](#31-cliprogress-keeps-a-default-log-picks-colours-and-asks-questions) | cliprogress keeps a default log, picks colours and asks questions | accepted |
-| [32](#32-mcpprogress-sends-a-line-that-counts-targets-and-stops-on-the-first-failure) | mcpprogress sends a line that counts targets, and stops on the first failure | accepted |
-| [33](#33-the-kit-reads-its-event-log-back-in-eventlog) | The kit reads its event log back, in eventlog | accepted |
-| [34](#34-localweb-guards-a-local-web-server-keeps-its-sessions-and-streams-its-pages) | localweb guards a local web server, keeps its sessions and streams its pages | accepted, refined by [35](#35-localweb-starts-a-server-once-opens-the-browser-on-it-and-serves-its-files-and-pages) |
-| [35](#35-localweb-starts-a-server-once-opens-the-browser-on-it-and-serves-its-files-and-pages) | localweb starts a server once, opens the browser on it, and serves its files and pages | accepted |
+| [32](#32-mcpprogress-sends-a-line-that-counts-targets-and-stops-on-the-first-failure) | mcpprogress sends a line that counts targets, and stops on the first failure | accepted, refined by [44](#44-progress-names-each-thing-once-and-a-nil-bus-is-safe) |
+| [33](#33-the-kit-reads-its-event-log-back-in-eventlog) | The kit reads its event log back, in eventlog | accepted, refined by [45](#45-eventlog-tells-a-newer-log-apart-and-forwards-one-run) |
+| [34](#34-localweb-guards-a-local-web-server-keeps-its-sessions-and-streams-its-pages) | localweb guards a local web server, keeps its sessions and streams its pages | accepted, refined by [35](#35-localweb-starts-a-server-once-opens-the-browser-on-it-and-serves-its-files-and-pages) and [40](#40-localweb-takes-one-form-for-each-hook-and-stops-its-streams-with-the-server) |
+| [35](#35-localweb-starts-a-server-once-opens-the-browser-on-it-and-serves-its-files-and-pages) | localweb starts a server once, opens the browser on it, and serves its files and pages | accepted, refined by [41](#41-launch-waits-under-a-context-page-limits-its-includes-and-htmx-restores-history-as-a-page) |
+| [36](#36-the-shapes-and-names-of-the-api-are-settled-before-v1) | The shapes and names of the API are settled before v1 | accepted |
+| [37](#37-fsutil-writes-locks-and-checks-the-files-of-a-program) | fsutil writes, locks and checks the files of a program | accepted |
+| [38](#38-doctor-reports-a-programs-checks-in-fixed-words-and-text) | doctor reports a program's checks in fixed words and text | accepted |
+| [39](#39-cobratree-marks-every-error-of-the-command-line-and-strict-takes-options) | cobratree marks every error of the command line, and Strict takes options | accepted |
+| [40](#40-localweb-takes-one-form-for-each-hook-and-stops-its-streams-with-the-server) | localweb takes one form for each hook, and stops its streams with the server | accepted |
+| [41](#41-launch-waits-under-a-context-page-limits-its-includes-and-htmx-restores-history-as-a-page) | launch waits under a context, page limits its includes, and htmx restores history as a page | accepted |
+| [42](#42-termtext-keeps-a-crlf-line-end-and-its-writer-and-limits-take-one-shape) | termtext keeps a CRLF line end, and its writer and limits take one shape | accepted |
+| [43](#43-fanout-returns-the-error-of-batches-names-its-limits-and-commits-to-go-nodeset) | fanout returns the error of Batches, names its limits, and commits to go-nodeset | accepted |
+| [44](#44-progress-names-each-thing-once-and-a-nil-bus-is-safe) | progress names each thing once, and a nil Bus is safe | accepted |
+| [45](#45-eventlog-tells-a-newer-log-apart-and-forwards-one-run) | eventlog tells a newer log apart, and forwards one run | accepted |
+| [46](#46-displays-themes-cannot-be-changed-and-its-names-follow-decision-36) | display's themes cannot be changed, and its names follow decision 36 | accepted |
 
 ## 1. Apache-2.0, and GSI holds the copyright
 
@@ -149,9 +160,7 @@ since v0.42.0 requires Go 1.26.
 
 ## 3. What the kit may require
 
-Status: accepted, refined by
-[decision 22](#22-the-kit-may-require-golangorgxsys-in-cliprogress-alone)
-and [decision 24](#24-the-strict-command-tree-is-the-kits-in-cobratree)
+Status: accepted, refined by [22](#22-the-kit-may-require-golangorgxsys-in-cliprogress-alone), [24](#24-the-strict-command-tree-is-the-kits-in-cobratree) and [43](#43-fanout-returns-the-error-of-batches-names-its-limits-and-commits-to-go-nodeset)
 
 ### Context
 
@@ -626,7 +635,7 @@ own time.
 
 ## 12. The program's identity lives on the Bus
 
-Status: accepted
+Status: accepted, refined by [43](#43-fanout-returns-the-error-of-batches-names-its-limits-and-commits-to-go-nodeset)
 
 ### Context
 
@@ -724,7 +733,7 @@ away from for `errors.Is` and a sentinel.
 
 ## 14. The escape deny-list may grow in a minor release
 
-Status: accepted
+Status: accepted, refined by [42](#42-termtext-keeps-a-crlf-line-end-and-its-writer-and-limits-take-one-shape)
 
 ### Context
 
@@ -920,7 +929,7 @@ told at a glance from a display that has stopped drawing.
 
 ## 19. The displays draw in themes the program picks
 
-Status: accepted, refined by [31](#31-cliprogress-keeps-a-default-log-picks-colours-and-asks-questions)
+Status: accepted, refined by [31](#31-cliprogress-keeps-a-default-log-picks-colours-and-asks-questions), [36](#36-the-shapes-and-names-of-the-api-are-settled-before-v1) and [46](#46-displays-themes-cannot-be-changed-and-its-names-follow-decision-36)
 
 ### Context
 
@@ -994,7 +1003,7 @@ emoji pictures, and fonts lack some, DejaVu Sans Mono all of braille.
 
 ## 20. A theme's look may change in a minor release
 
-Status: accepted
+Status: accepted, refined by [46](#46-displays-themes-cannot-be-changed-and-its-names-follow-decision-36)
 
 ### Context
 
@@ -1195,7 +1204,7 @@ requirement all the same. The calls cost 4,096 bytes on linux/amd64 and
 
 ## 23. A span reports its work, sampled, and a sink rolls it up
 
-Status: accepted
+Status: accepted, refined by [44](#44-progress-names-each-thing-once-and-a-nil-bus-is-safe)
 
 ### Context
 
@@ -1247,7 +1256,7 @@ each copy something showed its share done only as targets ended.
 
 ## 24. The strict command tree is the kit's, in cobratree
 
-Status: accepted, refined by [29](#29-cobratree-words-flag-values-carries-exit-statuses-and-shows-help-topics)
+Status: accepted, refined by [29](#29-cobratree-words-flag-values-carries-exit-statuses-and-shows-help-topics) and [39](#39-cobratree-marks-every-error-of-the-command-line-and-strict-takes-options)
 
 ### Context
 
@@ -1409,7 +1418,7 @@ others only if someone remembers it.
 
 ## 26. golang.org/x/sys also in fsutil and localweb
 
-Status: accepted. Refines [22](#22-the-kit-may-require-golangorgxsys-in-cliprogress-alone).
+Status: accepted, refined by [35](#35-localweb-starts-a-server-once-opens-the-browser-on-it-and-serves-its-files-and-pages) and [37](#37-fsutil-writes-locks-and-checks-the-files-of-a-program). Refines [22](#22-the-kit-may-require-golangorgxsys-in-cliprogress-alone).
 
 ### Context
 
@@ -1441,7 +1450,7 @@ without libc, which Apple does not support (decision 22). Without
 
 ## 27. Progress over MCP is built now, in mcpprogress
 
-Status: accepted, refined by [32](#32-mcpprogress-sends-a-line-that-counts-targets-and-stops-on-the-first-failure) and [33](#33-the-kit-reads-its-event-log-back-in-eventlog)
+Status: accepted, refined by [32](#32-mcpprogress-sends-a-line-that-counts-targets-and-stops-on-the-first-failure), [33](#33-the-kit-reads-its-event-log-back-in-eventlog) and [44](#44-progress-names-each-thing-once-and-a-nil-bus-is-safe)
 
 ### Context
 
@@ -1505,7 +1514,7 @@ the kit's copyright.
 
 ## 29. cobratree words flag values, carries exit statuses and shows help topics
 
-Status: accepted. Refines [24](#24-the-strict-command-tree-is-the-kits-in-cobratree).
+Status: accepted, refined by [39](#39-cobratree-marks-every-error-of-the-command-line-and-strict-takes-options). Refines [24](#24-the-strict-command-tree-is-the-kits-in-cobratree).
 
 ### Context
 
@@ -1565,7 +1574,7 @@ plumbing next to it, each its own way:
 
 ## 30. A command's result is written by cliout, as a table or as JSON, escaped
 
-Status: accepted
+Status: accepted, refined by [42](#42-termtext-keeps-a-crlf-line-end-and-its-writer-and-limits-take-one-shape)
 
 ### Context
 
@@ -1679,7 +1688,7 @@ program.
 
 ## 32. mcpprogress sends a line that counts targets, and stops on the first failure
 
-Status: accepted
+Status: accepted, refined by [44](#44-progress-names-each-thing-once-and-a-nil-bus-is-safe)
 
 ### Context
 
@@ -1719,7 +1728,7 @@ wrote the stack of a panic under its own name.
 
 ## 33. The kit reads its event log back, in eventlog
 
-Status: accepted
+Status: accepted, refined by [45](#45-eventlog-tells-a-newer-log-apart-and-forwards-one-run)
 
 ### Context
 
@@ -1775,7 +1784,7 @@ lets the two be tested against each other.
 
 ## 34. localweb guards a local web server, keeps its sessions and streams its pages
 
-Status: accepted, refined by [35](#35-localweb-starts-a-server-once-opens-the-browser-on-it-and-serves-its-files-and-pages). Refines [25](#25-the-local-web-server-is-the-kits-in-localweb).
+Status: accepted, refined by [35](#35-localweb-starts-a-server-once-opens-the-browser-on-it-and-serves-its-files-and-pages) and [40](#40-localweb-takes-one-form-for-each-hook-and-stops-its-streams-with-the-server). Refines [25](#25-the-local-web-server-is-the-kits-in-localweb).
 
 ### Context
 
@@ -1894,7 +1903,7 @@ out, so they come first.
 
 ## 35. localweb starts a server once, opens the browser on it, and serves its files and pages
 
-Status: accepted. Refines [25](#25-the-local-web-server-is-the-kits-in-localweb) and [34](#34-localweb-guards-a-local-web-server-keeps-its-sessions-and-streams-its-pages).
+Status: accepted, refined by [41](#41-launch-waits-under-a-context-page-limits-its-includes-and-htmx-restores-history-as-a-page). Refines [25](#25-the-local-web-server-is-the-kits-in-localweb) and [34](#34-localweb-guards-a-local-web-server-keeps-its-sessions-and-streams-its-pages).
 
 ### Context
 
@@ -1998,3 +2007,611 @@ on which decision 25 meant the launcher to build, is not built.
 - A program that wants a newer htmx waits for a release of the kit.
 - `launch` carries a check of a private directory that `fsutil` will take
   over.
+
+## 36. The shapes and names of the API are settled before v1
+
+Status: accepted. Refines [19](#19-the-displays-draw-in-themes-the-program-picks).
+
+### Context
+
+A review of the API at v0.9.0 read every exported name of the kit, about
+470 in 21 packages, and found the same concept in two or more shapes
+across the packages, which are meant to be used together: enum constants
+with a type prefix and without one, options named as nouns and one named
+`WithFlags`, `Options` in a package with several configurable types, a
+constructor that returns an interface, `Check*` that fails a test in one
+function and returns an error in the next, a negative value that means
+"no limit", a panic or a limit of zero, blocking calls without a context,
+a nil `*Bus` safe for three of its methods, settings that can change after
+construction, and `Colours` beside `Canceled`. Each fix renames or
+reshapes API, and v0 allows that in a minor release; after v1 it costs a
+major version.
+
+This decision sets one rule for each of those concepts. The findings
+behind them are the prefixes of enum constants (PR-05, XP-08, NM-02),
+options (PR-06, NM-09), options structs (EL-03, NM-10), constructors
+(TF-05, EL-09), test helpers (CT-09), zero and negative values (TF-02,
+LW-04, LW-13), contexts (LW-09, XP-02, TF-08, TF-10), nil receivers and
+hooks (PR-02, TF-07), state after construction (XP-10, XP-12) and
+spelling (NM-11). Decisions 39 to 46 apply the rules package by package,
+and settle those findings in code.
+
+### Decision
+
+These rules hold for the API of every package, and a new API keeps them:
+
+- Every constant of an enum type takes its type as a prefix:
+  `UnitBytes`, `StreamStdout`, `FlagHidden`, `BoundSize`, `StatusOK`.
+- An option is a bare noun, such as `progress.Host` or `progress.Flagged`.
+  `With*` names only a helper that returns a context, such as
+  `progress.WithBus`. A later name that would collide takes another noun,
+  never a `With`.
+- A package with more than one configurable type names each options
+  struct after its type: `XxxOptions`. A package with one may keep
+  `Options`.
+- `NewX` returns a concrete pointer, `*X`, never an interface, so that a
+  method can be added after v1.
+- A function named `Check*` takes a `testing.TB` and fails the test
+  through it. A function that returns an error takes another verb, such
+  as `Validate*`.
+- Each package states one rule for zero and negative values per family of
+  fields, in its package doc or on the options type. Zero is the default.
+  An option never panics because it is negative: it is refused with an
+  error at construction, or it means off, as the package states.
+- Every call that can block takes a `context.Context`, and returns the
+  context's error, wrapped, when the context ends first.
+- Every method of a type that `progress.BusFrom` can return as nil is safe
+  on a nil receiver. A hook that a type cannot work without is checked
+  when the type is made, not on first use.
+- Options are fixed when a value is made. The kit keeps no package state
+  that a caller can change, such as an exported variable that other
+  functions read.
+- Identifiers use American spelling, as Go and its standard library do:
+  `Colors`, not `Colours`. Comments and documentation stay in British
+  English. This refines decision 19, which named `Colours`.
+- A rename keeps the old name for one minor release, as a deprecated
+  alias: a type alias, a constant or variable, a wrapper function or
+  method, or, for a field of an options struct, a deprecated field that
+  the code still reads while the new field is zero. Its `Deprecated:`
+  paragraph ends with `(decision 36)`. `.golangci.yml` hides staticcheck's
+  SA1019 for these paragraphs alone, so that the kit's own callers in
+  other packages keep compiling and linting during that release, while a
+  deprecation of the standard library or of a requirement is still
+  reported.
+- A change that cannot keep an alias, such as a new signature or a field
+  of another type, is a breaking change, named in the release notes and in
+  the decision that makes it.
+
+### Costs
+
+- Every program that uses the kit changes names, mostly mechanically,
+  over v0.10.0 and v0.11.0. The aliases let it do so in its own time
+  within that window.
+- v0.11.0 moves the kit's own callers to the new names, deletes every
+  alias marked `(decision 36)` and the SA1019 exclusion. A program still
+  on an old name then fails to compile.
+- For one release, two names for one thing are on pkg.go.dev. The
+  deprecation notice says which one to use.
+
+## 37. fsutil writes, locks and checks the files of a program
+
+Status: accepted. Refines [26](#26-golangorgxsys-also-in-fsutil-and-localweb).
+
+### Context
+
+clusterctl's `internal/fileutil`, sind's `atomicfile` and brig's
+`WriteFileAtomic` each write a file through a temporary file and a rename,
+and clusterctl's also takes a lock beside a shared file and refuses
+configuration that another user could have written. They differ in the
+fixes each has: clusterctl keeps the owner, mode and group of a file that
+several administrators share and syncs the directory; sind removes the
+temporary file on every error path; brig follows a symbolic link at the
+path. Decision 25 planned `fsutil` before the web side, and decision 26
+gave it `golang.org/x/sys`, but the web side came first, and the review
+of v0.9.0 found decision 26 and depguard naming a package that did not
+exist (XP-05). This decision makes it.
+
+### Decision
+
+- A package `fsutil` holds, from clusterctl's `fileutil` without its cache,
+  with the fixes of sind and brig added:
+  - `WriteAtomic(path, data, perm)` writes a temporary file in the
+    directory of `path`, syncs it, closes it, renames it over `path` and
+    syncs the directory. A file that exists keeps its mode and group, and
+    its owner where this user can keep it; write permission for others is
+    never kept. A new file gets exactly `perm`, set with `Chmod` after it
+    is made, whatever the umask. A symbolic link at `path` is written
+    through, not replaced, for at most 40 links. The temporary file is
+    removed on every error path.
+  - `Lock(ctx, path, wait)` takes an exclusive `flock` of the sibling
+    lock file `.NAME.lock`, clusterctl's name, and returns the function
+    that lets it go, which may be called more than once. The lock file is
+    made as clusterctl makes it: readable
+    by the group that can write the locked file, so that every
+    administrator of a shared file can take its lock. `Lock` polls until
+    it holds the lock, until `ctx` ends, when it returns the context's
+    error wrapped, or until `wait` passes, when it returns an error that
+    matches `context.DeadlineExceeded` and names the process that holds
+    the lock, on Linux from `/proc/locks`. A `wait` of zero or less waits
+    until `ctx` ends. `DefaultLockWait` is 30 seconds, clusterctl's.
+  - `Update(ctx, path, perm, change)` reads the file under `Lock`, with
+    `DefaultLockWait`, a missing file as nil data, and writes what
+    `change` returns with `WriteAtomic`. When `change` returns an error,
+    nothing is written.
+  - `EnsureDir(dir)` makes a directory of mode 0700 and refuses one that
+    is a symbolic link, is not a directory, is another user's, or that its
+    group or others can write. It does not repair a mode that is too wide:
+    the error says what to run, as clusterctl's does.
+  - `CheckTrusted(path)` refuses a file or directory, or any of its
+    ancestors, that a user other than this one or root could have
+    written: one another user owns, one its group or others can write, or
+    an ancestor its group or others can write without the sticky bit.
+    Every refusal matches `ErrUntrusted`.
+- On Unix the lock is `flock(2)` from `syscall` or `golang.org/x/sys`
+  (decision 26). On a system that is not Unix, `Lock` and `EnsureDir`
+  return an error that matches `errors.ErrUnsupported`.
+- `fsutil` reads no environment and keeps no state a caller can change.
+- These are interfaces of the kit: the name and the mode of the lock
+  file, so that a program that adopts `fsutil` and an older build of it
+  that has its own copy exclude each other, and `ErrUntrusted`. The texts
+  of the errors are not.
+- The files move under decision 28; each program deletes its own copy in
+  its adoption commit.
+
+### Costs
+
+- `localweb/launch` and `cliprogress` keep their own lock and their own
+  check of a private file until a later release moves them onto `fsutil`.
+- A lock of `flock(2)` does not hold across machines on every NFS server;
+  a program with shared files on NFS keeps the rule it has.
+
+## 38. doctor reports a program's checks in fixed words and text
+
+Status: accepted
+
+### Context
+
+This decision and decision 37 bring the two packages that decision 25
+planned before the web side. Neither settles a finding of the review of
+v0.9.0.
+
+sind and clusterctl each have a `doctor` command, and brig has its
+preflight: a list of checks of the machine, each ok, a warning or a
+failure, written for a person and, in clusterctl, as JSON. sind writes a
+check mark and a cross with the detail, and a remediation after a failed
+check; clusterctl writes `name`, `status` and `detail` as JSON and a
+caption of the counts; brig has an enum of statuses and a hint. The UI
+convention gives a doctor page the go-to key `g d`. The checks differ by
+program; the way their result is written does not have to.
+
+### Decision
+
+- A package `doctor` holds `Status`, with `StatusOK`, `StatusWarning` and
+  `StatusFailed`, whose values are the words `ok`, `warning` and `failed`;
+  `Check`, with `Name`, `Status`, `Detail` and `Remediation`; `Worst`,
+  `Count` and `Write`. It imports `termtext` alone.
+- `Worst` orders failed above warning above ok, and returns ok for no
+  checks. A status that is none of the three counts as failed in `Worst`
+  and `Count`, so a mistake fails closed.
+- `Write` writes one line for each check, `MARK NAME` or
+  `MARK NAME: DETAIL`, with the mark `✓` for ok, `!` for a warning and `✗`
+  for a failure. After the lines it writes each distinct remediation
+  once, in the order it first appears, set off by blank lines. Every name,
+  detail and remediation is escaped with `termtext`. It returns the first
+  write error.
+- These are interfaces of the kit, which a script or a test of a program
+  may read: the three words, the JSON keys `name`, `status`, `detail` and
+  `remediation` (the last two left out when empty), and the text `Write`
+  writes, which a test of `doctor` holds byte for byte.
+- What stays in the program: the checks, their names and texts, the
+  command and its flags, and the exit status of a failed check (decision
+  21). The kit has no exit code.
+
+### Costs
+
+- sind shows `!` for a warning where it showed a cross, and writes its
+  remediations after all the lines; clusterctl gains `remediation`.
+- A new mark or word is a breaking change.
+
+## 39. cobratree marks every error of the command line, and Strict takes options
+
+Status: accepted. Refines [24](#24-the-strict-command-tree-is-the-kits-in-cobratree) and [29](#29-cobratree-words-flag-values-carries-exit-statuses-and-shows-help-topics).
+
+### Context
+
+The review of v0.9.0 found that `IsUsage` misses cobra's errors for a
+required flag and for flag groups (CT-01); a runnable root with
+subcommands stays as lenient as cobra and ignores `moved` (CT-02);
+`Strict` and `HelpTopics` work only in one order, nothing tells when they
+are called in the other, and `Strict(root, moved)` cannot take a new
+setting (CT-04); the topics cannot be listed, so completion does not offer
+them (CT-10); `Strict` makes a group runnable, which adds a line to its
+usage (CT-05); the merge of `Resolve` cannot be tested from outside, and
+its name does not say build info (CT-07, NM-08); `Coded` accepts the
+status 0 (CT-08); and `CheckCommandLine` returns an error while
+`CheckCommandLines` fails a test (CT-09). `HelpTopics` on a tree without
+subcommands takes the root over (CT-03), and `CheckCommandLine` refuses
+arguments that a runnable group takes (CT-06): two bugs, fixed in the same
+release, that take no decision.
+
+### Decision
+
+- `Strict` marks the errors of a required flag and of a flag group as
+  usage errors: the check it installs calls cobra's
+  `ValidateRequiredFlags` and `ValidateFlagGroups` and wraps their errors
+  with `Usage`, on every runnable command, one without `Args` included.
+  A program that exits with 2 for a usage error now does so for these too.
+- A runnable root with subcommands and no `Args` is strict as a group is:
+  a word that names no command is refused, with the hint of `moved`.
+- `Strict(root, opts...)` takes options: `Moved(map[string]string)`, and
+  `Topics(lookup, names)`, which shows help topics after the strict checks
+  and adds `names()` to the completion of `help`. The old signature
+  `Strict(root, moved)` breaks, as no alias can keep it; a call
+  `Strict(root, nil)` becomes `Strict(root)`. `HelpTopics` stays for one
+  release as a deprecated wrapper (decision 36), and panics when it and
+  `Strict` are called in the order that would lose the topics.
+- A group stays runnable, so that it can refuse a word that names no
+  command, and its usage keeps the extra line. The doc of `Strict` says so.
+- `Coded` with a status of zero or less returns the error unchanged, so
+  that `Status` gives the default.
+- `(BuildInfo).Resolve(version, commit)` is the merge, callable on a
+  `BuildInfo` a test builds. The function `Resolve` stays for one release
+  as a deprecated wrapper. `BuildInfo` stays in `cobratree`; decision 29
+  stands, and a package of its own is not made for now.
+- `cobratreetest.CheckCommandLine` becomes `ValidateCommandLine`; the old
+  name stays for one release as a deprecated wrapper.
+- The texts of decisions 24 and 29 do not change; the errors of a
+  required flag and of a flag group are cobra's texts.
+
+### Costs
+
+- A program whose tests expect its general exit status for a missing
+  required flag changes them.
+- Every call of `Strict` with a second argument changes.
+
+## 40. localweb takes one form for each hook, and stops its streams with the server
+
+Status: accepted. Refines [34](#34-localweb-guards-a-local-web-server-keeps-its-sessions-and-streams-its-pages).
+
+### Context
+
+The review of v0.9.0 found that the `Refuser` reaches the checks in three
+ways, an argument of `Hosts`, a field of `Origin` and a field of
+`session.Options`, and that `CrossSite` takes it and ignores it (LW-06,
+XP-03); `Origin` is a policy and `Options.Cookie` a prefix (LW-07,
+NM-06); `Sessions` nearly repeats its package (NM-05); `session.New`
+takes a cookie prefix or a header that `net/http` will not send (LW-03);
+a negative `KeepAlive` panics, a negative `Retry` is sent as it is, and a
+negative `MaxBody` becomes a limit of zero (LW-04, LW-13); an open stream
+holds a stopping server for its whole grace period unless the program
+connects `Done` itself (LW-05); `PeerListener` closes every connection of
+a listener that is not TCP (LW-10); `Login` promises a check it does not
+make, and a test cannot read the CSRF token (LW-11); one frozen message is
+written in two packages (LW-12); and `Format` writes a name with a line
+break (LW-14).
+
+### Decision
+
+- A `Refuser` is always a field `Refuse` of an options struct:
+  `Hosts(answers, HostsOptions)`, `OriginPolicy` and `session.Options`.
+  `Hosts` panics when it is made with a nil `answers`. `CrossSite` ignores
+  `Refuse`, as its doc says.
+- Renames, each with a deprecated alias (decision 36): `localweb.Origin`
+  to `OriginPolicy`; `session.Sessions` to `Manager`; the fields of
+  `session.Options` `Cookie` to `CookiePrefix`, `Header` to `CSRFHeader`
+  and `Field` to `CSRFField`; and `DefaultField` to `DefaultCSRFField`.
+- `session.New` refuses a cookie prefix that does not make a valid cookie
+  name with a port after it, and a CSRF header that is not a valid header
+  name, and its error names the field.
+- One rule for the values of every `localweb` option: zero is the
+  default; a negative duration turns the thing off, as `ServeOptions`
+  already says: `sse.Options.KeepAlive` sends no keep-alive, `Retry` sends
+  no `retry` field, and `Coalesce` gathers nothing. A negative size that
+  caps what a client may send to the program, `session.Options.MaxBody`,
+  is refused by `New`, since no cap would let any page of the user's fill
+  the program's memory.
+- `localweb.Serve` puts its stop signal in the context of every request,
+  and `localweb.Stopping(ctx)` returns it. `sse.Serve` ends its stream on
+  it when `Options.Done` is nil, so a stream no longer holds a stopping
+  server for its grace period.
+- `PeerListener` returns an error for a listener whose address is not
+  TCP, on every system.
+- `localweb.MisdirectedRefusal(host)` holds the frozen refusal of a Host,
+  which `Hosts` and `session.Middleware` both use. Its text does not
+  change.
+- `sse.Format` drops a carriage return and a line feed from an event's
+  name, so that no name adds a field or an event to the stream. `Serve`
+  still refuses such a name.
+- `localwebtest.Login` follows the redirect of the sign-in and fails
+  unless the page answers 2xx, and `(*Client).CSRF(tb, path)` reads the
+  CSRF token from a page as `session` writes it.
+- The interfaces of decision 34 do not change.
+
+### Costs
+
+- Every program that sets a `Refuser` on `Hosts` or `Origin` changes the
+  call; the renames can wait one release.
+- A program that passed a negative `MaxBody` now fails to start.
+
+## 41. launch waits under a context, page limits its includes, and htmx restores history as a page
+
+Status: accepted. Refines [35](#35-localweb-starts-a-server-once-opens-the-browser-on-it-and-serves-its-files-and-pages).
+
+### Context
+
+The review of v0.9.0 found that a template that includes itself crashes
+the process, which `recover` cannot stop, since `include` starts the
+depth limit of `text/template` again on each call (LW-01); htmx 2.0.11
+sends `HX-Request: true` on a history restore, so with the history cache
+off (`htmx.Config`) a handler that checks `IsHTMX` answers the back button
+with a fragment (LW-02); `assets.Assets` repeats its package and the
+version constants of `htmx` do not pair with its files (LW-08, XP-13,
+NM-07); `page.Options.Reload` is the switch `assets` calls `Dev` (NM-04);
+and `launch.Acquire` and `Retire` wait for a lock with no limit and no
+context (LW-09, XP-02).
+
+### Decision
+
+- `include` counts how deep it is nested in one render and returns an
+  error past `page.MaxIncludeDepth`, 100.
+- `IsHTMX` is false for a request with `HX-History-Restore-Request: true`,
+  and `htmx.Config` adds `"historyRestoreAsHxRequest": false`, so htmx
+  does not mark a history restore as its request at all. `htmx.Config` is
+  an interface (decision 35), so this is a breaking change: a page that
+  pins the Config in a test changes it.
+- Renames, each with a deprecated alias (decision 36): `assets.Assets` to
+  `assets.Set`; `htmx.Version` to `ScriptVersion` and
+  `htmx.IdiomorphVersion` to `MorphVersion`, in pairs with `Script`,
+  `SSE`/`SSEVersion` and `Morph`; `page.Options.Reload` to `Dev`, read as
+  before while `Dev` is false.
+- `launch.Acquire(ctx, runtimeDir, program)` and `(*Instance).Retire(ctx)`
+  poll the lock until they hold it or `ctx` ends, and then return the
+  context's error, wrapped. The signatures break; no alias can keep them.
+- The names, record, addresses, headers and script versions of decision
+  35 do not change.
+
+### Costs
+
+- Every program that calls `Acquire` or `Retire` passes a context.
+- A program with a test that pins `htmx.Config` changes it.
+
+## 42. termtext keeps a CRLF line end, and its writer and limits take one shape
+
+Status: accepted. Refines [14](#14-the-escape-deny-list-may-grow-in-a-minor-release) and [30](#30-a-commands-result-is-written-by-cliout-as-a-table-or-as-json-escaped).
+
+### Context
+
+The review of v0.9.0 found that `EscapeLines` and `NewEscapeWriter` show
+a literal `\r` at the end of every line of output with CRLF line ends,
+which `ssh -t` and a Windows host write, although a carriage return just
+before a line feed cannot overwrite anything (TF-04); `NewEscapeWriter`
+returns `io.WriteCloser` where every other constructor returns its type
+(TF-05); `Truncate` and `Wrap` name the width differently and read zero in
+opposite ways (TF-06); and `cliout.Table.Add` keeps the caller's slice, so
+a reused row buffer changes every row (PR-04).
+
+### Decision
+
+- The CRLF rule: in `EscapeLines` and the writer of `NewEscapeWriter`, a
+  carriage return immediately before a line feed is part of the line end
+  and is written as it is, `\r\n`. A carriage return anywhere else is
+  escaped as before, and `Escape`, for one line, escapes every carriage
+  return. The writer holds a carriage return at the end of a write until
+  the next byte says which it is. The escape policy in the package doc
+  states the rule.
+- This takes a rune out of the escaped set in one place, which decision
+  14 makes a breaking change: output that showed `\r` at its line ends
+  shows none.
+- `NewEscapeWriter` returns `*EscapeWriter`; a caller that holds an
+  `io.WriteCloser` still compiles.
+- `Wrap(s, cols, ...)` names its width as `Truncate` does. The package
+  doc states both zero rules together: `Truncate` with zero or fewer
+  columns returns "", and `Wrap` with zero or fewer never breaks a line.
+- `cliout.Table.Add` copies the cells it is given. What `cliout` writes
+  (decision 30) does not change.
+
+### Costs
+
+- A program whose tests expect `\r` at line ends changes them.
+
+## 43. fanout returns the error of Batches, names its limits, and commits to go-nodeset
+
+Status: accepted. Refines [3](#3-what-the-kit-may-require) and [12](#12-the-programs-identity-lives-on-the-bus).
+
+### Context
+
+The review of v0.9.0 found that `Batches` drops the error that ended its
+step, the gap decision 12 closed in `Map` (TF-01); `BatchOptions.Limit`
+limits nothing, and the zero of each limit means something else (TF-02);
+`Failure` reads as an error type but is a function, its error type is
+unexported, `Failed` is an adjective and `Item` describes an item
+(TF-03); `MapOptions.Noun` is a string where `cliprogress` and `display`
+take a function (NM-03); and `Keyed.Acquire` returns no error after the
+context ended when it is given no key (TF-10). It also found that
+`*nodeset.NodeSet` is in three exported signatures of `fanout`, the only
+type of a requirement in the kit's API, while decision 3 allows
+go-nodeset only to fold node names (XP-01).
+
+### Decision
+
+- `Batches` returns `([]Batch, error)`, the error that ended the step, as
+  `Map` does. The signature breaks.
+- `BatchOptions.Limit` becomes `ReportLimit`, with the old field read
+  while the new one is zero. The package doc lists the zero rule of every
+  limit: `Map` and `Each` take 16 for less than 1, `Keyed` 1, and
+  `ReportLimit` 0 records nothing.
+- `Failed` becomes `FailedItem` and `Item` becomes `ItemInfo`, each with
+  a deprecated alias. The error of a step is the exported
+  `*FailureError`, which `errors.As` finds, with its `Summary`; `Failure`
+  stays for one release as a deprecated constructor of it.
+- `MapOptions.Noun` is a `func(n int) string`, as in `cliprogress` and
+  `display`; nil leaves the noun out. The type of the field changes.
+- `Keyed.Acquire` checks the context before it looks at any key.
+- `*nodeset.NodeSet` in `BatchOptions.Before`, `Batch.Nodes` and
+  `Batches` is a commitment of the API: go-nodeset v2 would make
+  go-clikit v2. This refines decision 3, which allowed go-nodeset only to
+  fold names. Taking `[]string`, or a small interface, and keeping
+  go-nodeset inside was weighed and left: a batch of a power action is a
+  node set in every program that runs one, and each would fold and unfold
+  the names at the call.
+
+### Costs
+
+- Every caller that assigns the result of `Batches`, or sets
+  `MapOptions.Noun`, changes.
+- A major version of go-nodeset that changes `NodeSet` waits for a major
+  version of the kit, or the kit moves to its own type then.
+
+## 44. progress names each thing once, and a nil Bus is safe
+
+Status: accepted. Refines [23](#23-a-span-reports-its-work-sampled-and-a-sink-rolls-it-up), [27](#27-progress-over-mcp-is-built-now-in-mcpprogress) and [32](#32-mcpprogress-sends-a-line-that-counts-targets-and-stops-on-the-first-failure).
+
+### Context
+
+The review of v0.9.0 found in `progress`, `cliprogress` and `mcpprogress`:
+`Span.Update` ignores every option but the total, the message and the
+work (PR-01); a nil `*Bus` panics in `Trace`, `TraceContext` and `Close`
+(PR-02); a program cannot hand its current span to a child as a
+`traceparent` (PR-03); constants without a type prefix (PR-05, XP-08,
+NM-02); `WithFlags` among options that are nouns, and `HTTP` beside
+`HTTPStatus` (PR-06, NM-09); `Run` naming a header, a verb, a command's
+lifecycle and a snapshot, and the run ID spelt three ways (PR-07, XP-09,
+NM-01); `Trace` meaning a `TraceID` in some places and a `TraceContext`
+in others (PR-08, XP-04); an unnamed note from `Choose` (PR-09); probes
+that take different types (PR-10); a shared `*int` in an `Event` of plain
+data (PR-11); `CountWriter` and `CountReader`, which hide the fast paths
+of `io.Copy` and suggest the type `Count` (PR-12); `Meter` and `Tally`,
+which read differently with no reason given (PR-13); defaults that only
+some packages export (XP-11); and an `mcpprogress.New` that takes a nil
+`Send`, a `Send` without a context, a `Close` that can wait for ever, and
+options that repeat the Bus (TF-07, TF-08, TF-09).
+
+### Decision
+
+- Constants take their type's prefix: `UnitItems`, `UnitBytes`,
+  `UnitPercent`; `StreamStdout`, `StreamStderr`; `FlagHidden`,
+  `FlagFold`, `FlagShowLines`, `FlagDryRun`; `BoundNone`, `BoundSize`,
+  `BoundTargets`, `BoundChildren`. Their words in the log do not change.
+- Options: `WithFlags` becomes `Flagged`, `HTTP` becomes `HTTPRequest`.
+  `Timeout` records a value and enforces nothing, and `Exit` records a
+  status; their docs say so.
+- One name for each thing: the header a sink is given is `RunInfo`, with
+  a `Version`, and its sink `RunSink`; `Bus.TraceID()` returns the
+  `TraceID`; `TraceContext.ID` is the field that was `TraceContext.Trace`;
+  `LogOptions.RunID` names a run; `cliprogress.Run` becomes `Session`.
+  Each keeps a deprecated alias but `TraceContext.ID`, a field that no
+  alias can keep.
+- `Fields.Exit` is an `int` with `HasExit`, so an `Event` is plain data;
+  `progress.Exit(code)` sets both. The event log does not change.
+- `CountWriter` and `CountReader` become `AdvanceWriter` and
+  `AdvanceReader`, whose docs say that they hide `io.ReaderFrom` and
+  `io.WriterTo`.
+- `DefaultAdvanceEvery` and `DefaultFlushEvery` are exported, and the
+  field docs name them. The doc of `Tally` says that its zero value is
+  ready and why its accessors differ from those of `Meter`.
+- `Span.Update` applies every field option, as `End` does; the total
+  still never goes down, and the unit stays.
+- Every method of `*Bus` is safe on nil and returns a zero value or does
+  nothing. `(*Span).TraceContext()` returns the trace context of a span,
+  with the span as the parent, which a program hands a child it starts;
+  `NewTraceContext` is for a program without a Bus.
+- `cliprogress.Choose` names its results, `(mode, note, err)`, and says
+  that the note has the program's prefix and is escaped by `Start`. The
+  four probes take one parameter type, `any`; a value that gives no file
+  descriptor, such as a wrapper of a file, is never a terminal.
+- `mcpprogress`: `New` panics when `Send` is nil.
+  `Send func(ctx, progress, total, message)` takes a context, which ends
+  when the context given to `Close(ctx)` ends, so a stalled session holds
+  `Close` no longer than its caller allows. The `Notifier` is a `RunSink`
+  and takes the program's name and panic log from the Bus when its
+  options leave them empty, as decision 12 asks; `mcpprogress` needs no
+  exception from it. The rate, the rule and the line of decisions 27 and
+  32 do not change.
+- The JSONL event log, version 1, does not change: its keys stay, and the
+  golden log stays byte for byte.
+
+### Costs
+
+- Most callers of the kit change some names; the aliases give them one
+  release. `TraceContext.Trace`, `Fields.Exit`, the `Send` and `Close` of
+  `mcpprogress` and the probes break at once.
+
+## 45. eventlog tells a newer log apart, and forwards one run
+
+Status: accepted. Refines [33](#33-the-kit-reads-its-event-log-back-in-eventlog).
+
+### Context
+
+The review of v0.9.0 found that a reader of version 1 shows nothing for a
+log of a newer version and cannot say why (EL-01); `Forward` hands one
+sink the events of every run in the log, with a `Begin` for each, against
+the contracts of a sink (EL-02); `Options` configures only the `Reducer`,
+and `Keep` does not say what it keeps (EL-03, NM-10); a view cannot look
+a run up by its ID (EL-04); `Feed.Reset` asks to forget what `Forward`
+does not forget (EL-05); the doc of `Keep` says what the code does not do
+(EL-06); the set of dropped runs is cleared at once, so a dropped run can
+come back (EL-07); a new field of `progress.Fields` could be hidden on
+`Span` (EL-08); `Forward` returns an interface, and `Line` names a struct
+and a method (EL-09); and the defaults are not exported (XP-11).
+
+### Decision
+
+- `ErrVersion` and `*VersionError`, with the version it got, are the
+  error of a line of a newer version; `(*Reducer).Skipped()` counts the
+  lines the Reducer could not read.
+- `NewForwarder(sink, trace)` returns a `*Forwarder` that forwards the
+  run of one trace, the one the program handed the child with
+  `Span.TraceContext`, and counts the lines of other runs it drops.
+  `Forward` stays for one release, deprecated, and forwards the first run
+  that begins.
+- Renames, each with a deprecated alias: `Options` to `ReducerOptions`,
+  its `Keep` to `KeepRuns`, `Feed.Line` to `Take`, and `Line.Run` to
+  `RunID`.
+- `(*Reducer).Run(id)` returns one run; the docs of `Runs` and `Changed`
+  say why their orders differ.
+- `Feed.Reset` is a notice that the log was cut short or made again, and
+  each Feed says what it does on it.
+- The doc of `KeepRuns` says what the code does: past it, the oldest run
+  that has ended goes first, else the oldest.
+- The set of dropped runs is a ring that forgets the oldest ID first.
+- The test that keeps a field of `Fields` from being hidden covers
+  `Span` too.
+- `DefaultKeepRuns`, 100, and `DefaultMaxSpans`, 131072, are exported,
+  each named after its field.
+
+### Costs
+
+- A server that forwards a child's log passes the trace it gave the child.
+
+## 46. display's themes cannot be changed, and its names follow decision 36
+
+Status: accepted. Refines [19](#19-the-displays-draw-in-themes-the-program-picks) and [20](#20-a-themes-look-may-change-in-a-minor-release).
+
+### Context
+
+The review of v0.9.0 found that the five themes are exported variables
+that `Themes` and `ParseTheme` read, so a library that assigns
+`display.Classic` changes what `--theme classic` means in the whole
+process (XP-10); `Summary` takes its settings as fields that can change
+while it is on a Bus, where the other displays take options when they are
+made (XP-12); and `Colours`, `Colours256`, `Colours16` and `NoColours`
+are spelt in British English, with the prefix last in `NoColours` (NM-11,
+NM-02).
+
+### Decision
+
+- `Themes` and `ParseTheme` read unexported copies of the themes. The
+  exported variables stay, documented as copies; an assignment to one
+  changes nothing else. Functions such as `display.Classic()` are left
+  for later, since callers use the variables as values.
+- `NewSummary(SummaryOptions{Theme, ASCII})` makes a `Summary`, and the
+  zero `Summary` stays usable. The fields `Theme` and `ASCII` are
+  deprecated (decision 36).
+- `Colours` becomes `Colors`, with `Colors256`, `Colors16` and
+  `ColorsNone`, and `Theme.Colours()` becomes `Theme.Colors()`, each with
+  a deprecated alias. What the themes draw does not change.
+
+### Costs
+
+- A program that changed a theme by assigning its variable loses that;
+  none of the kit's users does.
