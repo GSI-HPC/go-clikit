@@ -18,13 +18,16 @@
 //	prog help crate   unknown help topic "crate": unknown command "crate" for "prog" (did you mean "create"?)
 //	prog power on     requires at least 1 arg(s), only received 0 (usage: prog power on NODES)
 //
-// Every such error is a usage error, as Usage makes one, and so is an
-// error pflag returns for a flag it cannot parse, wherever cobra parsed
-// it: IsUsage tells them from the errors of a command that ran and failed.
-// The package names no exit code: a program maps a usage error to its own,
-// commonly 2. FlagError, which a program sets as the tree's FlagErrorFunc,
-// words a flag's value that pflag cannot parse as InvalidValue words one the
-// program refuses itself, invalid --count value "x": want a whole number.
+// Every such error is a usage error, as Usage makes one, and so are
+// cobra's errors for a required flag not given and for the flags of a
+// group, those marked with MarkFlagsRequiredTogether, MarkFlagsOneRequired
+// or MarkFlagsMutuallyExclusive, and an error pflag returns for a flag it
+// cannot parse, wherever cobra parsed it: IsUsage tells them from the
+// errors of a command that ran and failed. The package names no exit
+// code: a program maps a usage error to its own, commonly 2. FlagError,
+// which a program sets as the tree's FlagErrorFunc, words a flag's value
+// that pflag cannot parse as InvalidValue words one the program refuses
+// itself, invalid --count value "x": want a whole number.
 // Coded gives an error the exit status the code nearer its cause knows,
 // such as that of a host that could not be reached, and Status returns it.
 //
@@ -68,6 +71,12 @@ import (
 //   - Every argument check in the tree returns a usage error, and that of
 //     a command that holds no subcommands ends with the command's usage
 //     line, since a program that silences cobra's usage block shows none.
+//   - Every runnable command, one without an argument check included,
+//     checks its required flags and its flag groups with its arguments,
+//     before its PersistentPreRun and PreRun hooks rather than after them
+//     as cobra does, and returns cobra's error for them as a usage error:
+//     required flag(s) "realm" not set. A hook that sets a required flag
+//     is too late for this check.
 //
 // moved maps a command line a program no longer takes, its words after the
 // program's name, such as "status" or "get node", to the command line that
@@ -152,20 +161,50 @@ func below(cmd *cobra.Command, word string) string {
 	return line
 }
 
-// usageArgs makes every argument check in the tree return a usage error.
-// Cobra's own checks, such as cobra.ExactArgs, return plain errors, which
-// name neither the arguments wanted nor the command.
+// usageArgs makes every argument check in the tree return a usage error,
+// and gives every runnable command one, that marks the errors of its
+// required flags and flag groups as usage errors too. Cobra's own checks,
+// such as cobra.ExactArgs, return plain errors, which name neither the
+// arguments wanted nor the command, and cobra checks the flags after Args
+// with plain errors of its own.
 func usageArgs(cmd *cobra.Command) {
-	if check := cmd.Args; check != nil {
+	if check := cmd.Args; check != nil || cmd.Runnable() {
 		cmd.Args = func(c *cobra.Command, args []string) error {
-			err := check(c, args)
-			if err != nil && !c.HasSubCommands() && c.Name() != "help" {
-				err = fmt.Errorf("%w (usage: %s)", err, strings.TrimSuffix(c.UseLine(), " [flags]"))
+			if err := argsError(c, check, args); err != nil {
+				return Usage(err)
 			}
-			return Usage(err)
+			return Usage(flagsError(c))
 		}
 	}
 	for _, sub := range cmd.Commands() {
 		usageArgs(sub)
 	}
+}
+
+// argsError returns the error of check for args, with the usage line of a
+// command that holds no subcommands after it. A nil check takes any
+// arguments, as cobra's does for a command that is not the root.
+func argsError(c *cobra.Command, check cobra.PositionalArgs, args []string) error {
+	if check == nil {
+		return nil
+	}
+	err := check(c, args)
+	if err != nil && !c.HasSubCommands() && c.Name() != "help" {
+		err = fmt.Errorf("%w (usage: %s)", err, strings.TrimSuffix(c.UseLine(), " [flags]"))
+	}
+	return err
+}
+
+// flagsError returns cobra's error for a required flag that was not given,
+// or for the flags of a group that were not given together, or given
+// together where they exclude each other. It checks only flags that were
+// parsed: cobra parses them before it calls Args.
+func flagsError(c *cobra.Command) error {
+	if !c.Flags().Parsed() {
+		return nil
+	}
+	if err := c.ValidateRequiredFlags(); err != nil {
+		return err
+	}
+	return c.ValidateFlagGroups()
 }

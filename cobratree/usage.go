@@ -39,10 +39,11 @@ func Usagef(format string, args ...any) error {
 }
 
 // IsUsage reports whether err is an error in the command line: one that
-// Usage or Usagef made, an argument check of a tree Strict made strict
-// among them, or one that pflag returned for a flag it could not parse,
-// unknown, without its value, with a value it does not take or of a
-// syntax it does not know. errors.As finds either anywhere in err's tree.
+// Usage or Usagef made, the checks of the arguments, the required flags
+// and the flag groups of a tree Strict made strict among them, or one
+// that pflag returned for a flag it could not parse, unknown, without its
+// value, with a value it does not take or of a syntax it does not know.
+// errors.As finds either anywhere in err's tree.
 //
 // pflag's errors count wherever cobra parsed the flags: cobra passes only
 // those of the command that runs through its FlagErrorFunc, not those of
