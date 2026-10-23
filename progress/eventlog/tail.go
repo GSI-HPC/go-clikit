@@ -25,11 +25,13 @@ const headLen = 128
 
 // Feed takes the lines a Tail reads.
 type Feed interface {
-	// Line takes one whole line of the log, without its newline. b is
-	// the Tail's, and only good until Line returns.
-	Line(b []byte)
-	// Reset forgets every line taken: the log was cut short or made
-	// again, and is read again from its start, the rotated copy first.
+	// Take takes one whole line of the log, without its newline. b is
+	// the Tail's, and only good until Take returns.
+	Take(b []byte)
+	// Reset is a notice that the log was cut short or made again: the
+	// Tail reads it again from its start, the rotated copy first, so the
+	// lines that follow may be lines taken before. Each Feed says what it
+	// does on it.
 	Reset()
 }
 
@@ -180,7 +182,7 @@ func (t *Tail) read(f *os.File, info os.FileInfo, p *position) (int, error) {
 		}
 		if err == nil {
 			if line := bytes.TrimSpace(t.line); len(t.line) <= MaxLine && len(line) > 0 {
-				t.feed.Line(line)
+				t.feed.Take(line)
 				lines++
 			}
 			t.line = t.line[:0]

@@ -4,6 +4,7 @@
 package eventlog_test
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -21,7 +22,7 @@ type record struct {
 	resets int
 }
 
-func (r *record) Line(b []byte) { r.lines = append(r.lines, string(b)) }
+func (r *record) Take(b []byte) { r.lines = append(r.lines, string(b)) }
 func (r *record) Reset()        { r.lines, r.resets = nil, r.resets+1 }
 
 // take returns the lines given since the last call.
@@ -328,10 +329,11 @@ type handler struct{ events []progress.Event }
 
 func (h *handler) Handle(e progress.Event) { h.events = append(h.events, e) }
 
-// Forward gives a sink every event of the log once, in order, the log
-// read again after a reset too, and tells a RunSink of the run first,
-// with the version the log names.
-func TestForward(t *testing.T) {
+// A Forwarder gives a sink every event of its run once, in order, the log
+// read again after a reset too, and tells a RunSink of the run first, with
+// the version the log names; a line it cannot read is skipped, and
+// counted.
+func TestNewForwarder(t *testing.T) {
 	lines := golden(t)
 	var want []progress.Event
 	for _, s := range lines[1:] {
@@ -342,12 +344,13 @@ func TestForward(t *testing.T) {
 		want = append(want, l.Event)
 	}
 	var s sink
-	feed := eventlog.Forward(&s)
+	f := eventlog.NewForwarder(&s, mustTrace(t, "4bf92f3577b34da6a3ce929d0e0e4736"))
 	for range 2 {
-		feed.Reset()
-		feed.Line([]byte("not a line"))
+		f.Reset()
+		f.Take([]byte("not a line"))
+		f.Take([]byte(`{"v":2,"run":"0123456789abcdef","type":"start"}`))
 		for _, l := range lines {
-			feed.Line([]byte(l))
+			f.Take([]byte(l))
 		}
 	}
 	if len(s.runs) != 1 || s.runs[0].Trace.Parent.String() != "00f067aa0ba902b7" || s.runs[0].Version != "v1.2.3" {
@@ -356,16 +359,74 @@ func TestForward(t *testing.T) {
 	if !reflect.DeepEqual(s.events, want) {
 		t.Errorf("the events = %+v\nwant %+v", s.events, want)
 	}
+	if f.Skipped() != 4 || f.Dropped() != 0 {
+		t.Errorf("Skipped() = %d, Dropped() = %d; want 4 and 0", f.Skipped(), f.Dropped())
+	}
+}
 
-	// Another run in the same log is given too; a sink that is no
-	// RunSink is given the events alone.
+// begin returns the first line of a run of trace, and event the line of
+// its event seq.
+func begin(run, trace string) string {
+	return `{"v":1,"type":"trace","run":"` + run + `","trace":"` + trace + `"}`
+}
+
+func event(run, trace string, seq int) string {
+	return fmt.Sprintf(`{"v":1,"run":%q,"trace":%q,"seq":%d,"time":"2026-09-25T12:00:00Z","type":"start","span":"%016x","kind":"call","name":"c","state":"running"}`,
+		run, trace, seq, seq)
+}
+
+// A Forwarder gives the sink one run, the first that begins in its trace,
+// as a sink is promised: the lines of the other runs, and those of its own
+// run before the run's first line, are dropped, and counted. A zero trace,
+// and Forward, take the first run that begins.
+func TestAForwarderGivesOneRun(t *testing.T) {
+	const ours, theirs = "4bf92f3577b34da6a3ce929d0e0e4736", "0af7651916cd43dd8448eb211c80319c"
+	log := []string{
+		event("aaaa", ours, 1),
+		begin("bbbb", theirs), event("bbbb", theirs, 1),
+		begin("aaaa", ours), event("aaaa", ours, 1), event("aaaa", ours, 2),
+		begin("cccc", ours), event("cccc", ours, 1),
+		begin("aaaa", ours), event("bbbb", theirs, 2), event("aaaa", ours, 3),
+	}
+	for _, tc := range []struct {
+		name    string
+		feed    func(progress.Sink) eventlog.Feed
+		run     string
+		seqs    []uint64
+		dropped int
+	}{
+		{"its trace", func(s progress.Sink) eventlog.Feed { return eventlog.NewForwarder(s, mustTrace(t, ours)) },
+			"aaaa", []uint64{1, 2, 3}, 6},
+		{"a zero trace", func(s progress.Sink) eventlog.Feed { return eventlog.NewForwarder(s, progress.TraceID{}) },
+			"bbbb", []uint64{1, 2}, 8},
+		{"Forward", eventlog.Forward, "bbbb", []uint64{1, 2}, 8},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var s sink
+			f := tc.feed(&s)
+			for _, l := range log {
+				f.Take([]byte(l))
+			}
+			var seqs []uint64
+			for _, e := range s.events {
+				seqs = append(seqs, e.Seq)
+			}
+			if len(s.runs) != 1 || !slices.Equal(seqs, tc.seqs) {
+				t.Errorf("the runs = %+v, the events %v; want one run, and %v", s.runs, seqs, tc.seqs)
+			}
+			if got := f.(*eventlog.Forwarder).Dropped(); got != tc.dropped {
+				t.Errorf("Dropped() = %d, want %d", got, tc.dropped)
+			}
+		})
+	}
+
+	// A sink that is no RunSink is given the events alone.
 	var h handler
-	feed = eventlog.Forward(&h)
-	feed.Line([]byte(lines[1]))
-	feed.Line([]byte(strings.Replace(lines[2], "0123456789abcdef", "fedcba9876543210", 1)))
-	feed.Line([]byte(lines[0]))
-	feed.Line([]byte(lines[1]))
-	if len(h.events) != 2 || h.events[0].Seq != 1 || h.events[1].Seq != 2 {
-		t.Errorf("the events of two runs = %+v", h.events)
+	f := eventlog.NewForwarder(&h, mustTrace(t, ours))
+	for _, l := range log {
+		f.Take([]byte(l))
+	}
+	if len(h.events) != 3 {
+		t.Errorf("the events = %+v, want the run's three", h.events)
 	}
 }

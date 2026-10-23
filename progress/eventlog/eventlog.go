@@ -13,18 +13,22 @@
 //
 // A Tail reads a log as it grows, polled, and follows it as
 // progress/cliprogress rotates it, and gives the whole lines it reads to a
-// Feed. Forward is the Feed of a server that runs a command as a child,
-// with the child's log in a file of its own: it gives the child's events
-// to a progress.Sink, such as an mcpprogress.Notifier, once each. A
-// Reducer is the Feed of a view of what a program did, as it does it: it
-// folds the lines into runs, each the tree of the spans of its command.
+// Feed. A Forwarder is the Feed of a server that runs a command as a
+// child, with the child's log in a file of its own: it gives the events of
+// the child's run to a progress.Sink, such as an mcpprogress.Notifier,
+// once each. A Reducer is the Feed of a view of what a program did, as it
+// does it: it folds the lines into runs, each the tree of the spans of its
+// command.
 //
 // A reader of version 1 leaves out the keys and the values it does not
 // know, as the format asks, so that a log a later release of the kit
 // writes, with a key or a value added, still reads: a key Decode does not
 // know is not read, a value of a kind, a state, a status, a class, a
 // unit, a stream or a flag it does not know is left out, and a line of a
-// type it does not know is not decoded at all.
+// type it does not know is not decoded at all. A line of another version,
+// which changes what a key means, is not read either: Decode refuses it
+// with ErrVersion, which a program can tell from the other errors and
+// name to the user, and the Feeds count it as a line they skipped.
 package eventlog
 
 import (
@@ -67,6 +71,29 @@ type Line struct {
 	// on an end, all of the span's.
 	LeftOut int
 }
+
+// ErrVersion is the error of a line of another version of the event log
+// than progress.LogVersion, most often a newer one, written by a later
+// release of the kit, which this one cannot read. Decode returns it as a
+// *VersionError, which errors.Is tells to be ErrVersion.
+var ErrVersion = errors.New("a line of another version of the event log")
+
+// VersionError is the error Decode returns for a line of another version
+// of the event log than progress.LogVersion. It unwraps to ErrVersion.
+type VersionError struct {
+	// Got is the version the line names, past progress.LogVersion for a
+	// log a later release wrote. A line that names none is no line of an
+	// event log, and no VersionError.
+	Got int
+}
+
+// Error says which version the line is of, and which one Decode reads.
+func (e *VersionError) Error() string {
+	return fmt.Sprintf("a line of version %d of the event log, not %d", e.Got, progress.LogVersion)
+}
+
+// Unwrap returns ErrVersion.
+func (e *VersionError) Unwrap() error { return ErrVersion }
 
 // line is what Decode reads of a line: every key the log writes.
 type line struct {
@@ -114,14 +141,15 @@ type line struct {
 }
 
 // Decode reads one line of an event log, with or without its newline. It
-// fails on a line that is not a JSON object, one of another version of
-// the format than progress.LogVersion, one without a run, one of a type
-// it does not know, an event without a time, and an event of a span
-// without a span id, or with an id, of the span or of its parent, that is
-// not 16 hexadecimal digits, not all zero. A key whose value is of the
-// wrong type is left out, and the rest of the line read. The texts of the
-// errors are no interface: a reader that skips the lines it cannot read
-// needs none.
+// fails on a line that is not a JSON object, one that names no version, one
+// of another version of the format than progress.LogVersion, one without a
+// run, one of a type it does not know, an event without a time, and an
+// event of a span without a span id, or with an id, of the span or of its
+// parent, that is not 16 hexadecimal digits, not all zero. A key whose
+// value is of the wrong type is left out, and the rest of the line read.
+// The error of a line of another version is a *VersionError, which is
+// ErrVersion; the texts of the errors are no interface: a reader that skips
+// the lines it cannot read needs none.
 //
 // The texts of an event are sanitised and cut to their bounds as the Bus
 // does it (see progress.Sanitize), and so are the run, the program and
@@ -135,8 +163,12 @@ func Decode(b []byte) (Line, error) {
 			return Line{}, fmt.Errorf("not a line of an event log: %w", err)
 		}
 	}
-	if l.V != progress.LogVersion {
-		return Line{}, fmt.Errorf("a line of version %d of the event log, not %d", l.V, progress.LogVersion)
+	switch l.V {
+	case progress.LogVersion:
+	case 0:
+		return Line{}, errors.New("not a line of an event log: it names no version")
+	default:
+		return Line{}, &VersionError{Got: l.V}
 	}
 	if l.Run == "" {
 		return Line{}, errors.New("a line of the event log without a run")
