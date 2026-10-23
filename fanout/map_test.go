@@ -593,30 +593,47 @@ func TestMapTakesTheProgramFromTheBus(t *testing.T) {
 	}
 }
 
-// Without a Summarize of the program's, the step ends with Failure, which
-// names the items by Noun; a Summarize is called when nothing failed too,
-// with a Summary that is not canceled.
+// Without a Summarize of the program's, the step ends with Failure's error,
+// which counts the items with Noun, a function of their number, or with the
+// number alone when Noun is nil; a Summarize is called when nothing failed
+// too, with a Summary that is not canceled.
 func TestMapSummarizesTheItems(t *testing.T) {
 	t.Parallel()
 
-	t.Run("the noun", func(t *testing.T) {
-		t.Parallel()
-		ctx, w := progresstest.Watch(context.Background(), t)
-		fanout.Map(ctx, nodes(2), fanout.MapOptions[string]{Step: "stop", Limit: 1, Noun: "hosts"},
-			func(_ context.Context, node string) (struct{}, error) {
-				if node == "exe2" {
-					return struct{}{}, errors.New(node + ": stopped")
-				}
-				return struct{}{}, nil
-			})
-		want := `step stop total=2 limit=1 [fold]: failed (target): 1 of 2 hosts failed: exe2
-  target exe1: ok
-  target exe2: failed (target): {}: stopped
-`
-		if got := w.Finish(); got != want {
-			t.Errorf("tree:\n%s\nwant:\n%s", got, want)
+	hosts := func(n int) string {
+		if n == 1 {
+			return "1 host"
 		}
-	})
+		return fmt.Sprintf("%d hosts", n)
+	}
+	for _, tc := range []struct {
+		name  string
+		items int
+		noun  func(int) string
+		want  string
+	}{
+		{"the noun", 2, hosts, "1 of 2 hosts failed: exe1"},
+		{"the noun of one", 1, hosts, "1 of 1 host failed: exe1"},
+		{"no noun", 2, nil, "1 of 2 failed: exe1"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			ctx, w := progresstest.Watch(context.Background(), t)
+			_, err := fanout.Map(ctx, nodes(tc.items), fanout.MapOptions[string]{Step: "stop", Limit: 1, Noun: tc.noun},
+				func(_ context.Context, node string) (struct{}, error) {
+					if node == "exe1" {
+						return struct{}{}, errors.New(node + ": stopped")
+					}
+					return struct{}{}, nil
+				})
+			if err == nil || err.Error() != tc.want {
+				t.Errorf("Map = %v, want %s", err, tc.want)
+			}
+			if first, _, _ := strings.Cut(w.Finish(), "\n"); !strings.HasSuffix(first, "failed (target): "+tc.want) {
+				t.Errorf("the step ended %q, want it failed with %s", first, tc.want)
+			}
+		})
+	}
 
 	t.Run("nothing failed", func(t *testing.T) {
 		t.Parallel()
