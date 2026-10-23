@@ -139,3 +139,21 @@ func ExampleHosts() {
 	// Output:
 	// 421 {"error":"This server answers to its loopback address only"}
 }
+
+// A program that checks the Host header itself, such as before a
+// handler that serves another name in development, refuses with the
+// same words as Hosts.
+func ExampleMisdirectedRefusal() {
+	h := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Host != "127.0.0.1:7374" {
+			localweb.Refuse(w, r, localweb.MisdirectedRefusal(r.Host))
+			return
+		}
+		fmt.Fprint(w, "ok")
+	})
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "http://rebind.example/", nil))
+	fmt.Print(w.Code, " ", w.Body)
+	// Output:
+	// 421 This server answers to its loopback address only.
+}

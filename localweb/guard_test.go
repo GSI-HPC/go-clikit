@@ -309,6 +309,21 @@ func TestHosts(t *testing.T) {
 	}
 }
 
+// The refusal of a Host is frozen (decision 34), and names the Host for
+// the log only.
+func TestMisdirectedRefusal(t *testing.T) {
+	t.Parallel()
+
+	want := Refusal{
+		Status:  http.StatusMisdirectedRequest,
+		Message: "This server answers to its loopback address only.",
+		Reason:  "Host is rebind.example",
+	}
+	if got := MisdirectedRefusal("rebind.example"); got != want {
+		t.Errorf("MisdirectedRefusal = %+v, want %+v", got, want)
+	}
+}
+
 // Origin is still the policy, under its former name.
 func TestOriginIsOriginPolicy(t *testing.T) {
 	t.Parallel()
