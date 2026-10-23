@@ -4,6 +4,7 @@
 package cobratreetest
 
 import (
+	"cmp"
 	"fmt"
 	"os"
 	"slices"
@@ -106,6 +107,70 @@ func TestCheckCommandLine(t *testing.T) {
 		err := CheckCommandLine(tree(), strings.Fields(line))
 		if err == nil || err.Error() != want {
 			t.Errorf("prog %s: error %v, want %q", line, err, want)
+		}
+	}
+}
+
+// A word under a runnable command with subcommands is refused only when
+// the command's own check refuses its arguments, as Execute refuses them.
+func TestCheckCommandLineUnderARunnableGroup(t *testing.T) {
+	run := func(*cobra.Command, []string) error { return nil }
+	build := func(rootRuns bool) *cobra.Command {
+		root := &cobra.Command{Use: "prog", SilenceErrors: true, SilenceUsage: true}
+		if rootRuns {
+			root.RunE = run
+		}
+		get := &cobra.Command{Use: "get [NODE]", Args: cobra.MaximumNArgs(1), RunE: run}
+		get.Flags().StringP("output", "o", "human", "human or json")
+		if err := get.MarkFlagRequired("output"); err != nil {
+			t.Fatal(err)
+		}
+		get.AddCommand(&cobra.Command{Use: "cluster", RunE: run})
+		logs := &cobra.Command{Use: "logs", RunE: run} // no check: any arguments
+		logs.AddCommand(&cobra.Command{Use: "clear", RunE: run})
+		power := &cobra.Command{Use: "power"} // runs nothing, unless Strict makes it
+		power.AddCommand(&cobra.Command{Use: "on", RunE: run})
+		root.AddCommand(get, logs, power)
+		return root
+	}
+	for _, strict := range []bool{false, true} {
+		newTree := func(rootRuns bool) *cobra.Command {
+			root := build(rootRuns)
+			if strict {
+				cobratree.Strict(root)
+			}
+			return root
+		}
+		for line, want := range map[string]string{
+			"get mynode":         "",
+			"get mynode -o json": "",
+			"get -o json mynode": "",
+			"get a b":            "prog get has no command a",
+			"get a -o json b":    "prog get has no command a",
+			"get -- a":           "",
+			"get a -- b":         "prog get has no command a",
+			"get cluster":        "",
+			"logs a b c":         "",
+			"get mynode --bogus": "prog get has no flag --bogus",
+			"power bogus":        "prog power has no command bogus",
+		} {
+			err := CheckCommandLine(newTree(false), strings.Fields(line))
+			if got := fmt.Sprint(err); got != cmp.Or(want, "<nil>") {
+				t.Errorf("strict %v: prog %s: error %v, want %q", strict, line, err, want)
+			}
+		}
+		// Execute agrees.
+		for line, ok := range map[string]bool{"get mynode -o json": true, "get a -o json b": false} {
+			root := newTree(false)
+			root.SetArgs(strings.Fields(line))
+			if err := root.Execute(); (err == nil) != ok {
+				t.Errorf("strict %v: prog %s: Execute error %v", strict, line, err)
+			}
+		}
+		// A runnable root takes no argument, by cobra's check or by Strict's.
+		err := CheckCommandLine(newTree(true), []string{"gte"})
+		if got := fmt.Sprint(err); got != "prog has no command gte" {
+			t.Errorf("strict %v: prog gte: error %v, want prog has no command gte", strict, err)
 		}
 	}
 }

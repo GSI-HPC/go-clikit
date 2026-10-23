@@ -91,21 +91,33 @@ var placeholder = regexp.MustCompile(`^[A-Z<\[(.]`)
 // command has, its own or inherited. It runs nothing.
 //
 // The words that name commands come first: a command that holds
-// subcommands takes no other word, as Strict has it, and a word that is a
-// placeholder, such as NAME, <name>, [flags] or ..., ends them, as does a
-// command that holds none. Every flag is looked up, after them too, and
-// takes the next word as its value unless it is a bool, a count or written
-// with =. What follows -- is the arguments' and is not looked at.
+// subcommands takes no other word, as Strict has it, unless it runs and
+// its own check of its arguments takes the words that follow, as Execute
+// would; a word that is a placeholder, such as NAME, <name>, [flags] or
+// ..., ends them, as does a command that holds none. Every flag is looked
+// up, after them too, and takes the next word as its value unless it is a
+// bool, a count or written with =. What follows -- is the arguments' and
+// is not looked at, but by the check of a command that holds subcommands.
 func CheckCommandLine(root *cobra.Command, args []string) error {
 	cmd := root
 	commands := true
+	// group is a runnable command that holds subcommands, and word the
+	// first of its arguments, which names none of them; positional holds
+	// its arguments, for its own check.
+	var group *cobra.Command
+	var word string
+	var positional []string
 	for i := 0; i < len(args); i++ {
 		arg := args[i]
 		cmd.InitDefaultHelpFlag()
 		cmd.InitDefaultVersionFlag()
 		switch {
 		case arg == "--":
-			return nil
+			if group == nil {
+				return nil
+			}
+			positional = append(positional, args[i+1:]...)
+			i = len(args)
 		case strings.HasPrefix(arg, "--"):
 			name, _, hasValue := strings.Cut(arg[2:], "=")
 			flag := lookupFlag(cmd, func(fs *pflag.FlagSet) *pflag.Flag { return fs.Lookup(name) })
@@ -137,14 +149,34 @@ func CheckCommandLine(root *cobra.Command, args []string) error {
 			switch {
 			case sub != nil:
 				cmd = sub
+			case cmd.HasSubCommands() && cmd.Runnable():
+				// The command's own check decides, once its arguments
+				// are known.
+				group, word, positional = cmd, arg, []string{arg}
+				commands = false
 			case cmd.HasSubCommands():
 				return fmt.Errorf("%s has no command %s", cmd.CommandPath(), arg)
 			default:
 				commands = false
 			}
+		case group != nil:
+			positional = append(positional, arg)
 		}
 	}
+	if group != nil && !takesArgs(group, positional) {
+		return fmt.Errorf("%s has no command %s", group.CommandPath(), word)
+	}
 	return nil
+}
+
+// takesArgs reports whether cmd, a runnable command that holds
+// subcommands, takes args, as Execute decides: by its own check, or, with
+// none, by cobra's, which refuses any argument of the root alone.
+func takesArgs(cmd *cobra.Command, args []string) bool {
+	if cmd.Args == nil && !cmd.HasParent() {
+		return false
+	}
+	return cmd.ValidateArgs(args) == nil
 }
 
 // subcommand returns the subcommand of cmd that name names, or one of its
