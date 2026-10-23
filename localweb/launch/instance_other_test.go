@@ -6,6 +6,7 @@
 package launch
 
 import (
+	"context"
 	"errors"
 	"testing"
 )
@@ -13,10 +14,13 @@ import (
 func TestAcquireIsUnsupported(t *testing.T) {
 	t.Parallel()
 
-	if i, err := Acquire(t.TempDir(), "prog"); i != nil || !errors.Is(err, errors.ErrUnsupported) {
+	if i, err := Acquire(context.Background(), t.TempDir(), "prog"); i != nil || !errors.Is(err, errors.ErrUnsupported) {
 		t.Errorf("Acquire = %v, %v, want errors.ErrUnsupported", i, err)
 	}
 	if err := checkPrivateDir(t.TempDir(), 0); !errors.Is(err, errors.ErrUnsupported) {
 		t.Errorf("checkPrivateDir = %v, want errors.ErrUnsupported", err)
+	}
+	if err := (&Instance{}).Retire(context.Background()); !errors.Is(err, errors.ErrUnsupported) {
+		t.Errorf("Retire = %v, want errors.ErrUnsupported", err)
 	}
 }

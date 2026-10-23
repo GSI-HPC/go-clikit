@@ -6,6 +6,7 @@
 package launch
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"net"
@@ -24,7 +25,7 @@ import (
 // acquireIn takes the instance "prog" in a new runtime directory.
 func acquireIn(t *testing.T) *Instance {
 	t.Helper()
-	i, err := Acquire(privateDir(t), "prog")
+	i, err := Acquire(t.Context(), privateDir(t), "prog")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -51,7 +52,7 @@ func TestAcquireMakesAPrivateDirectory(t *testing.T) {
 	t.Parallel()
 
 	runtimeDir := privateDir(t)
-	i, err := Acquire(runtimeDir, "prog")
+	i, err := Acquire(t.Context(), runtimeDir, "prog")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -124,7 +125,7 @@ func TestAcquireRefuses(t *testing.T) {
 			if tt.relDir {
 				runtimeDir = "run"
 			}
-			i, err := Acquire(runtimeDir, tt.program)
+			i, err := Acquire(t.Context(), runtimeDir, tt.program)
 
 			if err == nil || !strings.Contains(err.Error(), tt.err) {
 				t.Errorf("Acquire = %v, %v, want an error with %q", i, err, tt.err)
@@ -136,10 +137,105 @@ func TestAcquireRefuses(t *testing.T) {
 func TestAcquireFailsWhenTheLockFails(t *testing.T) {
 	t.Parallel()
 
-	i, err := acquire(privateDir(t), "prog", func(int, int) error { return unix.ENOLCK })
+	i, err := acquire(t.Context(), privateDir(t), "prog", func(int, int) error { return unix.ENOLCK })
 
 	if !errors.Is(err, unix.ENOLCK) || !strings.HasPrefix(err.Error(), "lock the runtime directory: ") || i != nil {
 		t.Errorf("acquire = %v, %v, want ENOLCK", i, err)
+	}
+}
+
+func TestAcquireTriesAgainWhileTheLockIsHeld(t *testing.T) {
+	t.Parallel()
+
+	var calls []int
+	flock := func(_, how int) error {
+		calls = append(calls, how)
+		switch len(calls) {
+		case 1, 2:
+			return unix.EWOULDBLOCK
+		case 3:
+			return unix.EINTR
+		}
+		return nil
+	}
+	i, err := acquire(t.Context(), privateDir(t), "prog", flock)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer i.Release()
+
+	if len(calls) != 4 {
+		t.Errorf("flock was called %d times, want 4", len(calls))
+	}
+	for _, how := range calls {
+		if how != unix.LOCK_EX|unix.LOCK_NB {
+			t.Errorf("flock(%#x), want LOCK_EX|LOCK_NB", how)
+		}
+	}
+}
+
+// holdLock takes the lock of "prog" in runtimeDir, as another start that
+// has not yet published does, until the test ends.
+func holdLock(t *testing.T, runtimeDir string) {
+	t.Helper()
+	other, err := Acquire(t.Context(), runtimeDir, "prog")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(other.Release)
+}
+
+// endedContexts are the two ways a context ends while a lock is held: its
+// deadline passes, or it is canceled.
+var endedContexts = []struct {
+	name string
+	ctx  func(t *testing.T) context.Context
+	want error
+}{
+	{name: "a deadline", want: context.DeadlineExceeded, ctx: func(t *testing.T) context.Context {
+		ctx, cancel := context.WithTimeout(t.Context(), 3*lockPoll)
+		t.Cleanup(cancel)
+		return ctx
+	}},
+	{name: "a cancel", want: context.Canceled, ctx: func(t *testing.T) context.Context {
+		ctx, cancel := context.WithCancel(t.Context())
+		timer := time.AfterFunc(3*lockPoll, cancel)
+		t.Cleanup(func() { timer.Stop(); cancel() })
+		return ctx
+	}},
+}
+
+func TestAcquireWaitsNoLongerThanItsContext(t *testing.T) {
+	t.Parallel()
+
+	for _, tt := range endedContexts {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			runtimeDir := privateDir(t)
+			holdLock(t, runtimeDir)
+
+			i, err := Acquire(tt.ctx(t), runtimeDir, "prog")
+
+			if !errors.Is(err, tt.want) || !strings.HasPrefix(err.Error(), "wait for the lock of the runtime directory: ") || i != nil {
+				t.Errorf("Acquire = %v, %v, want %v", i, err, tt.want)
+			}
+		})
+	}
+}
+
+func TestAcquireTakesAFreeLockUnderAnEndedContext(t *testing.T) {
+	t.Parallel()
+
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+	i, err := Acquire(ctx, privateDir(t), "prog")
+	if err != nil {
+		t.Fatalf("Acquire = %v, want the lock, which is free", err)
+	}
+	defer i.Release()
+	if i.lockf == nil {
+		t.Error("Acquire holds no lock")
 	}
 }
 
@@ -156,13 +252,13 @@ func TestTwoStartsTakeTurns(t *testing.T) {
 	t.Parallel()
 
 	runtimeDir := privateDir(t)
-	first, err := Acquire(runtimeDir, "prog")
+	first, err := Acquire(t.Context(), runtimeDir, "prog")
 	if err != nil {
 		t.Fatal(err)
 	}
 	got := make(chan *Instance)
 	go func() {
-		second, err := Acquire(runtimeDir, "prog")
+		second, err := Acquire(t.Context(), runtimeDir, "prog")
 		if err != nil {
 			t.Error(err)
 		}
@@ -496,7 +592,7 @@ func TestRetire(t *testing.T) {
 		if err := i.Publish("http://127.0.0.1:7374/"); err != nil {
 			t.Fatal(err)
 		}
-		if err := i.Retire(); err != nil {
+		if err := i.Retire(t.Context()); err != nil {
 			t.Fatal(err)
 		}
 		if _, err := os.Lstat(i.recordPath()); !errors.Is(err, os.ErrNotExist) {
@@ -513,7 +609,7 @@ func TestRetire(t *testing.T) {
 		i := acquireIn(t)
 		writeRecord(t, i, Record{URL: "http://127.0.0.1:7374/", PID: os.Getpid() + 1}, 0o600)
 		i.Release()
-		if err := i.Retire(); err != nil {
+		if err := i.Retire(t.Context()); err != nil {
 			t.Fatal(err)
 		}
 		if _, err := os.Lstat(i.recordPath()); err != nil {
@@ -525,7 +621,7 @@ func TestRetire(t *testing.T) {
 		t.Parallel()
 
 		i := acquireIn(t)
-		if err := i.Retire(); err != nil {
+		if err := i.Retire(t.Context()); err != nil {
 			t.Fatal(err)
 		}
 		if i.lockf != nil {
@@ -533,13 +629,58 @@ func TestRetire(t *testing.T) {
 		}
 	})
 
+	t.Run("an ended context, the lock free", func(t *testing.T) {
+		t.Parallel()
+
+		i := acquireIn(t)
+		if err := i.Publish("http://127.0.0.1:7374/"); err != nil {
+			t.Fatal(err)
+		}
+		ctx, cancel := context.WithCancel(t.Context())
+		cancel()
+		if err := i.Retire(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := os.Lstat(i.recordPath()); !errors.Is(err, os.ErrNotExist) {
+			t.Errorf("the record is there after Retire: %v", err)
+		}
+	})
+
+	for _, tt := range endedContexts {
+		t.Run("the lock held, "+tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			runtimeDir := privateDir(t)
+			i, err := Acquire(t.Context(), runtimeDir, "prog")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := i.Publish("http://127.0.0.1:7374/"); err != nil {
+				t.Fatal(err)
+			}
+			holdLock(t, runtimeDir)
+
+			err = i.Retire(tt.ctx(t))
+
+			if !errors.Is(err, tt.want) || !strings.HasPrefix(err.Error(), "wait for the lock of the runtime directory: ") {
+				t.Errorf("Retire = %v, want %v", err, tt.want)
+			}
+			if _, err := os.Lstat(i.recordPath()); err != nil {
+				t.Errorf("Retire removed the record without the lock: %v", err)
+			}
+			if i.lockf != nil {
+				t.Error("a failed Retire holds the lock")
+			}
+		})
+	}
+
 	t.Run("a lock that fails", func(t *testing.T) {
 		t.Parallel()
 
 		i := acquireIn(t)
 		i.Release()
 		i.flock = func(int, int) error { return unix.ENOLCK }
-		if err := i.Retire(); !errors.Is(err, unix.ENOLCK) {
+		if err := i.Retire(t.Context()); !errors.Is(err, unix.ENOLCK) {
 			t.Errorf("Retire = %v, want ENOLCK", err)
 		}
 	})

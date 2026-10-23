@@ -14,9 +14,10 @@
 //
 // An Instance is the record of the server that runs, in a private
 // directory of the user's, such as $XDG_RUNTIME_DIR/prog, and the lock
-// that makes two starts take turns:
+// that makes two starts take turns. A start waits for the lock no longer
+// than its context:
 //
-//	inst, err := launch.Acquire(runtimeDir, "prog")
+//	inst, err := launch.Acquire(ctx, runtimeDir, "prog")
 //	if err != nil {
 //		return err
 //	}
@@ -28,7 +29,7 @@
 //	if err := inst.Publish(url); err != nil {
 //		return err
 //	}
-//	defer inst.Retire()
+//	defer inst.Retire(ctx)
 //
 // The kit reads no environment: the program passes the runtime directory,
 // its name, the operating system and a lookup of the environment.
