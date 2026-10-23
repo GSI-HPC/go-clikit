@@ -115,12 +115,17 @@ func TestResolve(t *testing.T) {
 		{"no checkout", BuildInfo{Version: "v0.9.0"}, "v1.2.3", rev, BuildInfo{Version: "v1.2.3", Commit: rev}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			if got := tc.bi.resolve(tc.version, tc.commit); got != tc.want {
-				t.Errorf("resolve(%q, %q) = %+v, want %+v", tc.version, tc.commit, got, tc.want)
+			if got := tc.bi.Resolve(tc.version, tc.commit); got != tc.want {
+				t.Errorf("Resolve(%q, %q) = %+v, want %+v", tc.version, tc.commit, got, tc.want)
 			}
 		})
 	}
-	if got := Resolve("v1.2.3", "ebed487"); got.Version != "v1.2.3" || got.Commit != "ebed487" {
-		t.Errorf("Resolve = %+v, want what was set", got)
+}
+
+// The deprecated function resolves the build info of the running binary.
+func TestResolveTheRunningBinary(t *testing.T) {
+	want := ReadBuildInfo().Resolve("v1.2.3", "ebed487")
+	if got := Resolve("v1.2.3", "ebed487"); got != want || got.Version != "v1.2.3" || got.Commit != "ebed487" {
+		t.Errorf("Resolve = %+v, want %+v", got, want)
 	}
 }

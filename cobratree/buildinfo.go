@@ -63,22 +63,19 @@ func fromBuildInfo(bi *debug.BuildInfo) BuildInfo {
 	return info
 }
 
-// Resolve returns the build info of the running binary, as ReadBuildInfo
-// reads it, with the version and the commit a build set with -ldflags in
-// place of the toolchain's: a release build that sets them wins. An empty
-// value sets nothing, so a program declares the variables it sets that way
-// empty, rather than holding a word such as "dev", and words a build that
-// is no release itself, where Version is empty.
+// Resolve returns b with the version and the commit a build set with
+// -ldflags in place of the toolchain's: a release build that sets them
+// wins. An empty value sets nothing, so a program declares the variables it
+// sets that way empty, rather than holding a word such as "dev", and words
+// a build that is no release itself, where Version is empty:
 //
-// A commit set that is not the one the toolchain recorded, nor the start of
-// it, is another commit than the checkout's, and the time and the changes
-// recorded are then left out, as they are not that commit's.
-func Resolve(version, commit string) BuildInfo {
-	return ReadBuildInfo().resolve(version, commit)
-}
-
-// resolve returns b with the version and commit set, as Resolve says.
-func (b BuildInfo) resolve(version, commit string) BuildInfo {
+//	bi := cobratree.ReadBuildInfo().Resolve(version, commit)
+//
+// A commit set that is not the one b records, nor the start of it, is
+// another commit than the checkout's, and the time and the changes
+// recorded are then left out, as they are not that commit's. A test
+// applies these rules to a BuildInfo it builds itself.
+func (b BuildInfo) Resolve(version, commit string) BuildInfo {
 	if version != "" {
 		b.Version = version
 	}
@@ -89,6 +86,17 @@ func (b BuildInfo) resolve(version, commit string) BuildInfo {
 		b.Commit = commit
 	}
 	return b
+}
+
+// Resolve returns the build info of the running binary with the version
+// and the commit a build set with -ldflags, as BuildInfo.Resolve puts
+// them in place of what ReadBuildInfo reads.
+//
+// Deprecated: Use ReadBuildInfo().Resolve(version, commit), whose name
+// says that it returns build info, and whose rules a test can apply to a
+// BuildInfo it builds (decision 36).
+func Resolve(version, commit string) BuildInfo {
+	return ReadBuildInfo().Resolve(version, commit)
 }
 
 // Short returns the commit cut to its first n characters, as a version line
