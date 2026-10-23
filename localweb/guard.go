@@ -62,6 +62,12 @@ func NoStore(next http.Handler) http.Handler {
 	})
 }
 
+// HostsOptions configures Hosts.
+type HostsOptions struct {
+	// Refuse answers a refused request; nil is Refuse.
+	Refuse Refuser
+}
+
 // Hosts returns middleware that refuses every request whose Host header
 // answers does not accept, as Bound.Answers does, with 421 Misdirected
 // Request. This is the defence against DNS rebinding: a page of another
@@ -69,9 +75,13 @@ func NoStore(next http.Handler) http.Handler {
 // its own origin, where the browser lets it read the answers, but its
 // requests still name that site in Host.
 //
-// The refusal does not say which Host the server answers to.
-func Hosts(answers func(host string) bool, refuse Refuser) func(http.Handler) http.Handler {
-	refuse = refuser(refuse)
+// The refusal does not say which Host the server answers to. Hosts panics
+// when answers is nil (doc/decisions.md, decision 40).
+func Hosts(answers func(host string) bool, o HostsOptions) func(http.Handler) http.Handler {
+	if answers == nil {
+		panic("localweb: Hosts needs an answers func")
+	}
+	refuse := refuser(o.Refuse)
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if !answers(r.Host) {
@@ -125,8 +135,9 @@ func SameOrigin(o Origin) func(http.Handler) http.Handler {
 }
 
 // CrossSite says why r came from another site than the server's own
-// origin, or returns "" when it did not. It reads two headers, which a
-// browser sets and no page can set or remove:
+// origin, or returns "" when it did not. It reads o.Navigate and o.Others
+// and ignores o.Refuse, as it refuses nothing itself. It reads two
+// headers, which a browser sets and no page can set or remove:
 //
 //   - Sec-Fetch-Site must be same-origin. A request without it passes to
 //     the Origin check: it comes from a client that is no browser, or from

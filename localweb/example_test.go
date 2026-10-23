@@ -31,7 +31,7 @@ func ExampleListen() {
 	mux.HandleFunc("/", func(w http.ResponseWriter, _ *http.Request) {
 		fmt.Fprintln(w, "Hello from the user's machine.")
 	})
-	h := localweb.Headers("")(localweb.Hosts(b.Answers, nil)(
+	h := localweb.Headers("")(localweb.Hosts(b.Answers, localweb.HostsOptions{})(
 		localweb.SameOrigin(localweb.Origin{Navigate: true})(mux)))
 	done := make(chan error, 1)
 	go func() { done <- localweb.Serve(ctx, b.Listeners, h, localweb.ServeOptions{}) }()
@@ -120,13 +120,15 @@ func ExampleBound_Answers() {
 	// rebind.example:7374: false
 }
 
-// Hosts and SameOrigin take a Refuser to answer in the program's own form.
+// Hosts, SameOrigin and session take a Refuser in the field Refuse of
+// their options, to answer in the program's own form.
 func ExampleHosts() {
 	refuse := func(w http.ResponseWriter, _ *http.Request, f localweb.Refusal) {
 		log.Printf("refused: %s", f.Reason)
 		http.Error(w, `{"error":"`+strings.TrimSuffix(f.Message, ".")+`"}`, f.Status)
 	}
-	h := localweb.Hosts(func(host string) bool { return host == "127.0.0.1:7374" }, refuse)(
+	h := localweb.Hosts(func(host string) bool { return host == "127.0.0.1:7374" },
+		localweb.HostsOptions{Refuse: refuse})(
 		http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { fmt.Fprint(w, "ok") }))
 
 	req := httptest.NewRequest(http.MethodGet, "http://rebind.example/", nil)

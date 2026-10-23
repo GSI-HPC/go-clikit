@@ -5,6 +5,7 @@ package localweb
 
 import (
 	"crypto/tls"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -250,7 +251,7 @@ func TestHosts(t *testing.T) {
 				r.Host = tt.host
 				w := httptest.NewRecorder()
 
-				Hosts(answers, nil)(next).ServeHTTP(w, r)
+				Hosts(answers, HostsOptions{})(next).ServeHTTP(w, r)
 
 				if tt.ok {
 					if next.n != 1 || w.Code != http.StatusNoContent {
@@ -284,7 +285,7 @@ func TestHosts(t *testing.T) {
 				r.Host = tt.host
 				w := httptest.NewRecorder()
 
-				Hosts(answers, rr.refuse)(next).ServeHTTP(w, r)
+				Hosts(answers, HostsOptions{Refuse: rr.refuse})(next).ServeHTTP(w, r)
 
 				if tt.ok {
 					if next.n != 1 || len(rr.got) != 0 {
@@ -306,6 +307,18 @@ func TestHosts(t *testing.T) {
 			})
 		})
 	}
+}
+
+// Hosts refuses a nil answers when it is made, not on the first request.
+func TestHostsPanicsWithoutAnswers(t *testing.T) {
+	t.Parallel()
+
+	defer func() {
+		if r := recover(); r == nil || !strings.Contains(fmt.Sprint(r), "answers") {
+			t.Errorf("recovered %v, want a panic that names answers", r)
+		}
+	}()
+	Hosts(nil, HostsOptions{})
 }
 
 func TestSameOrigin(t *testing.T) {
@@ -433,7 +446,7 @@ func TestHeaders(t *testing.T) {
 func TestHeadersOnARefusal(t *testing.T) {
 	t.Parallel()
 
-	h := Headers("")(Hosts(func(string) bool { return false }, nil)(&reached{}))
+	h := Headers("")(Hosts(func(string) bool { return false }, HostsOptions{})(&reached{}))
 	w := httptest.NewRecorder()
 
 	h.ServeHTTP(w, request("GET", nil))
