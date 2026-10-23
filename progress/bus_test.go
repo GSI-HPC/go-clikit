@@ -334,7 +334,7 @@ func TestTotalNeverShrinks(t *testing.T) {
 
 	ctx, bus, capture := watched(t, progress.BusOptions{})
 	_, span := progress.Start(ctx, progress.KindStep, "ssh", progress.Total(5))
-	span.Update(progress.Total(3), progress.Node("ignored"))
+	span.Update(progress.Total(3))
 	span.Update(progress.Total(8))
 	span.End(nil, progress.Total(2))
 	bus.Close()
@@ -342,9 +342,6 @@ func TestTotalNeverShrinks(t *testing.T) {
 	var totals []int
 	for _, e := range capture.Events() {
 		totals = append(totals, e.Total)
-		if e.Node != "" {
-			t.Errorf("Update set Node %q; it sets only Total, Message and Work", e.Node)
-		}
 	}
 	if fmt.Sprint(totals) != "[5 5 8 8]" {
 		t.Errorf("Totals %v, want [5 5 8 8]", totals)
@@ -1188,6 +1185,36 @@ func TestAnEndLeavesOtherSpansOpen(t *testing.T) {
 	b.End(nil)
 	child.End(nil)
 	bus.Close()
+}
+
+// Update sets every field an option gives, as End does, so that a field a
+// span learns half-way is not lost when the span is canceled; the fields
+// it does not give keep their values, a unit once given stays, and Queued
+// and Flagged, which only Start gives, change nothing.
+func TestUpdateSetsEveryField(t *testing.T) {
+	t.Parallel()
+
+	ctx, bus, capture := watched(t, progress.BusOptions{})
+	_, call := progress.Start(ctx, progress.KindCall, "copy", progress.Node("exe1"), progress.Work(progress.UnitBytes, 10))
+	call.Update(progress.Host("exe1.example.org\x1b"), progress.Role("bmc"), progress.Limit(4), progress.Batch(1, 2),
+		progress.HTTPRequest("PUT", "/a"), progress.HTTPStatus(201), progress.Cache("hit"), progress.Source("age"),
+		progress.Timeout(time.Second), progress.Exit(3), progress.Work(progress.UnitPercent, 20), progress.Message("half-way"),
+		progress.Queued(), progress.Flagged(progress.FlagHidden))
+	bus.Close()
+
+	e := capture.Events()[1]
+	want := progress.Fields{Node: "exe1", Host: `exe1.example.org\x1b`, Role: "bmc", Limit: 4, Batch: "1/2",
+		Method: "PUT", Path: "/a", HTTPStatus: 201, Cache: "hit", Source: "age", Timeout: time.Second,
+		Exit: 3, HasExit: true, Message: "half-way", Size: 20, Unit: progress.UnitBytes}
+	if e.Type != progress.TypeUpdate || e.Fields != want {
+		t.Errorf("Update sent %s %+v\nwant update %+v", e.Type, e.Fields, want)
+	}
+	if e.State != progress.StateRunning || e.Flags != 0 {
+		t.Errorf("Update left the span %s with flags %q, want running with none", e.State, e.Flags)
+	}
+	if end := capture.Events()[2]; end.Fields != want {
+		t.Errorf("the span ended with %+v, want %+v", end.Fields, want)
+	}
 }
 
 // The Bus hands on what it was told of the program, so that a pool or a
