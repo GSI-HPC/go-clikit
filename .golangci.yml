@@ -108,6 +108,14 @@ linters:
       # in for would.
       - path: _test\.go
         linters: [forbidigo]
+      # A name renamed under decision 36 keeps a deprecated alias for one
+      # minor release, whose Deprecated paragraph ends with "(decision
+      # 36)", and the kit's own callers in other packages use it until
+      # then. Only those deprecations are hidden: one of the standard
+      # library or of a requirement is still reported. v0.11.0 moves the
+      # callers, deletes the aliases and removes this rule.
+      - linters: [staticcheck]
+        text: '^SA1019: .* is deprecated: .*\(decision 36\)'
 
 formatters:
   enable:
