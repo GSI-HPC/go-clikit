@@ -149,7 +149,7 @@ func TestWorkText(t *testing.T) {
 	t.Parallel()
 	bounded := progress.Reading{Unit: progress.Bytes, Amount: 1152 << 20, Size: 2 << 30, Bound: progress.ByBelow,
 		Fraction: 0.5625, Rate: 80 << 20, Left: 11200 * time.Millisecond}
-	ascii := lookOf(Tide.In(NoColours), true)
+	ascii := lookOf(Tide.In(ColorsNone), true)
 	for _, tc := range []struct {
 		name   string
 		g      look
@@ -213,7 +213,7 @@ func TestEndedText(t *testing.T) {
 // where the look has no bar.
 func TestFractionBar(t *testing.T) {
 	t.Parallel()
-	shape := lookOf(Tide.In(NoColours), false)
+	shape := lookOf(Tide.In(ColorsNone), false)
 	for _, tc := range []struct {
 		name string
 		f    float64

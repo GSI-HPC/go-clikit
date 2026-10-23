@@ -102,7 +102,7 @@ func treeThemeFrames(t *testing.T, theme display.Theme, ascii bool, width int, s
 // treeThemeName names theme in the colours it is drawn in, and in ASCII
 // if ascii says so: "aurora in 16 colours, ASCII".
 func treeThemeName(theme display.Theme, ascii bool) string {
-	name := fmt.Sprintf("%v in %v colours", theme, theme.Colours())
+	name := fmt.Sprintf("%v in %v colours", theme, theme.Colors())
 	if ascii {
 		name += ", ASCII"
 	}
@@ -164,7 +164,7 @@ func TestTheTreeInATheme(t *testing.T) {
 «1;38;5;103»⊘«» «1»power off«»  «38;5;103»canceled«»
 «1»provision reinstall«38;5;244» ∙ «38;5;103»interrupting«38;5;244» ∙ «38;5;68»0:04.5«»
 `}},
-		{display.Ember.In(display.Colours16), []string{`
+		{display.Ember.In(display.Colors16), []string{`
 «1»✓«» «1»boot«2» » «1»set the boot order«»  «2»0.5s«»
 «1»✓«» «1»boot«»  «2»0.8s«»
 «2»▢«» «1»disarm«»  «2»skipped«»: nothing was armed
@@ -204,7 +204,7 @@ func TestTheTreeInATheme(t *testing.T) {
 «35»⊟«» «1»power off«»  «35»canceled«»
 «1»provision reinstall«2» ╏ «35»interrupting«2» ╏ «33»0:04.5«»
 `}},
-		{display.Tide.In(display.NoColours), []string{`
+		{display.Tide.In(display.ColorsNone), []string{`
 ✓ boot ⟩ set the boot order  0.5s
 ✓ boot  0.8s
 ↷ disarm  skipped: nothing was armed
@@ -417,7 +417,7 @@ func TestATreeInAThemeCutsOffWhatNeverFits(t *testing.T) {
 // instant draws the same.
 func TestTheSpinnerOfATreeTurnsWithItsClock(t *testing.T) {
 	t.Parallel()
-	f := newTreeFixture(t, "exec", treeSetup{theme: display.Aurora.In(display.NoColours), styles: true})
+	f := newTreeFixture(t, "exec", treeSetup{theme: display.Aurora.In(display.ColorsNone), styles: true})
 	ctx, _ := progress.Start(f.ctx, progress.KindStep, "run", progress.WithFlags(progress.Fold), progress.Total(1))
 	_, spans := targets(ctx, "exe1")
 	spans[0].Run()
@@ -440,7 +440,7 @@ func TestTheSpinnerOfATreeTurnsWithItsClock(t *testing.T) {
 // In a theme a running target's row shows the last line of its output in
 // the terminal's own colour, as it shows the request it waits for: the
 // line is the command's, not the theme's.
-func TestATreeInAThemeLeavesTheOutputInTheTerminalsColour(t *testing.T) {
+func TestATreeInAThemeLeavesTheOutputInTheTerminalsColor(t *testing.T) {
 	t.Parallel()
 	f := newTreeFixture(t, "cinc run", treeSetup{theme: display.Tide, styles: true})
 	ctx, _ := progress.Start(f.ctx, progress.KindStep, "run",
@@ -466,7 +466,7 @@ func TestATreeInAThemeLeavesTheOutputInTheTerminalsColour(t *testing.T) {
 // A frame that has no rows left, once the command has ended, but writes the
 // lines of the steps that ended, sets the colours back before them, as a
 // frame with rows does: a colour the command left on does not tint them.
-func TestATreeInAThemeSetsTheColoursBackBeforeTheLinesItLeaves(t *testing.T) {
+func TestATreeInAThemeSetsTheColorsBackBeforeTheLinesItLeaves(t *testing.T) {
 	t.Parallel()
 	var raw bytes.Buffer
 	term := display.NewTerminal(&raw, display.TerminalOptions{Size: func() (int, int, error) { return 100, 24, nil }})
@@ -518,12 +518,12 @@ func treeThemeSealed(t *testing.T, what, styled string) {
 // and every line the tree leaves, sets the colours back, in every theme,
 // in each number of colours, with the ASCII marks too, so that nothing
 // the command writes after it, and no row below it, takes its colour.
-func TestATreeInAThemeLeavesNoColourOn(t *testing.T) {
+func TestATreeInAThemeLeavesNoColorOn(t *testing.T) {
 	t.Parallel()
 	for _, theme := range display.Themes() {
-		for _, colours := range []display.Colours{display.Colours256, display.Colours16, display.NoColours} {
+		for _, colors := range []display.Colors{display.Colors256, display.Colors16, display.ColorsNone} {
 			for _, ascii := range []bool{false, true} {
-				theme := theme.In(colours)
+				theme := theme.In(colors)
 				name := treeThemeName(theme, ascii)
 				marked := &progresstest.Screen{Styles: true}
 				height := 0

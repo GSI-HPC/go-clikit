@@ -308,7 +308,7 @@ func TestPlainLinesInAThemeSayTheWork(t *testing.T) {
 				t.Fatalf("no theme says no work:\n%s", none)
 			}
 			themed := plainThemeWorkLines(t, o)
-			plainThemeLeavesNoColourOn(t, themed)
+			plainThemeLeavesNoColorOn(t, themed)
 			text, _ := plainThemeShown(themed)
 			want := strings.Split(strings.TrimSuffix(none, "\n"), "\n")
 			got := strings.Split(strings.TrimSuffix(text, "\n"), "\n")
@@ -331,9 +331,9 @@ func TestPlainLinesInAThemeSayTheWork(t *testing.T) {
 
 // In a theme the amount and the rate of a step are muted, the share takes
 // the colour of the bar and what the work came to is muted.
-func TestPlainLinesInAThemeColourTheWork(t *testing.T) {
+func TestPlainLinesInAThemeColorTheWork(t *testing.T) {
 	t.Parallel()
-	_, styled := plainThemeShown(plainThemeWorkLines(t, display.PlainOptions{Theme: display.Tide.In(display.Colours16)}))
+	_, styled := plainThemeShown(plainThemeWorkLines(t, display.PlainOptions{Theme: display.Tide.In(display.Colors16)}))
 	for _, want := range []string{
 		"«2»0.8/2.0 GiB«», «36»39%«», «2»80.0 MiB/s«», «2»~16s left«»",
 		"«2»2.0 GiB«» at «2»80.0 MiB/s«»",
@@ -421,7 +421,7 @@ func TestTheSummaryAddsTheWorkOfTheCommand(t *testing.T) {
 func TestTheSummaryInAThemeAddsTheWorkOfTheCommand(t *testing.T) {
 	t.Parallel()
 	tc := plainThemeSummariesWithWork[0]
-	line := plainThemeSummary(t, display.Tide.In(display.Colours16), false, tc.work)
+	line := plainThemeSummary(t, display.Tide.In(display.Colors16), false, tc.work)
 	_, styled := plainThemeShown(line + "\n")
 	if want := "«36»11 ok«», «31»1 failed«», «2»22.8 GiB«» at «2»647 MiB/s«»"; !strings.Contains(styled, want) {
 		t.Errorf("no %q in %s", want, styled)
@@ -435,7 +435,7 @@ func TestTheSummaryInAThemeAddsTheWorkOfTheCommand(t *testing.T) {
 				if unmarked, marked := plainThemeUnmarked(strings.TrimSuffix(text, "\n"), ""); !marked || unmarked != tc.want {
 					t.Errorf("%s: the summary is %q, marked %v; want %q with a mark", tc.name, text, marked, tc.want)
 				}
-				plainThemeLeavesNoColourOn(t, line+"\n")
+				plainThemeLeavesNoColorOn(t, line+"\n")
 			}
 		})
 	}

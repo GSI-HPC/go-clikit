@@ -289,7 +289,7 @@ func (w writer) Write(p []byte) (int, error) {
 	n, err := w.w.Write(p)
 	if n > 0 {
 		wasOpen := t.open
-		if text := trimColours(p[:n]); len(text) > 0 {
+		if text := trimColors(p[:n]); len(text) > 0 {
 			t.open = text[len(text)-1] != '\n'
 		}
 		if wasOpen && !t.open && t.suspended == 0 {
@@ -300,7 +300,7 @@ func (w writer) Write(p []byte) (int, error) {
 	return n, err
 }
 
-// trimColours returns p without the sequences that set colours and other
+// trimColors returns p without the sequences that set colours and other
 // attributes of text (SGR, ESC [ … m) at its end, if the last of them sets
 // every attribute back (ESC [ m, ESC [ 0 m): they take no column, leave the
 // cursor where it is and leave no colour behind, so a write that ends a
@@ -308,7 +308,7 @@ func (w writer) Write(p []byte) (int, error) {
 // at the end of a write and not set back is the start of the text that
 // follows, which the display must not be drawn in, and any other sequence
 // is text.
-func trimColours(p []byte) []byte {
+func trimColors(p []byte) []byte {
 	reset := false
 	for len(p) > 0 && p[len(p)-1] == 'm' {
 		start := bytes.LastIndex(p, []byte("\x1b["))

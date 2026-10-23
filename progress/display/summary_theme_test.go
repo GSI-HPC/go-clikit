@@ -90,7 +90,7 @@ func plainThemeSummary(t *testing.T, theme display.Theme, ascii bool,
 // it draws the ASCII marks; with no theme, ASCII changes nothing.
 func TestTheSummaryInATheme(t *testing.T) {
 	t.Parallel()
-	ember, tide, neon := display.Ember, display.Tide.In(display.Colours16), display.Neon.In(display.NoColours)
+	ember, tide, neon := display.Ember, display.Tide.In(display.Colors16), display.Neon.In(display.ColorsNone)
 	for _, tc := range []struct {
 		theme display.Theme
 		ascii bool
@@ -200,7 +200,7 @@ func TestTheSummaryInAThemeSaysTheWordsOfNone(t *testing.T) {
 				if unmarked, marked := plainThemeUnmarked(strings.TrimSuffix(text, "\n"), ""); !marked || unmarked != none {
 					t.Errorf("%s: the summary is %q, marked %v; want %q with a mark", s.name, text, marked, none)
 				}
-				plainThemeLeavesNoColourOn(t, line+"\n")
+				plainThemeLeavesNoColorOn(t, line+"\n")
 			}
 		})
 	}

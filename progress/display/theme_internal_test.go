@@ -110,10 +110,10 @@ func TestLookOf(t *testing.T) {
 		l.pal != &auroraArt.p256 || len(l.spin) != 10 || l.running != "✦" {
 		t.Errorf("Aurora looks like %+v", l)
 	}
-	if l := lookOf(Aurora.In(Colours16), false); l.pal != &auroraArt.p16 {
+	if l := lookOf(Aurora.In(Colors16), false); l.pal != &auroraArt.p16 {
 		t.Errorf("Aurora in 16 colours has palette %p, want %p", l.pal, &auroraArt.p16)
 	}
-	for _, c := range []Colours{NoColours, 9} {
+	for _, c := range []Colors{ColorsNone, 9} {
 		if l := lookOf(Aurora.In(c), false); l.pal != nil || l.fill != "⣿" {
 			t.Errorf("Aurora in %v colours looks like %+v, want its art in none", c, l)
 		}
@@ -135,7 +135,7 @@ func TestLookOf(t *testing.T) {
 // A mark is bold as well where the palette draws marks bold, and bold once.
 func TestPaintAndMark(t *testing.T) {
 	t.Parallel()
-	aurora, ember, sixteen, none := lookOf(Aurora, false), lookOf(Ember, false), lookOf(Classic.In(Colours16), false), lookOf(Theme{}, false)
+	aurora, ember, sixteen, none := lookOf(Aurora, false), lookOf(Ember, false), lookOf(Classic.In(Colors16), false), lookOf(Theme{}, false)
 	for _, tc := range []struct {
 		name, got, want string
 	}{
@@ -167,7 +167,7 @@ func TestPaintAndMark(t *testing.T) {
 // is the same at any time, and a time before the start is the first frame.
 func TestSpinner(t *testing.T) {
 	t.Parallel()
-	tide := lookOf(Tide.In(NoColours), false)
+	tide := lookOf(Tide.In(ColorsNone), false)
 	for _, tc := range []struct {
 		age  time.Duration
 		want string
@@ -193,7 +193,7 @@ func TestSpinner(t *testing.T) {
 // the innermost level, muted.
 func TestIndent(t *testing.T) {
 	t.Parallel()
-	ember := lookOf(Ember.In(NoColours), false)
+	ember := lookOf(Ember.In(ColorsNone), false)
 	for depth, want := range []string{"", "╎ ", "  ╎ ", "    ╎ "} {
 		if got := ember.indent(depth); got != want {
 			t.Errorf("Ember's indent at %d is %q, want %q", depth, got, want)
@@ -215,7 +215,7 @@ func TestBar(t *testing.T) {
 	count := func(done, failed, total int) progress.Count {
 		return progress.Count{Done: done, Failed: failed, Total: total}
 	}
-	shape := lookOf(Tide.In(NoColours), false)
+	shape := lookOf(Tide.In(ColorsNone), false)
 	for _, tc := range []struct {
 		name string
 		c    progress.Count
@@ -237,7 +237,7 @@ func TestBar(t *testing.T) {
 	if got := lookOf(Classic, false).bar(count(1, 0, 2), 10); got != "" {
 		t.Errorf("Classic, which has no bar, draws %q", got)
 	}
-	if got := lookOf(Ember.In(NoColours), true).bar(count(5, 0, 10), 8); got != "[####....]" {
+	if got := lookOf(Ember.In(ColorsNone), true).bar(count(5, 0, 10), 8); got != "[####....]" {
 		t.Errorf("a bar in ASCII is %q", got)
 	}
 	const blue, orange, slate = "\x1b[38;5;32m", "\x1b[38;5;166m", "\x1b[38;5;66m"
@@ -284,7 +284,7 @@ func TestPalettes(t *testing.T) {
 			if params == "" || params == "1" {
 				continue
 			}
-			n, ok := colour256Of(params)
+			n, ok := color256Of(params)
 			if !ok || n < 16 {
 				t.Errorf("%s in 256 colours: %q, colour %d, sets no colour of the xterm palette", a.name, params, i)
 				continue
@@ -317,9 +317,9 @@ func TestTheFailedEndOfABarStandsApart(t *testing.T) {
 			continue
 		}
 		p := a.p256
-		failed, _ := colour256Of(p.roles[roleFailed])
+		failed, _ := color256Of(p.roles[roleFailed])
 		for _, params := range append([]string{p.roles[roleBar], p.roles[roleMuted]}, p.gradient...) {
-			other, _ := colour256Of(params)
+			other, _ := color256Of(params)
 			for _, sight := range []struct {
 				name string
 				m    *[3][3]float64
@@ -332,10 +332,10 @@ func TestTheFailedEndOfABarStandsApart(t *testing.T) {
 	}
 }
 
-// colour256Of returns n of the parameters 38;5;n of a colour of 256, which
+// color256Of returns n of the parameters 38;5;n of a colour of 256, which
 // "1;" may set bold before, and false for parameters that set no such
 // colour.
-func colour256Of(params string) (int, bool) {
+func color256Of(params string) (int, bool) {
 	n, ok := strings.CutPrefix(strings.TrimPrefix(params, "1;"), "38;5;")
 	if !ok {
 		return 0, false

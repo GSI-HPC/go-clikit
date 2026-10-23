@@ -78,34 +78,49 @@ func errText(err error) string {
 // colours, and not in others.
 func TestThemeIn(t *testing.T) {
 	t.Parallel()
-	if got := (display.Theme{}).In(display.Colours16); got != (display.Theme{}) {
+	if got := (display.Theme{}).In(display.Colors16); got != (display.Theme{}) {
 		t.Errorf("the zero Theme in 16 colours is %v, want the zero Theme", got)
 	}
-	for _, c := range []display.Colours{display.Colours256, display.Colours16} {
-		if got := (display.Theme{}).In(c).Colours(); got != display.NoColours {
+	for _, c := range []display.Colors{display.Colors256, display.Colors16} {
+		if got := (display.Theme{}).In(c).Colors(); got != display.ColorsNone {
 			t.Errorf("the zero Theme in %v colours draws in %v, want none", c, got)
 		}
 	}
-	if display.Aurora.In(display.Colours256) != display.Aurora {
+	if display.Aurora.In(display.Colors256) != display.Aurora {
 		t.Error("Aurora in 256 colours is not Aurora, which is drawn in 256")
 	}
-	sixteen := display.Aurora.In(display.Colours16)
-	if sixteen == display.Aurora || sixteen.Colours() != display.Colours16 || sixteen.String() != "aurora" {
-		t.Errorf("Aurora in 16 colours is %v in %v", sixteen, sixteen.Colours())
+	sixteen := display.Aurora.In(display.Colors16)
+	if sixteen == display.Aurora || sixteen.Colors() != display.Colors16 || sixteen.String() != "aurora" {
+		t.Errorf("Aurora in 16 colours is %v in %v", sixteen, sixteen.Colors())
 	}
-	if display.Aurora.Colours() != display.Colours256 {
-		t.Errorf("Aurora is drawn in %v colours, want 256", display.Aurora.Colours())
+	if display.Aurora.Colors() != display.Colors256 {
+		t.Errorf("Aurora is drawn in %v colours, want 256", display.Aurora.Colors())
 	}
 }
 
-// Colours names how many colours it draws in.
-func TestColoursString(t *testing.T) {
+// Colors names how many colours it draws in.
+func TestColorsString(t *testing.T) {
 	t.Parallel()
-	for c, want := range map[display.Colours]string{
-		display.Colours256: "256", display.Colours16: "16", display.NoColours: "none", 7: "Colours(7)",
+	for c, want := range map[display.Colors]string{
+		display.Colors256: "256", display.Colors16: "16", display.ColorsNone: "none", 7: "Colors(7)",
 	} {
 		if got := c.String(); got != want {
-			t.Errorf("Colours(%d) is %q, want %q", c, got, want)
+			t.Errorf("Colors(%d) is %q, want %q", c, got, want)
+		}
+	}
+}
+
+// The old names of Colors, its constants and Theme.Colors stay as aliases
+// for one minor release (decision 36), and name the same values.
+func TestTheOldNamesOfColorsAreAliases(t *testing.T) {
+	t.Parallel()
+	old := []display.Colours{display.Colours256, display.Colours16, display.NoColours}
+	if want := []display.Colors{display.Colors256, display.Colors16, display.ColorsNone}; !slices.Equal(old, want) {
+		t.Errorf("the old constants are %v, want %v", old, want)
+	}
+	for _, theme := range []display.Theme{{}, display.Aurora, display.Neon.In(display.Colors16)} {
+		if got, want := theme.Colours(), theme.Colors(); got != want {
+			t.Errorf("%v.Colours() is %v, want %v", theme, got, want)
 		}
 	}
 }
@@ -126,8 +141,8 @@ func TestAThemeIsAFlag(t *testing.T) {
 		{display.Classic, []string{"-theme", "Tide"}, display.Tide, false},
 		{display.Classic, []string{"-theme=none"}, display.Theme{}, false},
 		{display.Classic, []string{"-theme=dawn"}, display.Classic, true},
-		{display.Classic.In(display.NoColours), []string{"-theme", "aurora"}, display.Aurora.In(display.NoColours), false},
-		{display.Theme{}.In(display.NoColours), []string{"-theme", "aurora"}, display.Aurora, false},
+		{display.Classic.In(display.ColorsNone), []string{"-theme", "aurora"}, display.Aurora.In(display.ColorsNone), false},
+		{display.Theme{}.In(display.ColorsNone), []string{"-theme", "aurora"}, display.Aurora, false},
 	} {
 		fs := flag.NewFlagSet("prog", flag.ContinueOnError)
 		fs.SetOutput(io.Discard)
@@ -136,12 +151,12 @@ func TestAThemeIsAFlag(t *testing.T) {
 		err := fs.Parse(tc.args)
 		if theme != tc.want || (err != nil) != tc.err {
 			t.Errorf("%v over %v in %v: the flag reads %v in %v, %v; want %v in %v, an error %v",
-				tc.args, tc.value, tc.value.Colours(), theme, theme.Colours(), err, tc.want, tc.want.Colours(), tc.err)
+				tc.args, tc.value, tc.value.Colors(), theme, theme.Colors(), err, tc.want, tc.want.Colors(), tc.err)
 		}
 	}
-	theme := display.Ember.In(display.Colours16)
-	if err := theme.UnmarshalText([]byte("neon")); err != nil || theme != display.Neon.In(display.Colours16) {
-		t.Errorf("UnmarshalText of neon over Ember in 16 colours gives %v in %v, %v; want Neon in 16", theme, theme.Colours(), err)
+	theme := display.Ember.In(display.Colors16)
+	if err := theme.UnmarshalText([]byte("neon")); err != nil || theme != display.Neon.In(display.Colors16) {
+		t.Errorf("UnmarshalText of neon over Ember in 16 colours gives %v in %v, %v; want Neon in 16", theme, theme.Colors(), err)
 	}
 	if text, err := display.Neon.MarshalText(); string(text) != "neon" || err != nil {
 		t.Errorf("MarshalText of Neon = %q, %v", text, err)
