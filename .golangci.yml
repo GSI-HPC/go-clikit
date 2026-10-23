@@ -70,17 +70,18 @@ linters:
             - pkg: github.com/GSI-HPC/go-clikit/progress/cliprogress
               desc: localweb imports no command-line glue (doc/decisions.md, decision 25)
         # The ioctls and fcntls cliprogress makes, the file lock of fsutil
-        # and the peer check of localweb; every other package leaves the
-        # system alone (doc/decisions.md, decisions 22 and 26).
+        # and the lock of localweb/launch; every other package, the
+        # localweb root among them, leaves the system alone or asks it
+        # through syscall (doc/decisions.md, decisions 22, 26, 35 and 37).
         x-sys-only-where-decided:
           files:
             - $all
             - "!**/progress/cliprogress/**"
             - "!**/fsutil/**"
-            - "!**/localweb/**"
+            - "!**/localweb/launch/**"
           deny:
             - pkg: golang.org/x/sys
-              desc: only progress/cliprogress, fsutil and localweb ask the system (doc/decisions.md, decisions 22 and 26)
+              desc: only progress/cliprogress, fsutil and localweb/launch ask the system through golang.org/x/sys (doc/decisions.md, decisions 22, 26, 35 and 37)
     # The kit reads no environment, sets nothing process-wide and ends no
     # process (doc/decisions.md, decision 21): not through os, syscall or
     # golang.org/x/sys/unix, nor through log.Fatal.
