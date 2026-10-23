@@ -30,7 +30,14 @@ import (
 // matches errors.ErrUnsupported, and the program decides: serve on a Unix
 // socket (Listen), or refuse to start. A connection whose owner cannot be
 // told is closed.
+//
+// On every system, PeerListener returns an error when l is not a TCP
+// listener, whose connections it would all close (doc/decisions.md,
+// decision 40).
 func PeerListener(l net.Listener, uid int, refused func(error)) (net.Listener, error) {
+	if err := tcpOnly(l); err != nil {
+		return nil, err
+	}
 	return &peerListener{Listener: l, uid: uid, owner: procOwner("/proc", tcpEstablished), refused: refused}, nil
 }
 
