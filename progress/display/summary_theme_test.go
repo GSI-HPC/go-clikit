@@ -73,7 +73,7 @@ func plainThemeSummary(t *testing.T, theme display.Theme, ascii bool,
 ) string {
 	t.Helper()
 	c := &clock{now: time.Date(2026, 9, 26, 12, 0, 0, 0, time.UTC)}
-	summary := &display.Summary{Theme: theme, ASCII: ascii}
+	summary := display.NewSummary(display.SummaryOptions{Theme: theme, ASCII: ascii})
 	capture := &progresstest.Capture{}
 	bus := progress.NewBus(progress.BusOptions{Sinks: []progress.Sink{capture, summary}, Now: c.Now})
 	ctx, command := progress.Start(progress.WithBus(context.Background(), bus), progress.KindCommand, "exec")

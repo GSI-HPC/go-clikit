@@ -46,17 +46,30 @@ import (
 //
 //	✗ provision reinstall: failed in 18m03s: 478 ok, 2 failed
 //
+// NewSummary makes a Summary with its options, which stay as they are
+// given. The zero Summary is ready to use too, and draws in the zero Theme.
+//
 // A Summary is a progress.Sink; its methods are safe for concurrent use.
 type Summary struct {
-	// Theme draws the line in its colours, with the mark of how the
-	// command ended in front; the zero Theme draws it as it has always
-	// been drawn, with no mark and no escape code. Line reads it: set it
-	// before the Summary is put on a Bus.
+	// Theme is the old way to set SummaryOptions.Theme, read when NewSummary
+	// was given the zero Theme or did not make the Summary. Line reads it:
+	// set it before the Summary is put on a Bus.
+	//
+	// Deprecated: Pass SummaryOptions.Theme to NewSummary, which fixes it
+	// when the Summary is made, as the options of the other displays are
+	// (decision 36).
 	Theme Theme
-	// ASCII draws the mark of Theme in ASCII, for a locale that is not
-	// UTF-8; with the zero Theme it changes nothing. Line reads it: set it
-	// before the Summary is put on a Bus.
+	// ASCII is the old way to set SummaryOptions.ASCII, read with it: either
+	// draws in ASCII. Line reads it: set it before the Summary is put on a
+	// Bus.
+	//
+	// Deprecated: Pass SummaryOptions.ASCII to NewSummary, which fixes it
+	// when the Summary is made, as the options of the other displays are
+	// (decision 36).
 	ASCII bool
+
+	// o is what NewSummary was given.
+	o SummaryOptions
 
 	mu    sync.Mutex
 	tally progress.Tally
@@ -80,6 +93,32 @@ type Summary struct {
 	worked  progress.Reading
 	hasWork bool
 	units   map[progress.Unit]struct{}
+}
+
+// SummaryOptions configure a Summary.
+type SummaryOptions struct {
+	// Theme draws the line in its colours, with the mark of how the
+	// command ended in front; the zero Theme draws it as it has always
+	// been drawn, with no mark and no escape code.
+	Theme Theme
+	// ASCII draws the mark of Theme in ASCII, for a locale that is not
+	// UTF-8; with the zero Theme it changes nothing.
+	ASCII bool
+}
+
+// NewSummary returns a Summary that draws its line as o says (decision
+// 46). NewSummary(SummaryOptions{}) is the same as the zero Summary.
+func NewSummary(o SummaryOptions) *Summary { return &Summary{o: o} }
+
+// options returns what NewSummary was given, with the deprecated fields
+// read where it was given a zero.
+func (s *Summary) options() SummaryOptions {
+	o := s.o
+	if o.Theme == (Theme{}) {
+		o.Theme = s.Theme
+	}
+	o.ASCII = o.ASCII || s.ASCII
+	return o
 }
 
 // outcomes counts targets by how they ended.
@@ -229,9 +268,10 @@ func (s *Summary) Line() string {
 	if d < time.Second {
 		return ""
 	}
-	l := lookOf(s.Theme, s.ASCII)
+	o := s.options()
+	l := lookOf(o.Theme, o.ASCII)
 	line := fmt.Sprintf("%s: %s in %s", l.paint(roleTitle, s.name), wordIn(l, s.status), l.paint(roleMuted, took(d)))
-	if s.Theme.art != nil {
+	if o.Theme.art != nil {
 		line = l.endMark(s.status) + " " + line
 	}
 	sep := ": "

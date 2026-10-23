@@ -363,7 +363,7 @@ func ExampleNewPlain_theme() {
 	term := display.NewTerminal(screen, display.TerminalOptions{})
 	theme := display.Ember.In(display.Colors16)
 	plain := display.NewPlain(term, display.PlainOptions{Now: clock.Now, Theme: theme})
-	summary := &display.Summary{Theme: theme}
+	summary := display.NewSummary(display.SummaryOptions{Theme: theme})
 	bus := progress.NewBus(progress.BusOptions{Sinks: []progress.Sink{plain, summary}, Now: clock.Now})
 	ctx, command := progress.Start(progress.WithBus(context.Background(), bus), progress.KindCommand, "create cluster")
 
@@ -428,9 +428,9 @@ func ExampleNewCounter_theme() {
 
 // The Summary in a theme starts with the mark of how the command ended, in
 // its colour: here Tide's, in none, as under NO_COLOR, which keeps the mark.
-func ExampleSummary_theme() {
+func ExampleNewSummary() {
 	clock := newExampleClock()
-	summary := &display.Summary{Theme: display.Tide.In(display.ColorsNone)}
+	summary := display.NewSummary(display.SummaryOptions{Theme: display.Tide.In(display.ColorsNone)})
 	bus := progress.NewBus(progress.BusOptions{Sinks: []progress.Sink{summary}, Now: clock.Now})
 	ctx, command := progress.Start(progress.WithBus(context.Background(), bus), progress.KindCommand, "drain")
 
