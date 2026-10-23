@@ -128,13 +128,22 @@ type Manager struct {
 }
 
 // New returns the Manager of the launch o.Token. It refuses an Options
-// without a token, a cookie prefix or a CSRF header.
+// without a token, a cookie prefix or a CSRF header, a cookie prefix that
+// does not make a valid cookie name with a port after it, and a CSRF
+// header that is not a valid header name: net/http would not send either
+// (doc/decisions.md, decision 40).
 func New(o Options) (*Manager, error) {
 	o.CookiePrefix = cmp.Or(o.CookiePrefix, o.Cookie)
 	o.CSRFHeader = cmp.Or(o.CSRFHeader, o.Header)
 	o.CSRFField = cmp.Or(o.CSRFField, o.Field, DefaultCSRFField)
 	if o.Token == "" || o.CookiePrefix == "" || o.CSRFHeader == "" {
 		return nil, errors.New("session: Options needs a Token, a CookiePrefix and a CSRFHeader")
+	}
+	if !isToken(o.CookiePrefix + "80") {
+		return nil, fmt.Errorf("session: Options.CookiePrefix %q makes no valid cookie name", o.CookiePrefix)
+	}
+	if !isToken(o.CSRFHeader) {
+		return nil, fmt.Errorf("session: Options.CSRFHeader %q is no valid header name", o.CSRFHeader)
 	}
 	if o.MaxBody == 0 {
 		o.MaxBody = DefaultMaxBody
@@ -266,6 +275,13 @@ func (s *Manager) checkWrite(w http.ResponseWriter, r *http.Request, csrf string
 		return false
 	}
 	return true
+}
+
+// isToken reports whether s is a token of RFC 7230, as a header name and a
+// cookie name must be; http.SetCookie writes no cookie with another name,
+// and a cookie name follows the same rule as a header name.
+func isToken(s string) bool {
+	return (&http.Cookie{Name: s, Value: "x"}).Valid() == nil
 }
 
 // size words n bytes, in KiB when it is a whole number of them.
