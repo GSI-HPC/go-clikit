@@ -292,9 +292,9 @@ func ExampleTheme() {
 	}
 	noColor := true // the program read NO_COLOR from its environment
 	if noColor {
-		theme = theme.In(display.NoColours)
+		theme = theme.In(display.ColorsNone)
 	}
-	fmt.Println(theme, theme.Colours())
+	fmt.Println(theme, theme.Colors())
 	fmt.Println(display.Themes())
 	// Output:
 	// aurora none
@@ -305,7 +305,7 @@ func ExampleTheme() {
 // are when it reads none.
 func ExampleParseTheme() {
 	theme, err := display.ParseTheme("Tide")
-	fmt.Println(theme, theme.Colours(), err)
+	fmt.Println(theme, theme.Colors(), err)
 	_, err = display.ParseTheme("dawn")
 	fmt.Println(err)
 	// Output:
@@ -361,7 +361,7 @@ func ExampleNewPlain_theme() {
 	clock := newExampleClock()
 	screen := &progresstest.Screen{Styles: true}
 	term := display.NewTerminal(screen, display.TerminalOptions{})
-	theme := display.Ember.In(display.Colours16)
+	theme := display.Ember.In(display.Colors16)
 	plain := display.NewPlain(term, display.PlainOptions{Now: clock.Now, Theme: theme})
 	summary := &display.Summary{Theme: theme}
 	bus := progress.NewBus(progress.BusOptions{Sinks: []progress.Sink{plain, summary}, Now: clock.Now})
@@ -430,7 +430,7 @@ func ExampleNewCounter_theme() {
 // its colour: here Tide's, in none, as under NO_COLOR, which keeps the mark.
 func ExampleSummary_theme() {
 	clock := newExampleClock()
-	summary := &display.Summary{Theme: display.Tide.In(display.NoColours)}
+	summary := &display.Summary{Theme: display.Tide.In(display.ColorsNone)}
 	bus := progress.NewBus(progress.BusOptions{Sinks: []progress.Sink{summary}, Now: clock.Now})
 	ctx, command := progress.Start(progress.WithBus(context.Background(), bus), progress.KindCommand, "drain")
 

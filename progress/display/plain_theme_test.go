@@ -94,7 +94,7 @@ func plainThemeShown(raw string) (text, styled string) {
 func plainThemeOptions() []display.PlainOptions {
 	var all []display.PlainOptions
 	for _, theme := range display.Themes() {
-		for _, c := range []display.Colours{display.Colours256, display.Colours16, display.NoColours} {
+		for _, c := range []display.Colors{display.Colors256, display.Colors16, display.ColorsNone} {
 			for _, ascii := range []bool{false, true} {
 				all = append(all, display.PlainOptions{Theme: theme.In(c), ASCII: ascii})
 			}
@@ -105,7 +105,7 @@ func plainThemeOptions() []display.PlainOptions {
 
 // plainThemeName names the options of a Plain for a subtest.
 func plainThemeName(o display.PlainOptions) string {
-	name := o.Theme.String() + " in " + o.Theme.Colours().String()
+	name := o.Theme.String() + " in " + o.Theme.Colors().String()
 	if o.ASCII {
 		name += " in ASCII"
 	}
@@ -115,12 +115,12 @@ func plainThemeName(o display.PlainOptions) string {
 // plainThemeSGR finds the sequences that set attributes of text.
 var plainThemeSGR = regexp.MustCompile("\x1b\\[[0-9;:]*m")
 
-// plainThemeLeavesNoColourOn checks that every line of raw sets each
+// plainThemeLeavesNoColorOn checks that every line of raw sets each
 // attribute it sets back before it sets another and before it ends, that
 // it holds no escape but these, and that text written after it is in the
 // terminal's own colour: nothing a theme draws bleeds into the next line,
 // or into the command's output.
-func plainThemeLeavesNoColourOn(t *testing.T, raw string) {
+func plainThemeLeavesNoColorOn(t *testing.T, raw string) {
 	t.Helper()
 	for line := range strings.Lines(raw) {
 		seqs := plainThemeSGR.FindAllString(line, -1)
@@ -196,7 +196,7 @@ func TestPlainLinesInATheme(t *testing.T) {
 «1;38;5;136»[0:14]«» «1»✓«» bmc power on«38;5;101» › «»report: «1»done«» in «38;5;101»1.5s«»
 «1;38;5;130»⊟«» «1»bmc power on«»: «38;5;130»canceled«» in «38;5;101»14s«»: «1»2 ok«», «38;5;162»1 failed«», «38;5;130»3 canceled«», «38;5;101»2 skipped«»
 `},
-		{name: "tide in 16 colours", o: display.PlainOptions{Theme: display.Tide.In(display.Colours16)}, styled: `
+		{name: "tide in 16 colours", o: display.PlainOptions{Theme: display.Tide.In(display.Colors16)}, styled: `
 «32»[0:00]«» «32»↝«» bmc power on«2» › «»power on: «32»start«», 6 targets, 2 at a time
 «32»[0:00]«» «32»↝«» bmc power on«2» › «»power on«2» › «»batch 1/2: «32»start«», 5 targets
 «32»[0:01]«» «31»✕«» bmc power on«2» › «»power on«2» › «»batch 1/2«2» › «»exe1 «31»failed (transport)«»: exe1.mgmt: dial tcp: i/o timeout
@@ -220,7 +220,7 @@ func TestPlainLinesInATheme(t *testing.T) {
 «32»[0:14]«» «36»✓«» bmc power on«2» › «»report: «36»done«» in «2»1.5s«»
 «35»⊖«» «1»bmc power on«»: «35»canceled«» in «2»14s«»: «36»2 ok«», «31»1 failed«», «35»3 canceled«», «2»2 skipped«»
 `},
-		{name: "neon in no colours", o: display.PlainOptions{Theme: display.Neon.In(display.NoColours)}, styled: `
+		{name: "neon in no colours", o: display.PlainOptions{Theme: display.Neon.In(display.ColorsNone)}, styled: `
 [0:00] ➤ bmc power on › power on: start, 6 targets, 2 at a time
 [0:00] ➤ bmc power on › power on › batch 1/2: start, 5 targets
 [0:01] ✘ bmc power on › power on › batch 1/2 › exe1 failed (transport): exe1.mgmt: dial tcp: i/o timeout
@@ -343,12 +343,12 @@ func TestPlainLinesInAThemeSayTheWordsOfNone(t *testing.T) {
 
 // Nothing a theme draws is left on at the end of a line, so that no colour
 // runs on into the next line or into what the command writes.
-func TestPlainLinesInAThemeLeaveNoColourOn(t *testing.T) {
+func TestPlainLinesInAThemeLeaveNoColorOn(t *testing.T) {
 	t.Parallel()
 	for _, o := range plainThemeOptions() {
 		t.Run(plainThemeName(o), func(t *testing.T) {
 			t.Parallel()
-			plainThemeLeavesNoColourOn(t, plainThemeWork(t, o))
+			plainThemeLeavesNoColorOn(t, plainThemeWork(t, o))
 		})
 	}
 }

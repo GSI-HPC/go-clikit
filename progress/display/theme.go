@@ -39,8 +39,8 @@ import (
 // is dumb, passes the zero Theme. With the ASCII options a display draws a
 // theme's colours with ASCII marks.
 type Theme struct {
-	art     *art
-	colours Colours
+	art    *art
+	colors Colors
 }
 
 // The themes. Each is drawn in 256 colours; In draws it in others.
@@ -117,62 +117,90 @@ func (t *Theme) UnmarshalText(text []byte) error {
 	if err != nil {
 		return err
 	}
-	*t = p.In(t.colours)
+	*t = p.In(t.colors)
 	return nil
 }
 
 // In returns t drawn in c colours, with its own marks, spinner, bar and
 // guides. The zero Theme stays the zero Theme, which draws in no colour
 // whatever c is.
-func (t Theme) In(c Colours) Theme {
+func (t Theme) In(c Colors) Theme {
 	if t.art == nil {
 		return t
 	}
-	return Theme{art: t.art, colours: c}
+	return Theme{art: t.art, colors: c}
 }
 
-// Colours returns how many colours t draws in: NoColours for the zero
+// Colors returns how many colours t draws in: ColorsNone for the zero
 // Theme.
-func (t Theme) Colours() Colours {
+func (t Theme) Colors() Colors {
 	if t.art == nil {
-		return NoColours
+		return ColorsNone
 	}
-	return t.colours
+	return t.colors
 }
 
-// Colours is how many colours a Theme draws in: as many as the terminal
+// Colours returns how many colours t draws in, as Colors does.
+//
+// Deprecated: Use Colors, whose name is spelt in American English, as
+// identifiers are (decision 36).
+func (t Theme) Colours() Colors { return t.Colors() }
+
+// Colors is how many colours a Theme draws in: as many as the terminal
 // shows, which the program finds out, from TERM or COLORTERM, say.
-type Colours uint8
+type Colors uint8
 
 const (
-	// Colours256 draws a theme as it is designed, in colours of the xterm
+	// Colors256 draws a theme as it is designed, in colours of the xterm
 	// palette of 256, which xterm, VTE, Konsole, iTerm2, Terminal.app,
 	// Windows Terminal, tmux and screen show, chosen to read on a light
-	// background as on a dark one. It is the zero Colours.
-	Colours256 Colours = iota
-	// Colours16 draws a theme in the terminal's own palette, which its user
+	// background as on a dark one. It is the zero Colors.
+	Colors256 Colors = iota
+	// Colors16 draws a theme in the terminal's own palette, which its user
 	// chose for its background: green, red, yellow, blue's neighbours cyan
 	// and magenta, bold and faint, never bold with a colour and never the
 	// bright colours, which some palettes make grey.
-	Colours16
-	// NoColours draws a theme's art alone, with no escape code: for
-	// NO_COLOR. A Colours that is none of these draws as NoColours.
-	NoColours
+	Colors16
+	// ColorsNone draws a theme's art alone, with no escape code: for
+	// NO_COLOR. A Colors that is none of these draws as ColorsNone.
+	ColorsNone
 )
 
-// String returns "256", "16" or "none", and "Colours(n)" for a value that
-// is none of the Colours.
-func (c Colours) String() string {
+// String returns "256", "16" or "none", and "Colors(n)" for a value that
+// is none of the Colors.
+func (c Colors) String() string {
 	switch c {
-	case Colours256:
+	case Colors256:
 		return "256"
-	case Colours16:
+	case Colors16:
 		return "16"
-	case NoColours:
+	case ColorsNone:
 		return "none"
 	}
-	return fmt.Sprintf("Colours(%d)", uint8(c))
+	return fmt.Sprintf("Colors(%d)", uint8(c))
 }
+
+// Colours is the old name of Colors.
+//
+// Deprecated: Use Colors, whose name is spelt in American English, as
+// identifiers are (decision 36).
+type Colours = Colors
+
+const (
+	// Colours256 is the old name of Colors256.
+	//
+	// Deprecated: Use Colors256 (decision 36).
+	Colours256 = Colors256
+	// Colours16 is the old name of Colors16.
+	//
+	// Deprecated: Use Colors16 (decision 36).
+	Colours16 = Colors16
+	// NoColours is the old name of ColorsNone.
+	//
+	// Deprecated: Use ColorsNone, which takes its type as a prefix, as
+	// every enum constant does (decision 36).
+	NoColours = ColorsNone
+)
 
 // role is what a part of a row is, which its colour follows.
 type role int
@@ -241,8 +269,8 @@ type art struct {
 	p256, p16   palette
 }
 
-// colour256 is the parameters of colour n of the 256.
-func colour256(n int) string { return fmt.Sprintf("38;5;%d", n) }
+// color256 is the parameters of colour n of the 256.
+func color256(n int) string { return fmt.Sprintf("38;5;%d", n) }
 
 var (
 	classicArt = art{
@@ -250,8 +278,8 @@ var (
 		spin: []string{"▸"}, every: time.Second, still: "▸",
 		more: "⋯", sep: " ⋅ ", path: " › ", divider: " | ",
 		p256: palette{bold: true, roles: [roleCount]string{
-			roleTitle: "1", roleOK: colour256(28), roleFailed: colour256(196), roleCanceled: colour256(136),
-			roleSkipped: colour256(244), roleRunning: colour256(31), roleClock: colour256(31), roleMuted: colour256(244),
+			roleTitle: "1", roleOK: color256(28), roleFailed: color256(196), roleCanceled: color256(136),
+			roleSkipped: color256(244), roleRunning: color256(31), roleClock: color256(31), roleMuted: color256(244),
 		}},
 		p16: palette{roles: [roleCount]string{
 			roleTitle: "1", roleOK: "32", roleFailed: "31", roleCanceled: "33",
@@ -263,10 +291,10 @@ var (
 		spin: []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}, every: 100 * time.Millisecond, still: "✦",
 		more: "⋯", sep: " ∙ ", path: " › ", divider: " ⡇ ", guide: "⋮ ", fill: "⣿", track: "⣀",
 		p256: palette{bold: true, roles: [roleCount]string{
-			roleTitle: "1", roleOK: colour256(30), roleFailed: colour256(196), roleCanceled: colour256(103),
-			roleSkipped: colour256(244), roleRunning: colour256(98), roleClock: colour256(68), roleMuted: colour256(244),
-			roleBar: colour256(30),
-		}, gradient: []string{colour256(30), colour256(31), colour256(32), colour256(68), colour256(98), colour256(134)}},
+			roleTitle: "1", roleOK: color256(30), roleFailed: color256(196), roleCanceled: color256(103),
+			roleSkipped: color256(244), roleRunning: color256(98), roleClock: color256(68), roleMuted: color256(244),
+			roleBar: color256(30),
+		}, gradient: []string{color256(30), color256(31), color256(32), color256(68), color256(98), color256(134)}},
 		p16: palette{roles: [roleCount]string{
 			roleTitle: "1", roleOK: "36", roleFailed: "31", roleCanceled: "33",
 			roleSkipped: "2", roleRunning: "35", roleClock: "35", roleMuted: "2", roleBar: "36",
@@ -277,9 +305,9 @@ var (
 		spin: []string{"▖", "▘", "▝", "▗"}, every: 200 * time.Millisecond, still: "▮",
 		more: "⋯", sep: " ╏ ", path: " » ", divider: " ❚ ", guide: "╎ ", fill: "▮", track: "▯",
 		p256: palette{bold: true, roles: [roleCount]string{
-			roleTitle: "1", roleOK: "1", roleFailed: colour256(162), roleCanceled: colour256(130),
-			roleSkipped: colour256(101), roleRunning: colour256(166), roleClock: "1;" + colour256(136), roleMuted: colour256(101),
-			roleBar: colour256(166),
+			roleTitle: "1", roleOK: "1", roleFailed: color256(162), roleCanceled: color256(130),
+			roleSkipped: color256(101), roleRunning: color256(166), roleClock: "1;" + color256(136), roleMuted: color256(101),
+			roleBar: color256(166),
 		}},
 		p16: palette{roles: [roleCount]string{
 			roleTitle: "1", roleOK: "1", roleFailed: "31", roleCanceled: "35",
@@ -291,10 +319,10 @@ var (
 		spin: []string{"◴", "◷", "◶", "◵"}, every: 200 * time.Millisecond, still: "➤",
 		more: "⋯", sep: " ⋄ ", path: " ❯ ", divider: " ╏ ", guide: "╏ ", fill: "▰", track: "▱",
 		p256: palette{bold: true, roles: [roleCount]string{
-			roleTitle: "1", roleOK: colour256(33), roleFailed: colour256(197), roleCanceled: colour256(136),
-			roleSkipped: colour256(103), roleRunning: colour256(135), roleClock: "1;" + colour256(134), roleMuted: colour256(103),
-			roleBar: colour256(33),
-		}, gradient: []string{colour256(33), colour256(69), colour256(63), colour256(99), colour256(135), colour256(170)}},
+			roleTitle: "1", roleOK: color256(33), roleFailed: color256(197), roleCanceled: color256(136),
+			roleSkipped: color256(103), roleRunning: color256(135), roleClock: "1;" + color256(134), roleMuted: color256(103),
+			roleBar: color256(33),
+		}, gradient: []string{color256(33), color256(69), color256(63), color256(99), color256(135), color256(170)}},
 		p16: palette{roles: [roleCount]string{
 			roleTitle: "1", roleOK: "36", roleFailed: "31", roleCanceled: "33",
 			roleSkipped: "2", roleRunning: "35", roleClock: "35", roleMuted: "2", roleBar: "36",
@@ -305,9 +333,9 @@ var (
 		spin: []string{"◜", "◠", "◝", "◞", "◡", "◟"}, every: 200 * time.Millisecond, still: "↝",
 		more: "⋯", sep: " ◦ ", path: " ⟩ ", divider: " ╎ ", guide: "╎ ", fill: "◉", track: "◌",
 		p256: palette{bold: true, roles: [roleCount]string{
-			roleTitle: "1", roleOK: colour256(32), roleFailed: colour256(166), roleCanceled: colour256(103),
-			roleSkipped: colour256(66), roleRunning: colour256(29), roleClock: colour256(31), roleMuted: colour256(66),
-			roleBar: colour256(32),
+			roleTitle: "1", roleOK: color256(32), roleFailed: color256(166), roleCanceled: color256(103),
+			roleSkipped: color256(66), roleRunning: color256(29), roleClock: color256(31), roleMuted: color256(66),
+			roleBar: color256(32),
 		}},
 		p16: palette{roles: [roleCount]string{
 			roleTitle: "1", roleOK: "36", roleFailed: "31", roleCanceled: "35",
@@ -379,10 +407,10 @@ func lookOf(t Theme, ascii bool) look {
 		l.more, l.sep, l.path, l.divider = a.more, a.sep, a.path, a.divider
 		l.guide, l.fill, l.track = a.guide, a.fill, a.track
 	}
-	switch t.colours {
-	case Colours256:
+	switch t.colors {
+	case Colors256:
 		l.pal = &a.p256
-	case Colours16:
+	case Colors16:
 		l.pal = &a.p16
 	}
 	return l
@@ -397,8 +425,8 @@ func painted(params, s string) string {
 	return "\x1b[" + params + "m" + s + reset
 }
 
-// colour returns the parameters of r's colour, "" when the look has none.
-func (l look) colour(r role) string {
+// color returns the parameters of r's colour, "" when the look has none.
+func (l look) color(r role) string {
 	if l.pal == nil {
 		return ""
 	}
@@ -407,12 +435,12 @@ func (l look) colour(r role) string {
 
 // paint returns s in r's colour, set back after it, so that no colour runs
 // on into what follows; s itself when the look has no colour for r.
-func (l look) paint(r role, s string) string { return painted(l.colour(r), s) }
+func (l look) paint(r role, s string) string { return painted(l.color(r), s) }
 
 // mark returns the mark s in r's colour, bold as well where the palette
 // draws its marks bold.
 func (l look) mark(r role, s string) string {
-	params := l.colour(r)
+	params := l.color(r)
 	if params != "" && l.pal.bold && params != "1" && !strings.HasPrefix(params, "1;") {
 		params = "1;" + params
 	}
@@ -533,14 +561,14 @@ func (l look) cells(filled, bad, cells int) string {
 		}
 		run.WriteString(cell)
 	}
-	muted := l.colour(roleMuted)
+	muted := l.color(roleMuted)
 	add(muted, l.open)
 	for i := range cells {
 		switch {
 		case i < filled-bad:
-			add(l.barColour(i, cells), l.fill)
+			add(l.barColor(i, cells), l.fill)
 		case i < filled:
-			add(l.colour(roleFailed), l.fill)
+			add(l.color(roleFailed), l.fill)
 		default:
 			add(muted, l.track)
 		}
@@ -550,11 +578,11 @@ func (l look) cells(filled, bad, cells int) string {
 	return b.String()
 }
 
-// barColour returns the parameters of the colour of a bar's filled cell i
+// barColor returns the parameters of the colour of a bar's filled cell i
 // of cells: its place in the gradient, or the bar's colour.
-func (l look) barColour(i, cells int) string {
+func (l look) barColor(i, cells int) string {
 	if l.pal == nil || l.pal.gradient == nil {
-		return l.colour(roleBar)
+		return l.color(roleBar)
 	}
 	g := l.pal.gradient
 	return g[i*len(g)/cells]

@@ -147,16 +147,16 @@ func TestCounterThemeDrawsTheLineInATheme(t *testing.T) {
 			"«38;5;135»◵«» «1»reset the machines«38;5;103» ⋄ «38;5;33»▰▰«38;5;69»▰«38;5;63»▰«38;5;99»▰▰«38;5;197»▰«38;5;103»▱«» 7/8" +
 				"«38;5;103» ⋄ «38;5;197»1 failed«38;5;103» ⋄ «38;5;135»1 running«38;5;103» ⋄ «1;38;5;134»0:02.3«»",
 		}},
-		{display.Classic.In(display.Colours16), []string{
+		{display.Classic.In(display.Colors16), []string{
 			"«36»▸«» «1»reset the machines«2» ⋅ «»3/8«2» ⋅ «31»1 failed«2» ⋅ «36»2 running«2» ⋅ 3 queued ⋅ «36»0:02.0«»",
 			"«36»▸«» «1»reset the machines«2» ⋅ «»7/8«2» ⋅ «31»1 failed«2» ⋅ «36»1 running«2» ⋅ «36»0:02.3«»",
 		}},
-		{display.Aurora.In(display.NoColours), []string{
+		{display.Aurora.In(display.ColorsNone), []string{
 			"⠋ reset the machines ∙ ⣿⣿⣿⣀⣀⣀⣀⣀ 3/8 ∙ 1 failed ∙ 2 running ∙ 3 queued ∙ 0:02.0",
 			"⠸ reset the machines ∙ ⣿⣿⣿⣿⣿⣿⣿⣀ 7/8 ∙ 1 failed ∙ 1 running ∙ 0:02.3",
 		}},
 	} {
-		t.Run(tc.theme.String()+"/"+tc.theme.Colours().String(), func(t *testing.T) {
+		t.Run(tc.theme.String()+"/"+tc.theme.Colors().String(), func(t *testing.T) {
 			t.Parallel()
 			f := counterThemeNew(t, "provision reinstall", 100, display.CounterOptions{Theme: tc.theme})
 			targets := counterThemeResetTheMachines(f.ctx)
@@ -186,7 +186,7 @@ func TestCounterThemeShowsTwoStepsSideBySide(t *testing.T) {
 			"«38;5;66» ◦ «38;5;29»1 running«38;5;66» ◦ 1 queued ╎ " +
 			"«1»run«38;5;66» ◦ «38;5;166»◉◉«38;5;66»◌◌◌◌◌◌«» 1/3«38;5;66» ◦ «38;5;166»1 failed«38;5;66» ◦ " +
 			"«38;5;29»1 running«38;5;66» ◦ 1 queued ◦ «38;5;31»0:02.0«»"},
-		{display.Ember.In(display.Colours16), "«33»▝«» «1»read the power state«2» ╏ «33»▮▮«2»▯▯▯▯▯▯«» 1/3" +
+		{display.Ember.In(display.Colors16), "«33»▝«» «1»read the power state«2» ╏ «33»▮▮«2»▯▯▯▯▯▯«» 1/3" +
 			"«2» ╏ «33»1 running«2» ╏ 1 queued ❚ " +
 			"«1»run«2» ╏ «31»▮▮«2»▯▯▯▯▯▯«» 1/3«2» ╏ «31»1 failed«2» ╏ «33»1 running«2» ╏ 1 queued ╏ «33»0:02.0«»"},
 	} {
@@ -259,7 +259,7 @@ func TestCounterThemePaintsEveryCount(t *testing.T) {
 		{display.Tide, "«38;5;29»◡«» «1»check the nodes«38;5;66» ◦ «38;5;32»◉◉◉◉«38;5;166»◉«38;5;66»◌◌◌«» 4/6" +
 			"«38;5;66» ◦ «38;5;166»1 failed«38;5;66» ◦ «38;5;103»1 canceled«38;5;66» ◦ 1 skipped ◦ " +
 			"«38;5;29»1 running«38;5;66» ◦ 1 queued ◦ waiting ◦ «38;5;31»0:02.0«»"},
-		{display.Ember.In(display.Colours16), "«33»▝«» «1»check the nodes«2» ╏ «33»▮▮▮▮«31»▮«2»▯▯▯«» 4/6" +
+		{display.Ember.In(display.Colors16), "«33»▝«» «1»check the nodes«2» ╏ «33»▮▮▮▮«31»▮«2»▯▯▯«» 4/6" +
 			"«2» ╏ «31»1 failed«2» ╏ «35»1 canceled«2» ╏ 1 skipped ╏ «33»1 running«2» ╏ 1 queued ╏ waiting ╏ «33»0:02.0«»"},
 	} {
 		t.Run(tc.theme.String(), func(t *testing.T) {
@@ -312,7 +312,7 @@ func TestCounterThemeDropsTheBarsThatWouldNotFit(t *testing.T) {
 		{90, "◶ read the power state ⋄ ▱▱▱▱▱▱▱▱ 0/3 ⋄ 3 queued ╏ run ⋄ ▱▱▱▱▱▱▱▱ 0/3 ⋄ 3 queued ⋄ 0:02.0"},
 		{85, "◶ read the power state ⋄ 0/3 ⋄ 3 queued ╏ run ⋄ 0/3 ⋄ 3 queued ⋄ 0:02.0"},
 	} {
-		f := counterThemeNew(t, "provision status", tc.width, display.CounterOptions{Theme: display.Neon.In(display.NoColours)})
+		f := counterThemeNew(t, "provision status", tc.width, display.CounterOptions{Theme: display.Neon.In(display.ColorsNone)})
 		counterThemeStep(f.ctx, "read the power state", 3)
 		counterThemeStep(f.ctx, "run", 3)
 		f.draw(2 * time.Second)
@@ -337,7 +337,7 @@ func TestCounterThemeInASCII(t *testing.T) {
 				"«1»run«38;5;103» - [........]«» 0/3«38;5;103» - 3 queued - «1;38;5;134»0:02.0«»",
 		},
 		{
-			display.Classic.In(display.Colours16),
+			display.Classic.In(display.Colors16),
 			"> reset the machines - 3/8 - 1 failed - 2 running - 3 queued | run - 0/3 - 3 queued - 0:02.0",
 			"«36»>«» «1»reset the machines«2» - «»3/8«2» - «31»1 failed«2» - «36»2 running«2» - 3 queued | " +
 				"«1»run«2» - «»0/3«2» - 3 queued - «36»0:02.0«»",
@@ -373,7 +373,7 @@ func TestCounterThemeTurnsTheSpinnerWithTheClock(t *testing.T) {
 	} {
 		t.Run(tc.theme.String(), func(t *testing.T) {
 			t.Parallel()
-			f := counterThemeNew(t, "", 80, display.CounterOptions{Theme: tc.theme.In(display.NoColours)})
+			f := counterThemeNew(t, "", 80, display.CounterOptions{Theme: tc.theme.In(display.ColorsNone)})
 			var got strings.Builder
 			f.draw(time.Second)
 			for range []rune(tc.want) {
@@ -413,15 +413,15 @@ func TestCounterThemeNamesTheStepUnderWay(t *testing.T) {
 // No colour a line is drawn in runs on into what the command writes after
 // it, in any theme, in any number of colours, in ASCII or not, whether the
 // line fits or is cut.
-func TestCounterThemeLeavesNoColourOn(t *testing.T) {
+func TestCounterThemeLeavesNoColorOn(t *testing.T) {
 	t.Parallel()
 	for _, theme := range display.Themes() {
-		for _, colours := range []display.Colours{display.Colours256, display.Colours16, display.NoColours} {
+		for _, colors := range []display.Colors{display.Colors256, display.Colors16, display.ColorsNone} {
 			for _, ascii := range []bool{false, true} {
 				for _, width := range []int{200, 40, 12} {
-					t.Run(fmt.Sprintf("%s/%s/ascii=%t/%d", theme, colours, ascii, width), func(t *testing.T) {
+					t.Run(fmt.Sprintf("%s/%s/ascii=%t/%d", theme, colors, ascii, width), func(t *testing.T) {
 						t.Parallel()
-						f := counterThemeNew(t, "bmc status", width, display.CounterOptions{Theme: theme.In(colours), ASCII: ascii})
+						f := counterThemeNew(t, "bmc status", width, display.CounterOptions{Theme: theme.In(colors), ASCII: ascii})
 						counterThemeEveryCount(f.ctx)
 						counterThemeResetTheMachines(f.ctx)
 						f.draw(2 * time.Second)

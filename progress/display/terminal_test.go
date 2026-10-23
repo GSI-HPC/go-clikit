@@ -391,7 +391,7 @@ func TestLinesStayWholeUnderInterleaving(t *testing.T) {
 // line or alone, has begun the text that follows in that colour: the line
 // stays open, so that no frame and no line of a Lines writer is drawn in
 // the colour, until a write ends the line, or sets the colour back.
-func TestAColourNotSetBackLeavesTheLineOpen(t *testing.T) {
+func TestAColorNotSetBackLeavesTheLineOpen(t *testing.T) {
 	t.Parallel()
 	f := newTerminalFixture(t, display.TerminalOptions{})
 	out := f.term.Writer(f.screen)
@@ -509,7 +509,7 @@ func TestThePanicOfADisplayWritesWhatItHeldFirst(t *testing.T) {
 // A write that ends a line and then sets the colour back, as a coloured
 // line written whole often does, has left no line open: the counter is
 // drawn again, and the lines of the Lines writers are not held.
-func TestAColourAfterTheEndOfALineLeavesNoLineOpen(t *testing.T) {
+func TestAColorAfterTheEndOfALineLeavesNoLineOpen(t *testing.T) {
 	t.Parallel()
 	f := newTerminalFixture(t, display.TerminalOptions{})
 	out := f.term.Writer(f.screen)

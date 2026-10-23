@@ -11,7 +11,7 @@ import (
 	"github.com/GSI-HPC/go-clikit/termtext"
 )
 
-func TestCutReadsColoursAsTakingNoColumn(t *testing.T) {
+func TestCutReadsColorsAsTakingNoColumn(t *testing.T) {
 	const red, green = "\x1b[31m", "\x1b[38;5;42m"
 	for _, tc := range []struct {
 		name string
@@ -61,7 +61,7 @@ func TestCutOfPlainTextIsTruncate(t *testing.T) {
 // colour fills the width without wrapping, and sets the colour back where
 // it cut one short. A frame drawn in colour starts from none, so that a
 // colour the command left on does not tint it.
-func TestTheTerminalCutsAColouredRowByWhatItShows(t *testing.T) {
+func TestTheTerminalCutsAColoredRowByWhatItShows(t *testing.T) {
 	var b strings.Builder
 	term := NewTerminal(&b, TerminalOptions{Size: func() (int, int, error) { return 6, 10, nil }})
 	term.attach(nil)
