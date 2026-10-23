@@ -257,6 +257,24 @@ func TestAnIdleStreamKeepsAlive(t *testing.T) {
 	}
 }
 
+// A negative duration turns its thing off, and never panics: no retry
+// field, no keep-alive, and a change that is rendered at once.
+func TestNegativeOptionsTurnTheirThingOff(t *testing.T) {
+	t.Parallel()
+
+	p := newPage()
+	r, _ := serve(t, p, sse.Options{Coalesce: -1, KeepAlive: -1, Retry: -time.Second})
+	next(t, r)
+	next(t, r)
+	p.set("runs", "<ul>1</ul>")
+	if got, want := next(t, r), (sse.Event{Name: "runs", Data: "<ul>1</ul>"}); got != want {
+		t.Errorf("after a change: got %+v, want %+v", got, want)
+	}
+	if r.Retry != "" {
+		t.Errorf("retry is %q, want none", r.Retry)
+	}
+}
+
 // The stream ends without an error when the client goes or the server
 // stops.
 func TestAStreamEndsWithItsClientOrItsServer(t *testing.T) {

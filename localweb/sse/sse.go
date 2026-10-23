@@ -71,16 +71,20 @@ type Event struct {
 	Data string
 }
 
-// Options configures Serve.
+// Options configures Serve. A zero duration is its default, and a
+// negative one turns the thing off, as in localweb.ServeOptions; no value
+// makes Serve panic (doc/decisions.md, decision 40).
 type Options struct {
 	// Coalesce is how long changes gather before they are rendered; 0 is
-	// DefaultCoalesce.
+	// DefaultCoalesce, and a negative Coalesce gathers nothing: each
+	// change is rendered at once.
 	Coalesce time.Duration
 	// KeepAlive is how often an idle stream sends a comment; 0 is
-	// DefaultKeepAlive.
+	// DefaultKeepAlive, and a negative KeepAlive sends none.
 	KeepAlive time.Duration
 	// Retry is how long a browser waits before it opens a broken stream
-	// again; 0 is DefaultRetry.
+	// again; 0 is DefaultRetry, and a negative Retry sends no retry
+	// field, so that the browser waits as long as it chooses.
 	Retry time.Duration
 	// Done ends the stream when it closes, as the context of a server
 	// that stops does: http.Server.Shutdown does not end the requests in
@@ -134,14 +138,19 @@ func Serve[T comparable](w http.ResponseWriter, r *http.Request, n *Notifier[T],
 	w.WriteHeader(http.StatusOK)
 
 	st := stream{w: w, rc: rc, sent: map[string][sha256.Size]byte{}}
-	_, _ = io.WriteString(w, "retry: "+strconv.FormatInt(o.Retry.Milliseconds(), 10)+"\n\n")
+	if o.Retry > 0 {
+		_, _ = io.WriteString(w, "retry: "+strconv.FormatInt(o.Retry.Milliseconds(), 10)+"\n\n")
+	}
 	if err := st.send(first); err != nil {
 		return st.end(err)
 	}
 
-	var timer <-chan time.Time
-	keepAlive := time.NewTicker(o.KeepAlive)
-	defer keepAlive.Stop()
+	var timer, keepAlive <-chan time.Time
+	if o.KeepAlive > 0 {
+		t := time.NewTicker(o.KeepAlive)
+		defer t.Stop()
+		keepAlive = t.C
+	}
 	for {
 		select {
 		case <-r.Context().Done():
@@ -150,9 +159,9 @@ func Serve[T comparable](w http.ResponseWriter, r *http.Request, n *Notifier[T],
 			return nil
 		case <-sub.Changed():
 			if timer == nil {
-				timer = time.After(o.Coalesce)
+				timer = time.After(max(o.Coalesce, 0))
 			}
-		case <-keepAlive.C:
+		case <-keepAlive:
 			_, _ = io.WriteString(w, ": keep-alive\n\n")
 			if err := rc.Flush(); err != nil {
 				return st.end(err)
