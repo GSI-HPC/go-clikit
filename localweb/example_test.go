@@ -12,6 +12,7 @@ import (
 	"net/http/httptest"
 	"net/netip"
 	"strings"
+	"time"
 
 	"github.com/GSI-HPC/go-clikit/localweb"
 )
@@ -156,4 +157,48 @@ func ExampleMisdirectedRefusal() {
 	fmt.Print(w.Code, " ", w.Body)
 	// Output:
 	// 421 This server answers to its loopback address only.
+}
+
+// A handler that waits for news, such as a long poll, also waits for the
+// server to stop, so that it does not hold the stop for its grace period.
+func ExampleStopping() {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	b, err := localweb.Listen(ctx, "127.0.0.1:0", localweb.ListenOptions{})
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	news := make(chan string)
+	waiting := make(chan struct{})
+	h := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		close(waiting)
+		select {
+		case n := <-news:
+			fmt.Fprintln(w, n)
+		case <-localweb.Stopping(r.Context()):
+			w.WriteHeader(http.StatusServiceUnavailable)
+		case <-r.Context().Done():
+		}
+	})
+	done := make(chan error, 1)
+	go func() { done <- localweb.Serve(ctx, b.Listeners, h, localweb.ServeOptions{Grace: time.Hour}) }()
+
+	status := make(chan string, 1)
+	go func() {
+		res, err := http.Get("http://" + b.Host() + "/news")
+		if err != nil {
+			status <- err.Error()
+			return
+		}
+		_ = res.Body.Close()
+		status <- res.Status
+	}()
+	<-waiting
+	cancel()
+	fmt.Println(<-status)
+	fmt.Println(<-done)
+	// Output:
+	// 503 Service Unavailable
+	// <nil>
 }

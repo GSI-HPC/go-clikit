@@ -64,12 +64,19 @@ type ServeOptions struct {
 // stopped the others at once, and when requests had to be cut off at the
 // end of the grace period.
 //
+// The context of every request holds the stop signal, which Stopping
+// returns: http.Server.Shutdown does not end a request in flight, so a
+// handler that runs until its client goes, such as an event stream, ends
+// on the signal, and does not hold the stop for the whole grace period.
+//
 // A connection that has sent no request is closed at once on stop, where
 // http.Server.Shutdown would wait for it as for a request: a browser opens
 // such connections ahead of need, and without this, stopping shortly after
 // a page was loaded would take the whole grace period.
 func Serve(ctx context.Context, ls []net.Listener, h http.Handler, o ServeOptions) error {
 	spare := &spareConns{conns: map[net.Conn]struct{}{}}
+	stop := make(chan struct{})
+	base := context.WithValue(context.Background(), stoppingKey{}, (<-chan struct{})(stop))
 	s := &http.Server{
 		Handler:           h,
 		ReadHeaderTimeout: limit(o.ReadHeaderTimeout, DefaultReadHeaderTimeout),
@@ -79,6 +86,7 @@ func Serve(ctx context.Context, ls []net.Listener, h http.Handler, o ServeOption
 		MaxHeaderBytes:    limit(o.MaxHeaderBytes, DefaultMaxHeaderBytes),
 		ConnState:         spare.track,
 		ErrorLog:          o.ErrorLog,
+		BaseContext:       func(net.Listener) context.Context { return base },
 	}
 	// Shutdown calls this once the listeners are closed.
 	s.RegisterOnShutdown(spare.closeAll)
@@ -95,11 +103,13 @@ func Serve(ctx context.Context, ls []net.Listener, h http.Handler, o ServeOption
 	case err := <-served:
 		// One listener failed. Another would go on answering under half
 		// of the names the user was told, so it stops too, at once.
+		close(stop)
 		_ = s.Close()
 		wg.Wait()
 		return fmt.Errorf("serve: %w", err)
 	case <-ctx.Done():
 	}
+	close(stop)
 
 	grace, cancel := context.WithTimeout(context.WithoutCancel(ctx), limit(o.Grace, DefaultGrace))
 	defer cancel()
@@ -110,6 +120,19 @@ func Serve(ctx context.Context, ls []net.Listener, h http.Handler, o ServeOption
 	}
 	wg.Wait()
 	return err
+}
+
+// stoppingKey is the context key of the stop signal of Serve.
+type stoppingKey struct{}
+
+// Stopping returns a channel that closes when the Serve that serves the
+// request whose context is ctx starts to stop, before the grace period
+// begins. A handler that runs until its client goes, such as
+// localweb/sse's stream, ends when it closes. For a context that does not
+// come from Serve it returns nil, which never closes.
+func Stopping(ctx context.Context) <-chan struct{} {
+	stop, _ := ctx.Value(stoppingKey{}).(<-chan struct{})
+	return stop
 }
 
 // limit returns v, def when v is zero, and 0, no limit for net/http, when

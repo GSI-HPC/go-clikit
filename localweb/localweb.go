@@ -26,7 +26,8 @@
 //   - Headers sets the Content-Security-Policy, the frame, referrer and
 //     resource policies, and nosniff on every answer.
 //   - Serve serves with every timeout set, and stops within a grace period
-//     when its context ends.
+//     when its context ends. Stopping tells a handler that waits, such as
+//     an event stream, that the server stops.
 //
 // localweb/session exchanges the launch token for a session cookie and
 // holds the CSRF token, and localweb/sse streams the live parts of a page.

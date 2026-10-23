@@ -133,6 +133,51 @@ func TestServeLetsARequestInFlightFinish(t *testing.T) {
 	}
 }
 
+// A handler that waits for its client to go ends on the stop signal, and
+// does not hold the stop for the grace period.
+func TestStoppingEndsAHandlerThatWaits(t *testing.T) {
+	t.Parallel()
+
+	l := loopback(t)
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	started := make(chan struct{})
+	h := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		close(started)
+		select {
+		case <-Stopping(r.Context()):
+			_, _ = w.Write([]byte("stopping"))
+		case <-r.Context().Done():
+		}
+	})
+	done := serving(ctx, []net.Listener{l}, h, ServeOptions{Grace: time.Hour})
+	answer := make(chan string, 1)
+	go func() { answer <- get(t, "http://"+l.Addr().String()+"/") }()
+	<-started
+
+	begin := time.Now()
+	cancel()
+
+	if err := result(t, done); err != nil {
+		t.Errorf("Serve = %v, want nil", err)
+	}
+	if took := time.Since(begin); took > patience {
+		t.Errorf("the stop took %v", took)
+	}
+	if got := <-answer; got != "stopping" {
+		t.Errorf("answer = %q, want stopping", got)
+	}
+}
+
+// Outside Serve there is no stop signal.
+func TestStoppingOutsideServe(t *testing.T) {
+	t.Parallel()
+
+	if Stopping(context.Background()) != nil {
+		t.Error("Stopping of a bare context is not nil")
+	}
+}
+
 func TestServeCutsOffARequestAtTheEndOfTheGrace(t *testing.T) {
 	t.Parallel()
 
