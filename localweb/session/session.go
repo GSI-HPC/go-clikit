@@ -13,7 +13,7 @@
 // other sites and of other Host names:
 //
 //	sessions, err := session.New(session.Options{Token: token, Cookie: "prog_ui_", Header: "X-Prog-CSRF"})
-//	h := localweb.Headers("")(localweb.Hosts(b.Answers, nil)(
+//	h := localweb.Headers("")(localweb.Hosts(b.Answers, localweb.HostsOptions{})(
 //		localweb.SameOrigin(localweb.Origin{Navigate: true})(sessions.Middleware(mux))))
 //
 // A page puts CSRF(r.Context()) into its forms, in the field Options.Field,

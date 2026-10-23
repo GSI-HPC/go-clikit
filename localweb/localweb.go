@@ -35,7 +35,7 @@
 // that an http.ServeMux and a router such as chi can both take them. A
 // program puts them in this order, outermost first:
 //
-//	h := localweb.Headers("")(localweb.Hosts(b.Answers, nil)(
+//	h := localweb.Headers("")(localweb.Hosts(b.Answers, localweb.HostsOptions{})(
 //		localweb.SameOrigin(localweb.Origin{Navigate: true})(sessions.Middleware(mux))))
 //
 // A check that refuses a request answers it with a Refusal: a status, a
