@@ -76,9 +76,9 @@ func owns(u progress.Unit, amount, size int64) func(*progress.Event) {
 // queued starts a span queued.
 func queued(e *progress.Event) { e.State = progress.StateQueued }
 
-// counting makes a span a step with Fold that expects total targets.
+// counting makes a span a step with FlagFold that expects total targets.
 func counting(total int) func(*progress.Event) {
-	return func(e *progress.Event) { e.Flags, e.Total = progress.Fold, total }
+	return func(e *progress.Event) { e.Flags, e.Total = progress.FlagFold, total }
 }
 
 // totalOf sets a span's Total.
@@ -89,11 +89,11 @@ func totalOf(total int) func(*progress.Event) {
 func TestBoundNamesItsRule(t *testing.T) {
 	t.Parallel()
 	for b, want := range map[progress.Bound]string{
-		progress.Unbounded: "unbounded",
-		progress.BySize:    "size",
-		progress.ByTargets: "targets",
-		progress.ByBelow:   "below",
-		progress.Bound(9):  "bound(9)",
+		progress.BoundNone:     "unbounded",
+		progress.BoundSize:     "size",
+		progress.BoundTargets:  "targets",
+		progress.BoundChildren: "below",
+		progress.Bound(9):      "bound(9)",
 	} {
 		if got := b.String(); got != want {
 			t.Errorf("Bound(%d).String() = %q, want %q", b, got, want)
@@ -123,10 +123,10 @@ func TestTheMeterRollsTheAmountUpTheTree(t *testing.T) {
 	if _, ok := m.meter.Read(step, m.now); ok {
 		t.Errorf("a step without work has a reading")
 	}
-	m.start(first, step, progress.KindTarget, owns(progress.Bytes, 0, 1000))
-	m.start(second, first, progress.KindCall, owns(progress.Bytes, 0, 0))
-	m.start(third, first, progress.KindCall, owns(progress.Items, 7, 0))
-	m.start(fourth, step, progress.KindTarget, owns(progress.Bytes, 200, 0))
+	m.start(first, step, progress.KindTarget, owns(progress.UnitBytes, 0, 1000))
+	m.start(second, first, progress.KindCall, owns(progress.UnitBytes, 0, 0))
+	m.start(third, first, progress.KindCall, owns(progress.UnitItems, 7, 0))
+	m.start(fourth, step, progress.KindTarget, owns(progress.UnitBytes, 200, 0))
 	m.advance(second, 300)
 	m.send(progress.TypeEnd, second, func(e *progress.Event) { e.Amount = 400 })
 
@@ -135,11 +135,11 @@ func TestTheMeterRollsTheAmountUpTheTree(t *testing.T) {
 		unit   progress.Unit
 		amount int64
 	}{
-		{cmd, progress.Bytes, 600},
-		{step, progress.Bytes, 600},
-		{first, progress.Bytes, 400},
-		{third, progress.Items, 7},
-		{fourth, progress.Bytes, 200},
+		{cmd, progress.UnitBytes, 600},
+		{step, progress.UnitBytes, 600},
+		{first, progress.UnitBytes, 400},
+		{third, progress.UnitItems, 7},
+		{fourth, progress.UnitBytes, 200},
 	} {
 		if r := m.read(t, tc.span); r.Unit != tc.unit || r.Amount != tc.amount {
 			t.Errorf("span %d reads %d %s, want %d %s", tc.span, r.Amount, r.Unit, tc.amount, tc.unit)
@@ -168,175 +168,175 @@ func TestTheMeterTakesTheShareFromTheFirstRuleThatApplies(t *testing.T) {
 			return step
 		}, progress.Reading{}, false},
 		{"its own size", func(m *metering) progress.SpanID {
-			m.start(step, 0, progress.KindStep, owns(progress.Bytes, 0, 1000))
-			m.start(first, step, progress.KindCall, owns(progress.Bytes, 250, 0))
+			m.start(step, 0, progress.KindStep, owns(progress.UnitBytes, 0, 1000))
+			m.start(first, step, progress.KindCall, owns(progress.UnitBytes, 250, 0))
 			return step
-		}, progress.Reading{Unit: progress.Bytes, Amount: 250, Size: 1000, Bound: progress.BySize, Fraction: 0.25}, true},
+		}, progress.Reading{Unit: progress.UnitBytes, Amount: 250, Size: 1000, Bound: progress.BoundSize, Fraction: 0.25}, true},
 		{"an amount past its size is done", func(m *metering) progress.SpanID {
-			m.start(first, 0, progress.KindCall, owns(progress.Bytes, 3000, 2000))
+			m.start(first, 0, progress.KindCall, owns(progress.UnitBytes, 3000, 2000))
 			return first
-		}, progress.Reading{Unit: progress.Bytes, Amount: 3000, Size: 2000, Bound: progress.BySize, Fraction: 1}, true},
+		}, progress.Reading{Unit: progress.UnitBytes, Amount: 3000, Size: 2000, Bound: progress.BoundSize, Fraction: 1}, true},
 		{"its targets once one is bounded", func(m *metering) progress.SpanID {
 			m.start(step, 0, progress.KindStep, counting(4))
-			m.start(first, step, progress.KindTarget, queued, owns(progress.Bytes, 0, 100))
-			m.start(second, step, progress.KindTarget, queued, owns(progress.Bytes, 0, 100))
+			m.start(first, step, progress.KindTarget, queued, owns(progress.UnitBytes, 0, 100))
+			m.start(second, step, progress.KindTarget, queued, owns(progress.UnitBytes, 0, 100))
 			m.send(progress.TypeRun, first)
 			m.advance(first, 100)
 			m.end(first)
 			m.send(progress.TypeRun, second)
 			m.advance(second, 50)
 			return step
-		}, progress.Reading{Unit: progress.Bytes, Amount: 150, Bound: progress.ByTargets, Fraction: 0.375}, true},
+		}, progress.Reading{Unit: progress.UnitBytes, Amount: 150, Bound: progress.BoundTargets, Fraction: 0.375}, true},
 		{"its targets at their sizes are short of done", func(m *metering) progress.SpanID {
 			m.start(step, 0, progress.KindStep, counting(2))
-			m.start(first, step, progress.KindTarget, queued, owns(progress.Bytes, 0, 100))
-			m.start(second, step, progress.KindTarget, queued, owns(progress.Bytes, 0, 100))
+			m.start(first, step, progress.KindTarget, queued, owns(progress.UnitBytes, 0, 100))
+			m.start(second, step, progress.KindTarget, queued, owns(progress.UnitBytes, 0, 100))
 			m.send(progress.TypeRun, first)
 			m.send(progress.TypeRun, second)
 			m.advance(first, 100)
 			m.advance(second, 100)
 			m.end(first)
 			return step
-		}, progress.Reading{Unit: progress.Bytes, Amount: 200, Bound: progress.ByTargets, Fraction: 0.999}, true},
+		}, progress.Reading{Unit: progress.UnitBytes, Amount: 200, Bound: progress.BoundTargets, Fraction: 0.999}, true},
 		{"a running target without a bound adds nothing", func(m *metering) progress.SpanID {
 			m.start(step, 0, progress.KindStep, counting(2))
-			m.start(first, step, progress.KindTarget, owns(progress.Bytes, 50, 100))
-			m.start(second, step, progress.KindTarget, owns(progress.Items, 9, 0))
+			m.start(first, step, progress.KindTarget, owns(progress.UnitBytes, 50, 100))
+			m.start(second, step, progress.KindTarget, owns(progress.UnitItems, 9, 0))
 			return step
-		}, progress.Reading{Unit: progress.Bytes, Amount: 50, Bound: progress.ByTargets, Fraction: 0.25}, true},
+		}, progress.Reading{Unit: progress.UnitBytes, Amount: 50, Bound: progress.BoundTargets, Fraction: 0.25}, true},
 		{"targets without a bound leave the count to say it", func(m *metering) progress.SpanID {
 			m.start(step, 0, progress.KindStep, counting(2))
-			m.start(first, step, progress.KindTarget, owns(progress.Items, 4, 0))
+			m.start(first, step, progress.KindTarget, owns(progress.UnitItems, 4, 0))
 			m.start(second, step, progress.KindTarget, queued)
 			m.end(first)
 			return step
-		}, progress.Reading{Unit: progress.Items, Amount: 4}, true},
+		}, progress.Reading{Unit: progress.UnitItems, Amount: 4}, true},
 		{"every target ended", func(m *metering) progress.SpanID {
 			m.start(step, 0, progress.KindStep, counting(2))
-			m.start(first, step, progress.KindTarget, owns(progress.Bytes, 0, 3))
-			m.start(second, step, progress.KindTarget, owns(progress.Bytes, 0, 3))
+			m.start(first, step, progress.KindTarget, owns(progress.UnitBytes, 0, 3))
+			m.start(second, step, progress.KindTarget, owns(progress.UnitBytes, 0, 3))
 			m.advance(first, 1)
 			m.advance(second, 2)
 			m.end(first)
 			m.end(second)
 			return step
-		}, progress.Reading{Unit: progress.Bytes, Amount: 3, Bound: progress.ByTargets, Fraction: 1}, true},
+		}, progress.Reading{Unit: progress.UnitBytes, Amount: 3, Bound: progress.BoundTargets, Fraction: 1}, true},
 		{"a batch whose Total is not known", func(m *metering) progress.SpanID {
 			m.start(step, 0, progress.KindBatch)
-			m.start(first, step, progress.KindTarget, owns(progress.Bytes, 50, 100))
+			m.start(first, step, progress.KindTarget, owns(progress.UnitBytes, 50, 100))
 			return step
-		}, progress.Reading{Unit: progress.Bytes, Amount: 50, Size: 100, Bound: progress.ByBelow, Fraction: 0.5}, true},
+		}, progress.Reading{Unit: progress.UnitBytes, Amount: 50, Size: 100, Bound: progress.BoundChildren, Fraction: 0.5}, true},
 		{"a batch whose Total is known", func(m *metering) progress.SpanID {
 			m.start(step, 0, progress.KindBatch, totalOf(2))
-			m.start(first, step, progress.KindTarget, owns(progress.Bytes, 50, 100))
+			m.start(first, step, progress.KindTarget, owns(progress.UnitBytes, 50, 100))
 			return step
-		}, progress.Reading{Unit: progress.Bytes, Amount: 50, Bound: progress.ByTargets, Fraction: 0.25}, true},
+		}, progress.Reading{Unit: progress.UnitBytes, Amount: 50, Bound: progress.BoundTargets, Fraction: 0.25}, true},
 		{"the mean of the calls in percent", func(m *metering) progress.SpanID {
 			m.start(step, 0, progress.KindStep)
-			m.start(first, step, progress.KindCall, owns(progress.Percent, 40, 100))
-			m.start(second, step, progress.KindCall, owns(progress.Percent, 80, 100))
+			m.start(first, step, progress.KindCall, owns(progress.UnitPercent, 40, 100))
+			m.start(second, step, progress.KindCall, owns(progress.UnitPercent, 80, 100))
 			m.end(second)
 			return step
-		}, progress.Reading{Unit: progress.Percent, Amount: 120, Size: 200, Bound: progress.ByBelow, Fraction: 0.6}, true},
+		}, progress.Reading{Unit: progress.UnitPercent, Amount: 120, Size: 200, Bound: progress.BoundChildren, Fraction: 0.6}, true},
 		{"a sized call over a sized call counts once", func(m *metering) progress.SpanID {
 			m.start(step, 0, progress.KindStep)
-			m.start(first, step, progress.KindCall, owns(progress.Bytes, 0, 100))
-			m.start(second, first, progress.KindCall, owns(progress.Bytes, 0, 100))
+			m.start(first, step, progress.KindCall, owns(progress.UnitBytes, 0, 100))
+			m.start(second, first, progress.KindCall, owns(progress.UnitBytes, 0, 100))
 			m.advance(second, 100)
 			m.end(second)
 			m.end(first)
 			return step
-		}, progress.Reading{Unit: progress.Bytes, Amount: 100, Size: 100, Bound: progress.ByBelow, Fraction: 1}, true},
+		}, progress.Reading{Unit: progress.UnitBytes, Amount: 100, Size: 100, Bound: progress.BoundChildren, Fraction: 1}, true},
 		{"a sized target over a sized call counts once", func(m *metering) progress.SpanID {
 			m.start(cmd, 0, progress.KindCommand)
 			m.start(step, cmd, progress.KindStep)
-			m.start(first, step, progress.KindTarget, owns(progress.Bytes, 0, 1000))
-			m.start(second, first, progress.KindCall, owns(progress.Bytes, 0, 1000))
+			m.start(first, step, progress.KindTarget, owns(progress.UnitBytes, 0, 1000))
+			m.start(second, first, progress.KindCall, owns(progress.UnitBytes, 0, 1000))
 			m.advance(second, 1000)
 			m.end(second)
 			m.end(first)
 			return cmd
-		}, progress.Reading{Unit: progress.Bytes, Amount: 1000, Size: 1000, Bound: progress.ByBelow, Fraction: 1}, true},
+		}, progress.Reading{Unit: progress.UnitBytes, Amount: 1000, Size: 1000, Bound: progress.BoundChildren, Fraction: 1}, true},
 		{"a sized target over an unsized call bounds it", func(m *metering) progress.SpanID {
 			m.start(step, 0, progress.KindStep)
-			m.start(first, step, progress.KindTarget, owns(progress.Bytes, 0, 1000))
-			m.start(second, first, progress.KindCall, owns(progress.Bytes, 400, 0))
+			m.start(first, step, progress.KindTarget, owns(progress.UnitBytes, 0, 1000))
+			m.start(second, first, progress.KindCall, owns(progress.UnitBytes, 400, 0))
 			return step
-		}, progress.Reading{Unit: progress.Bytes, Amount: 400, Size: 1000, Bound: progress.ByBelow, Fraction: 0.4}, true},
+		}, progress.Reading{Unit: progress.UnitBytes, Amount: 400, Size: 1000, Bound: progress.BoundChildren, Fraction: 0.4}, true},
 		{"a size given up passes up what it covered", func(m *metering) progress.SpanID {
 			m.start(step, 0, progress.KindStep)
-			m.start(first, step, progress.KindTarget, owns(progress.Bytes, 10, 100))
-			m.start(second, first, progress.KindCall, owns(progress.Bytes, 5, 50))
+			m.start(first, step, progress.KindTarget, owns(progress.UnitBytes, 10, 100))
+			m.start(second, first, progress.KindCall, owns(progress.UnitBytes, 5, 50))
 			m.send(progress.TypeUpdate, first, owns(0, 0, 0))
 			return step
-		}, progress.Reading{Unit: progress.Bytes, Amount: 5, Size: 50, Bound: progress.ByBelow, Fraction: 0.1}, true},
+		}, progress.Reading{Unit: progress.UnitBytes, Amount: 5, Size: 50, Bound: progress.BoundChildren, Fraction: 0.1}, true},
 		{"a size not known below", func(m *metering) progress.SpanID {
 			m.start(step, 0, progress.KindStep)
-			m.start(first, step, progress.KindCall, owns(progress.Bytes, 10, 100))
-			m.start(second, step, progress.KindCall, owns(progress.Bytes, 5, 0))
+			m.start(first, step, progress.KindCall, owns(progress.UnitBytes, 10, 100))
+			m.start(second, step, progress.KindCall, owns(progress.UnitBytes, 5, 0))
 			return step
-		}, progress.Reading{Unit: progress.Bytes, Amount: 15}, true},
+		}, progress.Reading{Unit: progress.UnitBytes, Amount: 15}, true},
 		{"its own unit before the one below", func(m *metering) progress.SpanID {
-			m.start(step, 0, progress.KindStep, owns(progress.Items, 3, 0))
-			m.start(first, step, progress.KindCall, owns(progress.Bytes, 10, 100))
+			m.start(step, 0, progress.KindStep, owns(progress.UnitItems, 3, 0))
+			m.start(first, step, progress.KindCall, owns(progress.UnitBytes, 10, 100))
 			return step
-		}, progress.Reading{Unit: progress.Items, Amount: 3}, true},
+		}, progress.Reading{Unit: progress.UnitItems, Amount: 3}, true},
 		{"a unit taken from below gives way to its own", func(m *metering) progress.SpanID {
 			m.start(step, 0, progress.KindStep)
-			m.start(first, step, progress.KindCall, owns(progress.Bytes, 10, 100))
-			m.send(progress.TypeUpdate, step, owns(progress.Items, 5, 10))
+			m.start(first, step, progress.KindCall, owns(progress.UnitBytes, 10, 100))
+			m.send(progress.TypeUpdate, step, owns(progress.UnitItems, 5, 10))
 			return step
-		}, progress.Reading{Unit: progress.Items, Amount: 5, Size: 10, Bound: progress.BySize, Fraction: 0.5}, true},
+		}, progress.Reading{Unit: progress.UnitItems, Amount: 5, Size: 10, Bound: progress.BoundSize, Fraction: 0.5}, true},
 		{"an amount below 0 is none", func(m *metering) progress.SpanID {
-			m.start(first, 0, progress.KindCall, owns(progress.Bytes, -5, 10))
+			m.start(first, 0, progress.KindCall, owns(progress.UnitBytes, -5, 10))
 			return first
-		}, progress.Reading{Unit: progress.Bytes, Size: 10, Bound: progress.BySize}, true},
+		}, progress.Reading{Unit: progress.UnitBytes, Size: 10, Bound: progress.BoundSize}, true},
 		{"a unit that changes takes its amount along", func(m *metering) progress.SpanID {
 			m.start(step, 0, progress.KindStep)
-			m.start(first, step, progress.KindCall, owns(progress.Bytes, 10, 100))
-			m.send(progress.TypeUpdate, first, owns(progress.Items, 10, 0))
+			m.start(first, step, progress.KindCall, owns(progress.UnitBytes, 10, 100))
+			m.send(progress.TypeUpdate, first, owns(progress.UnitItems, 10, 0))
 			return step
-		}, progress.Reading{Unit: progress.Bytes}, true},
+		}, progress.Reading{Unit: progress.UnitBytes}, true},
 		{"work given up below", func(m *metering) progress.SpanID {
 			m.start(step, 0, progress.KindStep)
-			m.start(first, step, progress.KindCall, owns(progress.Bytes, 10, 100))
+			m.start(first, step, progress.KindCall, owns(progress.UnitBytes, 10, 100))
 			m.send(progress.TypeUpdate, first, owns(0, 0, 0))
 			return step
-		}, progress.Reading{Unit: progress.Bytes}, true},
+		}, progress.Reading{Unit: progress.UnitBytes}, true},
 		{"work in percent is out of 100", func(m *metering) progress.SpanID {
-			m.start(first, 0, progress.KindCall, owns(progress.Percent, 30, 7))
+			m.start(first, 0, progress.KindCall, owns(progress.UnitPercent, 30, 7))
 			return first
-		}, progress.Reading{Unit: progress.Percent, Amount: 30, Size: 100, Bound: progress.BySize, Fraction: 0.3}, true},
+		}, progress.Reading{Unit: progress.UnitPercent, Amount: 30, Size: 100, Bound: progress.BoundSize, Fraction: 0.3}, true},
 		{"a span started under one that ended", func(m *metering) progress.SpanID {
 			m.start(cmd, 0, progress.KindCommand)
 			m.start(step, cmd, progress.KindStep)
 			m.end(step)
-			m.start(first, step, progress.KindCall, owns(progress.Bytes, 10, 100))
+			m.start(first, step, progress.KindCall, owns(progress.UnitBytes, 10, 100))
 			return cmd
 		}, progress.Reading{}, false},
 		{"an event after the end", func(m *metering) progress.SpanID {
-			m.start(first, 0, progress.KindCall, owns(progress.Bytes, 10, 100))
+			m.start(first, 0, progress.KindCall, owns(progress.UnitBytes, 10, 100))
 			m.end(first)
 			m.advance(first, 20)
 			return first
 		}, progress.Reading{}, false},
 		{"a second start", func(m *metering) progress.SpanID {
-			m.start(first, 0, progress.KindCall, owns(progress.Bytes, 10, 100))
-			m.start(first, 0, progress.KindCall, owns(progress.Items, 1, 0))
+			m.start(first, 0, progress.KindCall, owns(progress.UnitBytes, 10, 100))
+			m.start(first, 0, progress.KindCall, owns(progress.UnitItems, 1, 0))
 			return first
-		}, progress.Reading{Unit: progress.Bytes, Amount: 10, Size: 100, Bound: progress.BySize, Fraction: 0.1}, true},
+		}, progress.Reading{Unit: progress.UnitBytes, Amount: 10, Size: 100, Bound: progress.BoundSize, Fraction: 0.1}, true},
 		{"a run of a span that runs", func(m *metering) progress.SpanID {
-			m.start(first, 0, progress.KindCall, owns(progress.Bytes, 10, 100))
-			m.send(progress.TypeRun, first, owns(progress.Bytes, 20, 100))
+			m.start(first, 0, progress.KindCall, owns(progress.UnitBytes, 10, 100))
+			m.send(progress.TypeRun, first, owns(progress.UnitBytes, 20, 100))
 			return first
-		}, progress.Reading{Unit: progress.Bytes, Amount: 20, Size: 100, Bound: progress.BySize, Fraction: 0.2}, true},
+		}, progress.Reading{Unit: progress.UnitBytes, Amount: 20, Size: 100, Bound: progress.BoundSize, Fraction: 0.2}, true},
 		{"events that do not carry work", func(m *metering) progress.SpanID {
-			m.start(first, 0, progress.KindCall, owns(progress.Bytes, 10, 100))
+			m.start(first, 0, progress.KindCall, owns(progress.UnitBytes, 10, 100))
 			m.send(progress.TypeLine, first, owns(0, 0, 0))
 			m.send(progress.TypeSuspend, first, owns(0, 0, 0))
 			m.send(progress.TypeRun, fourth)
 			return first
-		}, progress.Reading{Unit: progress.Bytes, Amount: 10, Size: 100, Bound: progress.BySize, Fraction: 0.1}, true},
+		}, progress.Reading{Unit: progress.UnitBytes, Amount: 10, Size: 100, Bound: progress.BoundSize, Fraction: 0.1}, true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
@@ -354,7 +354,7 @@ func TestTheMeterTakesTheShareFromTheFirstRuleThatApplies(t *testing.T) {
 // 100 ms for n times.
 func download(m *metering, n int) {
 	m.start(step, 0, progress.KindStep)
-	m.start(first, step, progress.KindCall, owns(progress.Bytes, 0, 2<<30))
+	m.start(first, step, progress.KindCall, owns(progress.UnitBytes, 0, 2<<30))
 	for i := range n {
 		m.now = m.now.Add(100 * time.Millisecond)
 		m.advance(first, int64(i+1)*8<<20)
@@ -376,16 +376,16 @@ func TestTheMeterReadsTheRateTheTimeLeftAndAStall(t *testing.T) {
 		after time.Duration
 		want  progress.Reading
 	}{
-		{"as it starts", 0, 0, progress.Reading{Unit: progress.Bytes, Size: 2 << 30, Bound: progress.ByBelow}},
-		{"for the time it ran", 10, 0, progress.Reading{Unit: progress.Bytes, Amount: 80 * mib, Size: 2 << 30,
-			Bound: progress.ByBelow, Fraction: 80.0 / 2048, Rate: 80 * mib}},
-		{"over the last five seconds", 144, 0, progress.Reading{Unit: progress.Bytes, Amount: 1152 * mib, Size: 2 << 30,
-			Bound: progress.ByBelow, Fraction: 0.5625, Rate: 80 * mib, Left: 11200 * time.Millisecond}},
-		{"as it slows", 144, 2 * time.Second, progress.Reading{Unit: progress.Bytes, Amount: 1152 * mib, Size: 2 << 30,
-			Bound: progress.ByBelow, Fraction: 0.5625, Rate: 48 * mib, Left: 18666666666}},
-		{"stalled", 144, 5 * time.Second, progress.Reading{Unit: progress.Bytes, Amount: 1152 * mib, Size: 2 << 30,
-			Bound: progress.ByBelow, Fraction: 0.5625, Stalled: 5 * time.Second}},
-		{"read before it started", 0, -time.Second, progress.Reading{Unit: progress.Bytes, Size: 2 << 30, Bound: progress.ByBelow}},
+		{"as it starts", 0, 0, progress.Reading{Unit: progress.UnitBytes, Size: 2 << 30, Bound: progress.BoundChildren}},
+		{"for the time it ran", 10, 0, progress.Reading{Unit: progress.UnitBytes, Amount: 80 * mib, Size: 2 << 30,
+			Bound: progress.BoundChildren, Fraction: 80.0 / 2048, Rate: 80 * mib}},
+		{"over the last five seconds", 144, 0, progress.Reading{Unit: progress.UnitBytes, Amount: 1152 * mib, Size: 2 << 30,
+			Bound: progress.BoundChildren, Fraction: 0.5625, Rate: 80 * mib, Left: 11200 * time.Millisecond}},
+		{"as it slows", 144, 2 * time.Second, progress.Reading{Unit: progress.UnitBytes, Amount: 1152 * mib, Size: 2 << 30,
+			Bound: progress.BoundChildren, Fraction: 0.5625, Rate: 48 * mib, Left: 18666666666}},
+		{"stalled", 144, 5 * time.Second, progress.Reading{Unit: progress.UnitBytes, Amount: 1152 * mib, Size: 2 << 30,
+			Bound: progress.BoundChildren, Fraction: 0.5625, Stalled: 5 * time.Second}},
+		{"read before it started", 0, -time.Second, progress.Reading{Unit: progress.UnitBytes, Size: 2 << 30, Bound: progress.BoundChildren}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
@@ -405,9 +405,9 @@ func TestTheMeterReadsTheRateTheTimeLeftAndAStall(t *testing.T) {
 func TestTheMeterReadsOnlyWhatARunningSpanHas(t *testing.T) {
 	t.Parallel()
 	m := newMetering()
-	m.start(first, 0, progress.KindTarget, queued, owns(progress.Bytes, 0, 100))
-	m.start(second, 0, progress.KindCall, owns(progress.Bytes, 50, 100))
-	m.start(third, 0, progress.KindCall, owns(progress.Bytes, 0, 1<<62))
+	m.start(first, 0, progress.KindTarget, queued, owns(progress.UnitBytes, 0, 100))
+	m.start(second, 0, progress.KindCall, owns(progress.UnitBytes, 50, 100))
+	m.start(third, 0, progress.KindCall, owns(progress.UnitBytes, 0, 1<<62))
 	m.now = m.now.Add(time.Second)
 	m.advance(second, 10)
 	m.advance(third, 1)
@@ -417,9 +417,9 @@ func TestTheMeterReadsOnlyWhatARunningSpanHas(t *testing.T) {
 		span progress.SpanID
 		want progress.Reading
 	}{
-		{first, progress.Reading{Unit: progress.Bytes, Size: 100, Bound: progress.BySize}},
-		{second, progress.Reading{Unit: progress.Bytes, Amount: 10, Size: 100, Bound: progress.BySize, Fraction: 0.1}},
-		{third, progress.Reading{Unit: progress.Bytes, Amount: 1, Size: 1 << 62, Bound: progress.BySize, Fraction: 1.0 / (1 << 62),
+		{first, progress.Reading{Unit: progress.UnitBytes, Size: 100, Bound: progress.BoundSize}},
+		{second, progress.Reading{Unit: progress.UnitBytes, Amount: 10, Size: 100, Bound: progress.BoundSize, Fraction: 0.1}},
+		{third, progress.Reading{Unit: progress.UnitBytes, Amount: 1, Size: 1 << 62, Bound: progress.BoundSize, Fraction: 1.0 / (1 << 62),
 			Rate: 1.0 / 3, Left: 1 << 62}},
 	} {
 		if got := m.read(t, tc.span); got != tc.want {
@@ -436,7 +436,7 @@ func TestTheMeterSaysWhatTheWorkCameTo(t *testing.T) {
 	download(m, 256)
 	m.end(first)
 	got, ok := m.send(progress.TypeEnd, step)
-	want := progress.Reading{Unit: progress.Bytes, Amount: 2 << 30, Size: 2 << 30, Bound: progress.ByBelow, Fraction: 1,
+	want := progress.Reading{Unit: progress.UnitBytes, Amount: 2 << 30, Size: 2 << 30, Bound: progress.BoundChildren, Fraction: 1,
 		Rate: 80 << 20}
 	if !ok || got != want {
 		t.Errorf("the step ended with %+v, %v, want %+v", got, ok, want)
@@ -455,14 +455,14 @@ func TestTheMeterSaysWhatTheWorkCameTo(t *testing.T) {
 			return m.send(progress.TypeEnd, first)
 		}, progress.Reading{}, false},
 		{"left out while queued", func(m *metering) (progress.Reading, bool) {
-			m.start(first, 0, progress.KindTarget, queued, owns(progress.Bytes, 0, 100))
+			m.start(first, 0, progress.KindTarget, queued, owns(progress.UnitBytes, 0, 100))
 			m.now = m.now.Add(time.Second)
 			return m.send(progress.TypeEnd, first)
-		}, progress.Reading{Unit: progress.Bytes, Size: 100, Bound: progress.BySize}, true},
+		}, progress.Reading{Unit: progress.UnitBytes, Size: 100, Bound: progress.BoundSize}, true},
 		{"in no time", func(m *metering) (progress.Reading, bool) {
-			m.start(first, 0, progress.KindCall, owns(progress.Items, 0, 0))
-			return m.send(progress.TypeEnd, first, owns(progress.Items, 7, 0))
-		}, progress.Reading{Unit: progress.Items, Amount: 7}, true},
+			m.start(first, 0, progress.KindCall, owns(progress.UnitItems, 0, 0))
+			return m.send(progress.TypeEnd, first, owns(progress.UnitItems, 7, 0))
+		}, progress.Reading{Unit: progress.UnitItems, Amount: 7}, true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
@@ -525,7 +525,7 @@ func FuzzMeter(f *testing.F) {
 			if r.Amount != want {
 				t.Fatalf("span %d reads %d %s, but the events say %d", id, r.Amount, r.Unit, want)
 			}
-			if !(r.Fraction >= 0 && r.Fraction <= 1) || r.Bound == progress.Unbounded && r.Fraction != 0 {
+			if !(r.Fraction >= 0 && r.Fraction <= 1) || r.Bound == progress.BoundNone && r.Fraction != 0 {
 				t.Fatalf("span %d reads a share of %v, %s", id, r.Fraction, r.Bound)
 			}
 			if r.Rate < 0 || r.Left < 0 || r.Stalled != 0 && r.Stalled < 5*time.Second {
@@ -553,7 +553,7 @@ func FuzzMeter(f *testing.F) {
 					e.Amount = int64(int8(a))
 					e.Total = int(c % 4)
 					if b&8 != 0 {
-						e.Flags = progress.Fold
+						e.Flags = progress.FlagFold
 					}
 					if b&16 != 0 {
 						e.State = progress.StateQueued

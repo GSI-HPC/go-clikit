@@ -44,7 +44,7 @@ type work struct {
 }
 
 // Advance adds n to the amount of a span's work. A span that was given no
-// Work counts Items. It does nothing to a span that is not running, and
+// Work counts UnitItems. It does nothing to a span that is not running, and
 // costs an atomic add and a read of BusOptions.Now, outside the Bus's lock,
 // and the lock but once each 100 ms: the Bus sends the amount at most that
 // often, the newest never lost, and with the span's End in any case.
@@ -123,7 +123,7 @@ func (s *Span) sendWork() {
 		return
 	}
 	if s.fields.Unit == 0 {
-		s.fields.Unit = Items
+		s.fields.Unit = UnitItems
 	}
 	s.fields.Amount = amount
 	w.sent, w.hasSent = now, true
@@ -141,7 +141,7 @@ func (s *Span) endWork() {
 	}
 	if amount := max(w.amount.Load(), 0); amount != s.fields.Amount {
 		if s.fields.Unit == 0 {
-			s.fields.Unit = Items
+			s.fields.Unit = UnitItems
 		}
 		s.fields.Amount = amount
 	}

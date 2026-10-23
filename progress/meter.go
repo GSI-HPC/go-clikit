@@ -40,23 +40,23 @@ const (
 // done comes from the first of three rules that applies, which Bound
 // names:
 //
-//  1. BySize: a span with a size of its own is its amount over that size.
-//  2. ByTargets: a step with Fold, or a batch whose Total is known, once at
-//     least one target below it has been bounded, is as far as the targets
-//     that ended, however they ended, and the share done of each target
-//     running, over its Total. A running target that is unbounded adds
-//     nothing until it ends. The share stays short of done until Tally's
-//     count reaches its Total, so that a step whose running targets have
-//     all reached their sizes does not read as done.
-//  3. ByBelow: any other span is its amount over the sum of the sizes of
-//     the spans below it with work in its unit, those that ended included,
-//     as long as every one of them has a size. A span with a size of its
-//     own counts for everything below it: what is below it adds neither
-//     its size nor its want of one. Work in Percent counts with a size of
-//     100, so a span over several such calls is as far as the mean of
-//     their shares.
+//  1. BoundSize: a span with a size of its own is its amount over that size.
+//  2. BoundTargets: a step with FlagFold, or a batch whose Total is known,
+//     once at least one target below it has been bounded, is as far as the
+//     targets that ended, however they ended, and the share done of each
+//     target running, over its Total. A running target that is unbounded
+//     adds nothing until it ends. The share stays short of done until
+//     Tally's count reaches its Total, so that a step whose running targets
+//     have all reached their sizes does not read as done.
+//  3. BoundChildren: any other span is its amount over the sum of the sizes
+//     of the spans below it with work in its unit, those that ended
+//     included, as long as every one of them has a size. A span with a size
+//     of its own counts for everything below it: what is below it adds
+//     neither its size nor its want of one. Work in UnitPercent counts with
+//     a size of 100, so a span over several such calls is as far as the
+//     mean of their shares.
 //
-// Without any of them a span is Unbounded. A share is held to 0 to 1, so
+// Without any of them a span is BoundNone. A share is held to 0 to 1, so
 // that an amount that passes its size reads as done.
 //
 // A Meter is given every event of a Bus in order, as a sink is, and keeps
@@ -78,9 +78,10 @@ type Reading struct {
 	Unit Unit
 	// Amount is the span's own amount and that of the spans below in Unit.
 	Amount int64
-	// Size is the bound of Amount, under BySize and ByBelow; 0 otherwise.
+	// Size is the bound of Amount, under BoundSize and BoundChildren; 0
+	// otherwise.
 	Size int64
-	// Bound says where Fraction comes from; Unbounded has none.
+	// Bound says where Fraction comes from; BoundNone has none.
 	Bound Bound
 	// Fraction is the share of the work done, from 0 to 1.
 	Fraction float64
@@ -102,27 +103,49 @@ type Reading struct {
 type Bound uint8
 
 const (
-	// Unbounded is a span no rule gives a share.
-	Unbounded Bound = iota
-	// BySize is rule 1: the span's own Size.
-	BySize
-	// ByTargets is rule 2: the targets it counts.
-	ByTargets
-	// ByBelow is rule 3: the sizes of the work below it.
-	ByBelow
+	// BoundNone is a span no rule gives a share.
+	BoundNone Bound = iota
+	// BoundSize is rule 1: the span's own Size.
+	BoundSize
+	// BoundTargets is rule 2: the targets it counts.
+	BoundTargets
+	// BoundChildren is rule 3: the sizes of the work below it.
+	BoundChildren
+)
+
+// The old names of the bounds.
+const (
+	// Unbounded is the old name of BoundNone.
+	//
+	// Deprecated: Use BoundNone, which takes its type as a prefix, as every
+	// enum constant does (decision 36).
+	Unbounded = BoundNone
+	// BySize is the old name of BoundSize.
+	//
+	// Deprecated: Use BoundSize (decision 36).
+	BySize = BoundSize
+	// ByTargets is the old name of BoundTargets.
+	//
+	// Deprecated: Use BoundTargets (decision 36).
+	ByTargets = BoundTargets
+	// ByBelow is the old name of BoundChildren.
+	//
+	// Deprecated: Use BoundChildren, which says what it counts: the work
+	// of the spans below (decision 36).
+	ByBelow = BoundChildren
 )
 
 // String returns "unbounded", "size", "targets" or "below", or "bound(n)"
 // for a value this package does not define.
 func (b Bound) String() string {
 	switch b {
-	case Unbounded:
+	case BoundNone:
 		return "unbounded"
-	case BySize:
+	case BoundSize:
 		return "size"
-	case ByTargets:
+	case BoundTargets:
 		return "targets"
-	case ByBelow:
+	case BoundChildren:
 		return "below"
 	}
 	return fmt.Sprintf("bound(%d)", uint8(b))
@@ -138,7 +161,7 @@ type metered struct {
 	tallied *tallied
 
 	// unit, amount and size are the span's own work, the amount held to
-	// 0 or more and the size of work in Percent 100; a zero unit is none.
+	// 0 or more and the size of work in UnitPercent 100; a zero unit is none.
 	unit         Unit
 	amount, size int64
 	// took is the unit of the first span below that reported work.
@@ -302,7 +325,7 @@ func (s *metered) run(t time.Time) {
 // spans above.
 func (s *metered) own(f Fields) {
 	unit, amount, size := f.Unit, max(f.Amount, 0), max(f.Size, 0)
-	if unit == Percent {
+	if unit == UnitPercent {
 		size = 100
 	}
 	if unit == s.unit && amount == s.amount && size == s.size {
@@ -403,24 +426,24 @@ func (s *metered) settle(t time.Time) {
 
 // share works out the share of s by the first rule that applies.
 func (s *metered) share() {
-	s.bound, s.fraction = Unbounded, 0
+	s.bound, s.fraction = BoundNone, 0
 	unit := s.workUnit()
 	switch {
 	case unit == 0:
 	case s.unit != 0 && s.size > 0:
-		s.bound, s.fraction = BySize, ratio(float64(s.rolled()), float64(s.size))
+		s.bound, s.fraction = BoundSize, ratio(float64(s.rolled()), float64(s.size))
 	case s.tallied.counts && s.boundedBelow && s.tallied.count.Total > 0:
 		if s.running == 0 {
 			s.shares = 0
 		}
 		done := float64(s.tallied.count.Done) + s.shares
-		s.bound, s.fraction = ByTargets, ratio(done, float64(s.tallied.count.Total))
+		s.bound, s.fraction = BoundTargets, ratio(done, float64(s.tallied.count.Total))
 		if s.tallied.count.Done < s.tallied.count.Total {
 			s.fraction = min(s.fraction, almostDone)
 		}
 	default:
 		if b := s.sum(unit); b.unsized == 0 && b.size > 0 {
-			s.bound, s.fraction = ByBelow, ratio(float64(s.rolled()), float64(b.size))
+			s.bound, s.fraction = BoundChildren, ratio(float64(s.rolled()), float64(b.size))
 		}
 	}
 }
@@ -432,7 +455,7 @@ func (s *metered) offer() {
 	if s.state == StateRunning {
 		add = s.fraction
 	}
-	bounded := s.bound != Unbounded
+	bounded := s.bound != BoundNone
 	if add == s.added && !bounded {
 		return
 	}
@@ -489,9 +512,9 @@ func (s *metered) at(t time.Time) sample {
 func (s *metered) reading() Reading {
 	r := Reading{Unit: s.workUnit(), Amount: s.rolled(), Bound: s.bound, Fraction: s.fraction}
 	switch s.bound {
-	case BySize:
+	case BoundSize:
 		r.Size = s.size
-	case ByBelow:
+	case BoundChildren:
 		r.Size = s.sum(r.Unit).size
 	}
 	return r

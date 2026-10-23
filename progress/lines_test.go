@@ -55,7 +55,7 @@ func showing(t *testing.T, o progress.BusOptions) (context.Context, *progress.Sp
 		bus.Close()
 		progresstest.Check(t, capture.Events())
 	})
-	ctx, _ := progress.Start(progress.WithBus(context.Background(), bus), progress.KindStep, "uptime", progress.WithFlags(progress.ShowLines))
+	ctx, _ := progress.Start(progress.WithBus(context.Background(), bus), progress.KindStep, "uptime", progress.WithFlags(progress.FlagShowLines))
 	ctx, call := progress.Start(ctx, progress.KindCall, "ssh")
 	return ctx, call, capture
 }
@@ -71,7 +71,7 @@ func TestTeeIsTheWriterItselfWhenNothingWantsTheLines(t *testing.T) {
 		ctx, _ := progress.Start(progress.WithBus(context.Background(), b), progress.KindCall, "ssh", progress.WithFlags(f))
 		return ctx
 	}
-	ended, span := progress.Start(shows(wantsLines, progress.ShowLines), progress.KindCall, "ssh")
+	ended, span := progress.Start(shows(wantsLines, progress.FlagShowLines), progress.KindCall, "ssh")
 	span.End(nil)
 
 	tests := []struct {
@@ -80,13 +80,13 @@ func TestTeeIsTheWriterItselfWhenNothingWantsTheLines(t *testing.T) {
 	}{
 		{"no Bus", context.Background()},
 		{"no span", progress.WithBus(context.Background(), wantsLines)},
-		{"a span without ShowLines", shows(wantsLines, 0)},
-		{"no sink that wants lines", shows(noLines, progress.ShowLines)},
+		{"a span without FlagShowLines", shows(wantsLines, 0)},
+		{"no sink that wants lines", shows(noLines, progress.FlagShowLines)},
 		{"a span that has ended", ended},
 	}
 	for _, tc := range tests {
 		var buf bytes.Buffer
-		if w := progress.Tee(tc.ctx, &buf, progress.Stdout, nil); w != &buf {
+		if w := progress.Tee(tc.ctx, &buf, progress.StreamStdout, nil); w != &buf {
 			t.Errorf("%s: Tee = %T, want the writer itself", tc.name, w)
 		}
 	}
@@ -120,7 +120,7 @@ func TestTeeHandsAParserCompleteLinesOnly(t *testing.T) {
 				}
 				var p parser
 				var buf bytes.Buffer
-				w := progress.Tee(ctx, &buf, progress.Stdout, p.parse)
+				w := progress.Tee(ctx, &buf, progress.StreamStdout, p.parse)
 				for _, s := range tc.writes {
 					if n, err := w.Write([]byte(s)); n != len(s) || err != nil {
 						t.Fatalf("Write = %d, %v", n, err)
@@ -143,8 +143,8 @@ func TestTeeShowsSanitisedLines(t *testing.T) {
 
 	ctx, call, capture := showing(t, progress.BusOptions{})
 	var stdout, stderr bytes.Buffer
-	out := progress.Tee(ctx, &stdout, progress.Stdout, nil)
-	errw := progress.Tee(ctx, &stderr, progress.Stderr, nil)
+	out := progress.Tee(ctx, &stdout, progress.StreamStdout, nil)
+	errw := progress.Tee(ctx, &stderr, progress.StreamStderr, nil)
 	fmt.Fprint(out, "up 3 days\n\x1b]52;c;ZXZpbA==\x07\n")
 	fmt.Fprint(errw, "50%\r100%\r\n\n")
 	call.End(nil)
@@ -173,7 +173,7 @@ func TestADisplayGetsALongLineInPiecesAndTheRestAtTheEnd(t *testing.T) {
 
 	ctx, call, capture := showing(t, progress.BusOptions{})
 	var p parser
-	w := progress.Tee(ctx, io.Discard, progress.Stdout, p.parse)
+	w := progress.Tee(ctx, io.Discard, progress.StreamStdout, p.parse)
 	// After the "a", every two-byte rune starts at an odd offset, so the
 	// 4 KiB mark falls inside one.
 	long := "a" + strings.Repeat("é", 5000)
@@ -207,7 +207,7 @@ func TestLinesAreRateLimitedKeepingTheNewest(t *testing.T) {
 
 	clock := newClock()
 	ctx, call, capture := showing(t, progress.BusOptions{Now: clock.Now})
-	w := progress.Tee(ctx, io.Discard, progress.Stdout, nil)
+	w := progress.Tee(ctx, io.Discard, progress.StreamStdout, nil)
 	for i := range 30 {
 		fmt.Fprintf(w, "line %d\n", i)
 	}
@@ -245,7 +245,7 @@ func TestTheLineHeldBackIsSentWhenItsPlaceComes(t *testing.T) {
 	t.Parallel()
 
 	ctx, call, capture := showing(t, progress.BusOptions{})
-	w := progress.Tee(ctx, io.Discard, progress.Stdout, nil)
+	w := progress.Tee(ctx, io.Discard, progress.StreamStdout, nil)
 	for i := range 21 {
 		fmt.Fprintf(w, "line %d\n", i)
 	}
@@ -271,7 +271,7 @@ func TestNoLineIsShownOnceTheSpanHasEnded(t *testing.T) {
 
 	ctx, call, capture := showing(t, progress.BusOptions{})
 	var p parser
-	w := progress.Tee(ctx, io.Discard, progress.Stdout, p.parse)
+	w := progress.Tee(ctx, io.Discard, progress.StreamStdout, p.parse)
 	call.End(nil)
 	fmt.Fprint(w, "late\n")
 	if got := shown(capture); len(got) != 0 {
@@ -294,7 +294,7 @@ func TestTeeReportsWhatTheWriterDid(t *testing.T) {
 
 	ctx, call, capture := showing(t, progress.BusOptions{})
 	var p parser
-	w := progress.Tee(ctx, failing{}, progress.Stdout, p.parse)
+	w := progress.Tee(ctx, failing{}, progress.StreamStdout, p.parse)
 	n, err := w.Write([]byte("ab\ncd\n"))
 	call.End(nil)
 	if n != 3 || err == nil {
@@ -314,7 +314,7 @@ func TestTeeKeepsUpWithAnEndWhileWriting(t *testing.T) {
 	ctx, call, _ := showing(t, progress.BusOptions{})
 	var p parser
 	var wg sync.WaitGroup
-	for _, st := range []progress.Stream{progress.Stdout, progress.Stderr} {
+	for _, st := range []progress.Stream{progress.StreamStdout, progress.StreamStderr} {
 		w := progress.Tee(ctx, io.Discard, st, p.parse)
 		wg.Go(func() {
 			for i := range 200 {
@@ -358,7 +358,7 @@ func TestTheLineHeldBackWaitsForItsTokenByTheBusClock(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		clock := newClock()
 		ctx, call, capture := showing(t, progress.BusOptions{Now: clock.Now})
-		w := progress.Tee(ctx, io.Discard, progress.Stdout, nil)
+		w := progress.Tee(ctx, io.Discard, progress.StreamStdout, nil)
 		for i := range 21 {
 			fmt.Fprintf(w, "line %d\n", i)
 		}
@@ -387,7 +387,7 @@ func TestALateTokenIsWaitedForAWholeInterval(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		clock := &stepper{now: time.Date(2026, 9, 25, 12, 0, 0, 0, time.UTC)}
 		ctx, call, capture := showing(t, progress.BusOptions{Now: clock.Now})
-		w := progress.Tee(ctx, io.Discard, progress.Stdout, nil)
+		w := progress.Tee(ctx, io.Discard, progress.StreamStdout, nil)
 		for i := range 20 {
 			fmt.Fprintf(w, "line %d\n", i)
 		}
@@ -411,7 +411,7 @@ func TestALineOfASpanThatEndedWhileItWasParsedIsNotShown(t *testing.T) {
 	t.Parallel()
 
 	ctx, call, capture := showing(t, progress.BusOptions{})
-	w := progress.Tee(ctx, io.Discard, progress.Stdout, func(progress.Stream, string) { call.End(nil) })
+	w := progress.Tee(ctx, io.Discard, progress.StreamStdout, func(progress.Stream, string) { call.End(nil) })
 	fmt.Fprint(w, "done\n")
 	if got := shown(capture); len(got) != 0 {
 		t.Errorf("lines shown after the End: %q", got)
@@ -424,7 +424,7 @@ func TestALineEndedByAWriteThatEndsTheSpanIsNotShown(t *testing.T) {
 	t.Parallel()
 
 	ctx, call, capture := showing(t, progress.BusOptions{})
-	w := progress.Tee(ctx, io.Discard, progress.Stdout, func(progress.Stream, string) { call.End(nil) })
+	w := progress.Tee(ctx, io.Discard, progress.StreamStdout, func(progress.Stream, string) { call.End(nil) })
 	fmt.Fprint(w, "do")
 	fmt.Fprint(w, "ne\n")
 	if got := shown(capture); len(got) != 0 {
@@ -438,7 +438,7 @@ func TestALongLineWithoutAnEndIsCutInLinearTime(t *testing.T) {
 	t.Parallel()
 
 	ctx, call, _ := showing(t, progress.BusOptions{})
-	w := progress.Tee(ctx, io.Discard, progress.Stdout, nil)
+	w := progress.Tee(ctx, io.Discard, progress.StreamStdout, nil)
 	const size = 8 << 20
 	unended := bytes.Repeat([]byte("x"), size)
 	lined := bytes.Repeat(append(bytes.Repeat([]byte("x"), 4<<10-1), '\n'), size/(4<<10))
@@ -464,8 +464,8 @@ func TestTheUnfinishedLineOfEachStreamIsSentAtTheEnd(t *testing.T) {
 	t.Parallel()
 
 	ctx, call, capture := showing(t, progress.BusOptions{Now: newClock().Now})
-	out := progress.Tee(ctx, io.Discard, progress.Stdout, nil)
-	errw := progress.Tee(ctx, io.Discard, progress.Stderr, nil)
+	out := progress.Tee(ctx, io.Discard, progress.StreamStdout, nil)
+	errw := progress.Tee(ctx, io.Discard, progress.StreamStderr, nil)
 	for i := range 25 {
 		fmt.Fprintf(out, "line %d\n", i)
 	}
@@ -497,7 +497,7 @@ func TestTheLineThatWaitsAndTheUnfinishedOneAreBothSentAtTheEnd(t *testing.T) {
 
 	clock := newClock()
 	ctx, call, capture := showing(t, progress.BusOptions{Now: clock.Now})
-	w := progress.Tee(ctx, io.Discard, progress.Stdout, nil)
+	w := progress.Tee(ctx, io.Discard, progress.StreamStdout, nil)
 	for i := range 21 {
 		fmt.Fprintf(w, "line %d\n", i)
 	}
@@ -526,7 +526,7 @@ func TestASpanKeepsNoWriterOfACommandThatIsDone(t *testing.T) {
 	for i := range commands {
 		buf := new(bytes.Buffer)
 		runtime.AddCleanup(buf, func(n *atomic.Int32) { n.Add(1) }, &collected)
-		w := progress.Tee(ctx, buf, progress.Stdout, nil)
+		w := progress.Tee(ctx, buf, progress.StreamStdout, nil)
 		fmt.Fprint(w, "tick\n")
 		if i == commands-1 {
 			fmt.Fprint(w, "tock")

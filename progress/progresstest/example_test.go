@@ -17,7 +17,7 @@ import (
 // for each node.
 func reset(ctx context.Context, nodes []string) error {
 	ctx, step := progress.Start(ctx, progress.KindStep, "reset the machines",
-		progress.WithFlags(progress.Fold), progress.Total(len(nodes)))
+		progress.WithFlags(progress.FlagFold), progress.Total(len(nodes)))
 	targets := make([]*progress.Span, len(nodes))
 	for i, node := range nodes {
 		_, targets[i] = progress.Start(ctx, progress.KindTarget, node, progress.Queued(), progress.Node(node))

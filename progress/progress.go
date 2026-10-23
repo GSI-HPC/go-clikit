@@ -56,7 +56,7 @@ const (
 	// KindCommand is the command being run, the root of the tree.
 	KindCommand Kind = iota + 1
 	// KindStep is a named phase of a command, such as "reset the
-	// machines". A step with Fold is where a pool's targets are counted.
+	// machines". A step with FlagFold is where a pool's targets are counted.
 	KindStep
 	// KindBatch is one of the batches a staggered action runs in turn.
 	KindBatch
@@ -208,25 +208,46 @@ func (c Class) String() string {
 type Flags uint8
 
 const (
-	// Hidden is plumbing, drawn only when it fails or takes long. A span
-	// started under a Hidden one is Hidden too.
-	Hidden Flags = 1 << iota
-	// Fold marks a step whose finished targets a display folds into node
-	// sets. A Fold step with no Fold step above it is where a counter
-	// counts: its Total is what the counter expects.
-	Fold
-	// ShowLines lets the output of the calls below be shown as it
+	// FlagHidden is plumbing, drawn only when it fails or takes long. A
+	// span started under a hidden one is hidden too.
+	FlagHidden Flags = 1 << iota
+	// FlagFold marks a step whose finished targets a display folds into
+	// node sets. A step with FlagFold and no such step above it is where a
+	// counter counts: its Total is what the counter expects.
+	FlagFold
+	// FlagShowLines lets the output of the calls below be shown as it
 	// arrives, for a command whose output is the product, such as one that
 	// runs a command on many hosts. A span started under one shows lines
 	// too.
-	ShowLines
-	// DryRun marks the command of a dry run, and a call a dry run only
+	FlagShowLines
+	// FlagDryRun marks the command of a dry run, and a call a dry run only
 	// recorded. It is not passed down.
-	DryRun
+	FlagDryRun
+)
+
+// The old names of the flags.
+const (
+	// Hidden is the old name of FlagHidden.
+	//
+	// Deprecated: Use FlagHidden, which takes its type as a prefix, as
+	// every enum constant does (decision 36).
+	Hidden = FlagHidden
+	// Fold is the old name of FlagFold.
+	//
+	// Deprecated: Use FlagFold (decision 36).
+	Fold = FlagFold
+	// ShowLines is the old name of FlagShowLines.
+	//
+	// Deprecated: Use FlagShowLines (decision 36).
+	ShowLines = FlagShowLines
+	// DryRun is the old name of FlagDryRun.
+	//
+	// Deprecated: Use FlagDryRun (decision 36).
+	DryRun = FlagDryRun
 )
 
 // inherited are the flags a span passes to the spans started under it.
-const inherited = Hidden | ShowLines
+const inherited = FlagHidden | FlagShowLines
 
 // String returns the names of the flags set, split by commas; the event
 // log writes the same names as a list.
@@ -238,7 +259,7 @@ func (f Flags) names() []string {
 	for _, n := range []struct {
 		flag Flags
 		name string
-	}{{Hidden, "hidden"}, {Fold, "fold"}, {ShowLines, "show-lines"}, {DryRun, "dry-run"}} {
+	}{{FlagHidden, "hidden"}, {FlagFold, "fold"}, {FlagShowLines, "show-lines"}, {FlagDryRun, "dry-run"}} {
 		if f&n.flag != 0 {
 			names = append(names, n.name)
 		}
@@ -299,19 +320,33 @@ func (t Type) String() string {
 type Stream uint8
 
 const (
-	// Stdout is standard output.
-	Stdout Stream = 1
-	// Stderr is standard error.
-	Stderr Stream = 2
+	// StreamStdout is standard output.
+	StreamStdout Stream = 1
+	// StreamStderr is standard error.
+	StreamStderr Stream = 2
+)
+
+// The old names of the streams.
+const (
+	// Stdout is the old name of StreamStdout.
+	//
+	// Deprecated: Use StreamStdout, which takes its type as a prefix, as
+	// every enum constant does, and does not read as os.Stdout (decision
+	// 36).
+	Stdout = StreamStdout
+	// Stderr is the old name of StreamStderr.
+	//
+	// Deprecated: Use StreamStderr (decision 36).
+	Stderr = StreamStderr
 )
 
 // String returns the name the event log writes for the stream, such as
 // "stdout", or "stream(n)" for a value this package does not define.
 func (s Stream) String() string {
 	switch s {
-	case Stdout:
+	case StreamStdout:
 		return "stdout"
-	case Stderr:
+	case StreamStderr:
 		return "stderr"
 	}
 	return fmt.Sprintf("stream(%d)", uint8(s))
@@ -322,25 +357,42 @@ func (s Stream) String() string {
 type Unit uint8
 
 const (
-	// Items counts things, such as files, rows or packages.
-	Items Unit = iota + 1
-	// Bytes counts bytes, which a display draws in KiB, MiB, GiB and TiB.
-	Bytes
-	// Percent is how far work has got, from 0 to 100, for work that says
+	// UnitItems counts things, such as files, rows or packages.
+	UnitItems Unit = iota + 1
+	// UnitBytes counts bytes, which a display draws in KiB, MiB, GiB and TiB.
+	UnitBytes
+	// UnitPercent is how far work has got, from 0 to 100, for work that says
 	// nothing else, such as a remote task. Its size is always 100, and a
 	// display draws its share, never an amount or a rate.
-	Percent
+	UnitPercent
+)
+
+// The old names of the units.
+const (
+	// Items is the old name of UnitItems.
+	//
+	// Deprecated: Use UnitItems, which takes its type as a prefix, as every
+	// enum constant does (decision 36).
+	Items = UnitItems
+	// Bytes is the old name of UnitBytes.
+	//
+	// Deprecated: Use UnitBytes (decision 36).
+	Bytes = UnitBytes
+	// Percent is the old name of UnitPercent.
+	//
+	// Deprecated: Use UnitPercent (decision 36).
+	Percent = UnitPercent
 )
 
 // String returns the name the event log writes for the unit, such as
 // "bytes", or "unit(n)" for a value this package does not define.
 func (u Unit) String() string {
 	switch u {
-	case Items:
+	case UnitItems:
 		return "items"
-	case Bytes:
+	case UnitBytes:
 		return "bytes"
-	case Percent:
+	case UnitPercent:
 		return "percent"
 	}
 	return fmt.Sprintf("unit(%d)", uint8(u))
@@ -551,7 +603,7 @@ func (o *options) apply(opts []Option) {
 			o.Unit = o.unit
 		}
 		o.Size = max(o.size, 0)
-		if o.Unit == Percent {
+		if o.Unit == UnitPercent {
 			o.Size = 100
 		}
 	}
@@ -609,14 +661,14 @@ func Timeout(d time.Duration) Option { return func(o *options) { o.Timeout = d }
 // Exit sets Exit.
 func Exit(code int) Option { return func(o *options) { o.exit, o.hasExit = code, true } }
 
-// Work says that a span reports work in u, out of size; a size of 0 or
-// less is one not known, and a zero u is Items. Start and Update take it:
+// Work says that a span reports work in u, out of size; a size of 0 or less
+// is one not known, and a zero u is UnitItems. Start and Update take it:
 // Update to give the size once it is known, or to change it. A unit given
-// before stays. The size of work in Percent is 100, whatever size is given.
-// Advance and SetAmount move the amount.
+// before stays. The size of work in UnitPercent is 100, whatever size is
+// given. Advance and SetAmount move the amount.
 func Work(u Unit, size int64) Option {
 	if u == 0 {
-		u = Items
+		u = UnitItems
 	}
 	return func(o *options) { o.work, o.unit, o.size = true, u, size }
 }

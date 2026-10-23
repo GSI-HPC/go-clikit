@@ -23,7 +23,7 @@ func TestTheMeterKeepsItsMemoryBounded(t *testing.T) {
 	}
 	send(Event{Type: TypeStart, Span: 1, Kind: KindStep, State: StateRunning})
 	call := Event{Span: 2, Parent: 1, Kind: KindCall, State: StateRunning,
-		Fields: Fields{Unit: Bytes, Size: 1 << 40}}
+		Fields: Fields{Unit: UnitBytes, Size: 1 << 40}}
 	call.Type = TypeStart
 	send(call)
 	call.Type = TypeAdvance

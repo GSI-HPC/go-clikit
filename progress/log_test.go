@@ -91,11 +91,11 @@ func TestTheEventLogWritesEveryEventOnALineOfItsOwn(t *testing.T) {
 	log, events := logged(t, progress.BusOptions{
 		Now: clock.Now, Trace: tc,
 	}, func(busCtx context.Context) {
-		ctx, cmd := progress.Start(busCtx, progress.KindCommand, "exec", progress.WithFlags(progress.DryRun))
-		_, cred := progress.Start(ctx, progress.KindCall, "credential bmc", progress.WithFlags(progress.Hidden), progress.Source("env"))
+		ctx, cmd := progress.Start(busCtx, progress.KindCommand, "exec", progress.WithFlags(progress.FlagDryRun))
+		_, cred := progress.Start(ctx, progress.KindCall, "credential bmc", progress.WithFlags(progress.FlagHidden), progress.Source("env"))
 		cred.End(nil)
 		stepCtx, step := progress.Start(ctx, progress.KindStep, "run",
-			progress.WithFlags(progress.Fold|progress.ShowLines), progress.Total(2), progress.Limit(1))
+			progress.WithFlags(progress.FlagFold|progress.FlagShowLines), progress.Total(2), progress.Limit(1))
 		ctx1, one := progress.Start(stepCtx, progress.KindTarget, "exe0001", progress.Queued(),
 			progress.Node("exe0001"), progress.Host("exe0001.hpc.example.org"), progress.Role("compute"))
 		ctx2, two := progress.Start(stepCtx, progress.KindTarget, "exe0002", progress.Queued(),
@@ -103,8 +103,8 @@ func TestTheEventLogWritesEveryEventOnALineOfItsOwn(t *testing.T) {
 		clock.Add(time.Second)
 		one.Run()
 		callCtx, call := progress.Start(ctx1, progress.KindCall, "ssh", progress.Timeout(1500*time.Millisecond))
-		_, _ = io.WriteString(progress.Tee(callCtx, io.Discard, progress.Stdout, nil), "the secret line\n")
-		_, _ = io.WriteString(progress.Tee(callCtx, io.Discard, progress.Stderr, nil), "the secret warning\n")
+		_, _ = io.WriteString(progress.Tee(callCtx, io.Discard, progress.StreamStdout, nil), "the secret line\n")
+		_, _ = io.WriteString(progress.Tee(callCtx, io.Discard, progress.StreamStderr, nil), "the secret warning\n")
 		clock.Add(time.Second)
 		call.End(nil, progress.Exit(0))
 		one.End(nil)
@@ -119,7 +119,7 @@ func TestTheEventLogWritesEveryEventOnALineOfItsOwn(t *testing.T) {
 		// A staggered power on in two batches: the first ends each way a
 		// target can fail, and the second is left out.
 		powerCtx, power := progress.Start(ctx, progress.KindStep, "power on",
-			progress.WithFlags(progress.Fold), progress.Total(6), progress.Limit(5))
+			progress.WithFlags(progress.FlagFold), progress.Total(6), progress.Limit(5))
 		nodes := []string{"exe0003", "exe0004", "exe0005", "exe0006", "exe0007"}
 		batchCtx, first := progress.Start(powerCtx, progress.KindBatch, "batch 1/2", progress.Queued(),
 			progress.Batch(1, 2), progress.Node("exe[0003-0007]"), progress.Total(len(nodes)), progress.Limit(5))
@@ -151,14 +151,14 @@ func TestTheEventLogWritesEveryEventOnALineOfItsOwn(t *testing.T) {
 		ctx, status := progress.Start(busCtx, progress.KindCommand, "status")
 		// Lookups answered from each place a cache can answer from.
 		for _, cache := range []string{"hit", "miss", "memory", "disk"} {
-			_, lookup := progress.Start(ctx, progress.KindCall, "inventory", progress.WithFlags(progress.Hidden))
+			_, lookup := progress.Start(ctx, progress.KindCall, "inventory", progress.WithFlags(progress.FlagHidden))
 			lookup.End(nil, progress.Cache(cache))
 		}
 		// A burst of output longer than the lines a display is sent at
 		// once: the line before the last is left out, and the last is sent
 		// as the call ends, saying so.
-		solCtx, sol := progress.Start(ctx, progress.KindCall, "sol", progress.WithFlags(progress.ShowLines))
-		_, _ = io.WriteString(progress.Tee(solCtx, io.Discard, progress.Stdout, nil), strings.Repeat("the secret console\n", 22))
+		solCtx, sol := progress.Start(ctx, progress.KindCall, "sol", progress.WithFlags(progress.FlagShowLines))
+		_, _ = io.WriteString(progress.Tee(solCtx, io.Discard, progress.StreamStdout, nil), strings.Repeat("the secret console\n", 22))
 		sol.End(nil)
 		status.End(nil)
 
@@ -172,7 +172,7 @@ func TestTheEventLogWritesEveryEventOnALineOfItsOwn(t *testing.T) {
 		ctx, fetch := progress.Start(busCtx, progress.KindCommand, "fetch")
 		stepCtx, image := progress.Start(ctx, progress.KindStep, "fetching the base image")
 		_, download := progress.Start(stepCtx, progress.KindCall, "download", progress.HTTP("GET", "/images/rocky-9.4.qcow2"))
-		download.Update(progress.Work(progress.Bytes, 2<<30))
+		download.Update(progress.Work(progress.UnitBytes, 2<<30))
 		for range 12 {
 			clock.Add(100 * time.Millisecond)
 			download.Advance(8 << 20)
@@ -180,12 +180,12 @@ func TestTheEventLogWritesEveryEventOnALineOfItsOwn(t *testing.T) {
 		download.Advance(8 << 20)
 		download.End(nil)
 		image.End(nil)
-		_, index := progress.Start(ctx, progress.KindStep, "indexing the archive", progress.Work(progress.Items, 0))
+		_, index := progress.Start(ctx, progress.KindStep, "indexing the archive", progress.Work(progress.UnitItems, 0))
 		clock.Add(100 * time.Millisecond)
 		index.Advance(1200)
 		index.End(nil)
 		_, firmware := progress.Start(ctx, progress.KindCall, "firmware update",
-			progress.HTTP("GET", "/redfish/v1/TaskService/Tasks/7"), progress.Work(progress.Percent, 0))
+			progress.HTTP("GET", "/redfish/v1/TaskService/Tasks/7"), progress.Work(progress.UnitPercent, 0))
 		clock.Add(100 * time.Millisecond)
 		firmware.SetAmount(40)
 		clock.Add(100 * time.Millisecond)
@@ -303,11 +303,11 @@ func TestEveryValueHasANameInTheLog(t *testing.T) {
 		"State":  {progress.StateQueued, progress.StateRunning, progress.StateEnded},
 		"Status": {progress.StatusOK, progress.StatusFailed, progress.StatusCanceled, progress.StatusSkipped},
 		"Class":  {progress.ClassTarget, progress.ClassTransport, progress.ClassTimeout, progress.ClassAuth, progress.ClassPin, progress.ClassUsage, progress.ClassCanceled},
-		"Flags":  {progress.Hidden, progress.Fold, progress.ShowLines, progress.DryRun},
+		"Flags":  {progress.FlagHidden, progress.FlagFold, progress.FlagShowLines, progress.FlagDryRun},
 		"Type": {progress.TypeStart, progress.TypeRun, progress.TypeUpdate, progress.TypeLine, progress.TypeEnd,
 			progress.TypeSuspend, progress.TypeResume, progress.TypeAdvance},
-		"Stream": {progress.Stdout, progress.Stderr},
-		"Unit":   {progress.Items, progress.Bytes, progress.Percent},
+		"Stream": {progress.StreamStdout, progress.StreamStderr},
+		"Unit":   {progress.UnitItems, progress.UnitBytes, progress.UnitPercent},
 	}
 	keys := map[string]string{"Kind": "kind", "State": "state", "Status": "status", "Class": "class", "Flags": "flags",
 		"Type": "type", "Stream": "stream", "Unit": "unit"}
