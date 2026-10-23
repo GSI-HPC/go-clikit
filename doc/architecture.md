@@ -3,7 +3,7 @@
 
 # Architecture
 
-The kit is twelve packages that a command-line program and the library
+The kit is a set of packages that a command-line program and the library
 packages it calls share: a library reports what it does, and the command
 decides how that is shown. This document says where the packages came from,
 how they fit together, what runs on which goroutine, what a program fills
@@ -43,45 +43,53 @@ strict and to read the build info
 | `termtext` | Escaping untrusted text for a terminal, as a string or as a stream, the columns text takes there, and filling text to a number of them | `golang.org/x/text/width` |
 | `progress` | Spans carried in a `context.Context`, the `Bus` that orders their events, `Tally`, `Meter`, `Sanitize`, the JSONL event log and the W3C trace context | `termtext` |
 | `progress/display` | The `Terminal` a display shares with the command, the live `Tree`, the `Counter`, `Plain` lines and the `Summary` | `progress`, `termtext`, `go-nodeset` |
-| `progress/cliprogress` | The words of `--progress` and the rule that picks a display from them, a command's `Run`, which makes and takes down its Bus, display, summary and event log, the private file the log is appended to, a default log kept unasked and moved aside, the colours a terminal shows, a question asked with the display off, and the probes of a command's streams | `progress`, `progress/display`, `termtext`, `golang.org/x/sys` |
+| `progress/cliprogress` | The words of `--progress` and the rule that picks a display from them, a command's `Session`, which makes and takes down its Bus, display, summary and event log, the private file the log is appended to, a default log kept unasked and moved aside, the colours a terminal shows, a question asked with the display off, and the probes of a command's streams | `progress`, `progress/display`, `termtext`, `golang.org/x/sys` |
 | `progress/progresstest` | `Capture`, `Check`, `Watch` and its `Watcher`, and `Screen`, a terminal for tests | `progress`, `termtext`, `go-nodeset` |
 | `progress/mcpprogress` | `Notifier`, a sink that sends a tool call's progress as MCP progress notifications, through a `Send` the server gives it | `progress` |
-| `progress/eventlog` | `Decode`, which reads a line of the event log back into the first line of a run or one of its events, as a `progress.Event`; `Tail`, which reads a log as it grows and is rotated; `Forward`, which gives the events a child logged to a sink; and `Reducer`, which folds a log into runs, each the tree of its command's spans, for a view of what a program did | `progress` |
+| `progress/eventlog` | `Decode`, which reads a line of the event log back into the first line of a run or one of its events, as a `progress.Event`; `Tail`, which reads a log as it grows and is rotated; `NewForwarder`, which gives the events of the run a child logged to a sink; and `Reducer`, which folds a log into runs, each the tree of its command's spans, for a view of what a program did | `progress` |
 | `fanout` | `Each`, `Map` and `Batches`, the bounded pools that report their items as targets, and `Keyed`, which bounds the work under way on each key, such as a host | `progress`, `go-nodeset` |
 | `fanout/fanouttest` | `InFlight`, which counts the calls a test's fake is in the middle of, and holds them to prove a limit | none |
 | `cliout` | `Table`, a command's result in columns aligned by the columns a terminal gives them, and `WriteJSON`, every cell and string escaped | `termtext` |
+| `doctor` | `Check`, one check of a doctor command, with its `Status`, `ok`, `warning` or `failed`; `Worst` and `Count`; and `Write`, which writes the checks for a person in a text that is an interface | `termtext` |
+| `fsutil` | `WriteAtomic`, which replaces a file whole or not at all; `Lock`, a lock beside a file that several processes share, and `Update`, a change of the file under it; `EnsureDir` and `CheckTrusted`, which refuse a directory or a file that another user could have written | `golang.org/x/sys`, where the lock needs it |
 | `cobratree` | `Strict`, which makes a cobra command tree strict about its command line, the usage errors and the words of a flag's value refused, exit statuses carried by errors, help topics, and the build info | cobra, pflag |
 | `cobratree/cobratreetest` | `Run`, which runs a command tree in a test and keeps its standard output and standard error apart, and `CheckCommandLines`, which checks the command lines of a manual against the tree | `cobratree`, cobra, pflag |
 | `localweb` | `Listen`, which binds a loopback address or a private Unix socket, `PeerListener`, which closes another user's connections, `ListenerOwner`, which names the user of a listening socket, the checks `Hosts`, `SameOrigin` and `Headers`, and `Serve`, which serves with every timeout set | none |
-| `localweb/session` | `Sessions`, which exchange the launch token for a session cookie and hold each session's CSRF token, and `NewToken` | `localweb` |
+| `localweb/session` | `Manager`, which exchanges the launch token for a session cookie and holds each session's CSRF token, and `NewToken` | `localweb` |
 | `localweb/sse` | `Notifier` and `Subscription`, which tell a stream the exact topics that changed, and `Serve`, which streams a page's fragments as Server-Sent Events, every one first and then those that changed | none |
 | `localweb/localwebtest` | `Login`, a client that signs in and sends requests as the server's own pages do, and `Reader`, which reads the events of a stream | `localweb/session`, `localweb/sse` |
 | `localweb/launch` | `Opener`, which opens the browser on an address through a private file, and `Instance`, the lock and the record that keep one server per user | `localweb`, `golang.org/x/sys` |
-| `localweb/assets` | `Assets`, which serves a page's static files at addresses with a hash of them all | none |
+| `localweb/assets` | `Set`, which serves a page's static files at addresses with a hash of them all | none |
 | `localweb/page` | `Set`, a program's templates in one set, which renders a block before it answers, and `IsHTMX`, `Redirect` and `Retarget` for the requests of htmx | none |
 | `localweb/htmx` | `Files`, the scripts of htmx, its SSE extension and idiomorph, and `Config`, the configuration a page gives htmx | none |
 
 Every arrow points down the table: nothing imports `cliprogress`,
 `progresstest`, `mcpprogress`, `eventlog` or `fanout`, only `cliprogress` imports `display`,
 `progress` imports only `termtext`, and `termtext` only
-`golang.org/x/text`. `cliout` imports only `termtext`. `cobratree` stands
+`golang.org/x/text`. `cliout` and `doctor` import only `termtext`, and
+`fsutil` no package of the kit. `cobratree` stands
 apart: it imports no package of the kit, and none imports it but
 `cobratree/cobratreetest`. A library imports `progress`, and `fanout` when
 it works on many items; the command imports `cliprogress`, or `display`
 when it picks its displays by a rule of its own, an MCP server
 `mcpprogress`, a program that reads back the event log it or a child
 wrote `eventlog`, `cliout` to write its
-result, and `cobratree` when it is built with cobra; tests import
+result, `doctor` for its doctor command, `fsutil` for the files it
+shares or keeps private, and `cobratree` when it is built with cobra; tests import
 `progresstest`, `fanouttest` for a limit, and `cobratreetest` for a
-command tree. `localweb` stands apart as `cobratree` does, on the web
-side: it imports no package of the kit but its own, and is the only one
-that imports `net/http` and `html/template`. `go-nodeset` folds the names of targets into node sets,
+command tree. The `localweb` packages stand apart as `cobratree` does,
+on the web side: they import no package of the kit but their own, and
+are the only ones that import `net/http` and `html/template`. `go-nodeset` folds the names of targets into node sets,
 `exe[0001-0480]`, in the tree, the tests' trees and the summary of a pool
 that failed.
 [Decision 3](decisions.md#3-what-the-kit-may-require) says what else the kit
 may require, which is nothing without a record;
-[decision 22](decisions.md#22-the-kit-may-require-golangorgxsys-in-cliprogress-alone)
-lets `cliprogress` alone require `golang.org/x/sys`, and
+decisions
+[22](decisions.md#22-the-kit-may-require-golangorgxsys-in-cliprogress-alone),
+[26](decisions.md#26-golangorgxsys-also-in-fsutil-and-localweb) and
+[35](decisions.md#35-localweb-starts-a-server-once-opens-the-browser-on-it-and-serves-its-files-and-pages)
+let `cliprogress`, `fsutil` and `localweb/launch` alone import
+`golang.org/x/sys`, and
 [decision 24](decisions.md#24-the-strict-command-tree-is-the-kits-in-cobratree)
 `cobratree` alone cobra and pflag.
 
@@ -135,7 +143,7 @@ keeps it without a line of the caller's.
 
 A span may also report its work: an amount in a unit, out of a size when one
 is known (decision 23). The span's own `Advance`, `SetAmount`,
-`CountWriter` and `CountReader` add to an atomic amount and nothing else, so
+`AdvanceWriter` and `AdvanceReader` add to an atomic amount and nothing else, so
 a copy that writes a hundred thousand times a second takes no lock. The Bus
 samples that amount: it sends it as a `TypeAdvance` event at most every
 100 ms a span, by its own clock, the newest amount never lost, and with the
@@ -179,10 +187,12 @@ counts the advances it leaves out in `leftOut`; they are the only gaps in
   `mcpprogress.Notifier` sends from a goroutine of its own as well, at
   most every 500 ms and at once as a step or a batch ends; its `Close`,
   after the Bus's, sends what is left, so that nothing follows the
-  answer to the call.
+  answer to the call, and waits no longer than the context it is given.
+  `fsutil.Lock` and `launch.Acquire` wait for their locks no longer than
+  their contexts either.
   `eventlog.Tail` starts no goroutine: the program polls it from one of
   its own, and the Feed it gives the lines to, and a sink behind
-  `eventlog.Forward`, are called there, under no lock of the kit's.
+  an `eventlog.Forwarder`, are called there, under no lock of the kit's.
 - **The terminal is lent.** `progress.Suspend` calls every sink that is a
   `Suspender` outside the lock, and returns once each display is off the
   terminal, so that a question can be asked there; the function it returns
@@ -239,36 +249,38 @@ The kit knows no program. What depends on one is a parameter or a hook:
 | What | Where |
 | --- | --- |
 | The program's name, in the line that says a sink, a display or a pool's work panicked, and in the error a panic becomes | `progress.BusOptions.Program`, `display.TerminalOptions.Program`, `fanout.MapOptions.Program` in place of the Bus's, `fanout.Recovered`, `cliprogress.Options.Program` |
-| The program's name and version on the event log's first line | `progress.BusOptions.Program`, which the Bus hands the log in `progress.Run`, or `progress.LogOptions.Program` in its place; `progress.LogOptions.Version`; `cliprogress.Options.LogOptions` |
+| The program's name and version on the event log's first line | `progress.BusOptions.Program`, which the Bus hands the log in `progress.RunInfo`, or `progress.LogOptions.Program` in its place; `progress.LogOptions.Version`; `cliprogress.Options.LogOptions` |
 | The class of an error that says none of its own, such as the program's rule for its exit codes | `progress.BusOptions.Classify`, `fanout.MapOptions.Classify` in place of the Bus's, `progresstest.Classify`, `cliprogress.Options.Classify` |
-| The error a pool's step ends with, such as the program's exit code on the kit's summary | `fanout.MapOptions.Summarize`, which is given a `fanout.Summary`, with `fanout.Failure` as the default |
-| The noun for the targets, such as "1 host" and "480 hosts"; Plain says "1 target" and "480 targets" without one | `display.PlainOptions.Noun`, `fanout.MapOptions.Noun`, `fanout.Failure`, `cliprogress.Options.Noun` |
-| What a display names an item by, and what an item needs besides its place in the pool, such as the unit and size of its work | `fanout.MapOptions.Describe`, which returns a `fanout.Item`, and `fanout.MapOptions.Acquire` |
+| The error a pool's step ends with, such as the program's exit code on the kit's summary | `fanout.MapOptions.Summarize`, which is given a `fanout.Summary`, with a `*fanout.FailureError` as the default |
+| The noun for the targets, such as "1 host" and "480 hosts"; Plain says "1 target" and "480 targets" without one | `display.PlainOptions.Noun`, `fanout.MapOptions.Noun` and `cliprogress.Options.Noun`, a function of the count in each |
+| What a display names an item by, and what an item needs besides its place in the pool, such as the unit and size of its work | `fanout.MapOptions.Describe`, which returns a `fanout.ItemInfo`, and `fanout.MapOptions.Acquire` |
 | The terminal's size, whether the process is in its foreground, whether its locale shows UTF-8, and the interrupt | `display.TerminalOptions`, the `ASCII` options, `display.TreeOptions.Interrupted`; `cliprogress.Options.Size`, `.Foreground` and `.ASCII`, which `cliprogress.TerminalSize`, `cliprogress.InForeground` and `cliprogress.UTF8Locale` find out, and the end of the context `cliprogress.Start` is given |
 | The trace another program handed on | `progress.BusOptions.Trace`, as `progress.ParseTraceContext` reads it from the values the program read from `TRACEPARENT` and `TRACESTATE`; `cliprogress.Options.Trace`, which `cliprogress.Start` calls only once it makes a Bus |
-| The trace a program hands a child it starts, such as its own command line run from a page of its web UI, and whether it passes one on at all | the program, which puts `TraceContext.Traceparent` of `progress.NewTraceContext`, read from `crypto/rand.Reader`, in the child's environment |
+| The trace a program hands a child it starts, such as its own command line run from a page of its web UI, and whether it passes one on at all | the program, which puts the `Traceparent` of `Span.TraceContext`, the trace context of the span the child works for, in the child's environment, so that the child's log names that span as its parent; a program without a Bus takes `progress.NewTraceContext`, read from `crypto/rand.Reader`, which starts a trace |
 | Where a panic's stack goes | the `PanicLog` options |
 | How the command line and the environment ask for a display and an event log: the names of the flag and of the variable that stands in for it, and what each holds | `cliprogress.Options.Mode` and `cliprogress.Options.Log`, a `cliprogress.Setting` each |
 | Whether standard error is a terminal, and a dumb one, and whether standard output goes into a pipe | `cliprogress.Options.OnTerminal`, `.Dumb` and `.IntoPipe`; `cliprogress.IsTerminal` tells the first and `cliprogress.IsPipe` the last |
 | An event log the program keeps unasked, and how large it grows | `cliprogress.Options.DefaultLog` and `.RotateAt` (decision 31) |
 | Whether a command asks before it acts, where standard input is no terminal, and what an answer means | the program, which asks with `cliprogress.Ask`, tells a terminal with `cliprogress.IsTerminal` and reads a yes with `cliprogress.Yes` |
 | Where the notes go, and the display and the summary | `cliprogress.Options.Notes`, `cliprogress.Options.Stderr` |
-| Which of the program's writers, and its logger's, go through the display's Terminal | the writers of `cliprogress.Run.Writer` and `cliprogress.Run.Lines`, which the program puts in place of its own and puts back once `cliprogress.Run.Finish` has returned |
-| Whether a command that succeeded leaves the summary | the argument of `cliprogress.Run.Finish` |
+| Which of the program's writers, and its logger's, go through the display's Terminal | the writers of `cliprogress.Session.Writer` and `cliprogress.Session.Lines`, which the program puts in place of its own and puts back once `cliprogress.Session.Finish` has returned |
+| Whether a command that succeeded leaves the summary | the argument of `cliprogress.Session.Finish` |
 | How an error of the command line is reported | the program marks the errors `cliprogress.Choose` and `cliprogress.Start` return as its usage errors, with `cobratree.Usage` when it is built with cobra; `cobratree.Strict` marks those of its tree's argument checks, and `cobratree.IsUsage` tells them, and pflag's, from other errors, for the program's exit code; `cobratree.FlagError`, set as the tree's `FlagErrorFunc`, and `cobratree.InvalidValue` word a flag's value refused |
 | The exit status of an error that is no usage error, such as that of a host that could not be reached | the program's numbers, given where the cause is known with `cobratree.Coded` and read in main with `cobratree.Status` |
-| The topics help shows beside the commands, and their texts | the function the program passes `cobratree.HelpTopics`, and the `Short` and `Long` of the help command it returns |
-| The commands a program dropped, and what replaced them | the `moved` argument of `cobratree.Strict` |
-| Whether a tool call's progress is sent over MCP, and on which session, with which token | the server, which gives a call that came with a progress token a Bus of its own with an `mcpprogress.Notifier` among its sinks, and puts the token in what the `Send` of `mcpprogress.Options` sends; a server that runs the call as a child gives the child an event log of its own and polls it with `eventlog.Tail`, through `eventlog.Forward` to the Notifier, while the child runs and once after |
-| How a view of what the program did reads its event log: which log, how often it polls it, how many runs it keeps, and when a run that has not ended is taken for one that was killed | the program, which polls an `eventlog.Tail` on its own time into an `eventlog.Reducer`, keeps `eventlog.Options.Keep` runs, and judges a run by its `Last` event |
-| How the program words its version: the word for a build that is no release, how much of the commit it shows, and a version injected at build time | the program, from the fields of `cobratree.BuildInfo`, which `cobratree.ReadBuildInfo` returns, and `cobratree.Resolve` with what a release build set with -ldflags; `BuildInfo.Short` cuts the commit to the digits the program shows |
-| How the displays look: a theme, in how many colours, or none | `display.TreeOptions.Theme`, `display.CounterOptions.Theme`, `display.PlainOptions.Theme` and `display.Summary.Theme`, one of `display.Themes`, which `display.ParseTheme` reads, drawn in 256 colours, `Colours16` or `NoColours` by `Theme.In`; the zero `Theme` draws in no colour, as before (decisions 19 and 20); `cliprogress.Options.Theme`; `cliprogress.ThemeFor` picks the colours from what the program read of NO_COLOR, TERM and COLORTERM |
-| Where a local web server listens, which user it serves, and how a refusal is written and logged | the address the program passes `localweb.Listen`, the uid it passes `localweb.PeerListener`, and the `localweb.Refuser` of each check; the program prints the address and opens the browser |
-| The names of a local web server's session cookie and CSRF header, and the line a refusal adds to tell the user where the address is | `session.Options.Cookie`, `.Header` and `.Refuse`; the program makes the token with `session.NewToken` and prints it in the address |
+| The topics help shows beside the commands, and their texts | the lookup and the list of names the program passes `cobratree.Topics`, an option of `Strict`, whose names `help` completes |
+| The commands a program dropped, and what replaced them | `cobratree.Moved`, an option of `Strict` |
+| Whether a tool call's progress is sent over MCP, and on which session, with which token | the server, which gives a call that came with a progress token a Bus of its own with an `mcpprogress.Notifier` among its sinks, and puts the token in what the `Send` of `mcpprogress.Options` sends; a server that runs the call as a child gives the child an event log of its own and polls it with `eventlog.Tail`, through the `eventlog.NewForwarder` of the trace it handed the child to the Notifier, while the child runs and once after |
+| How a view of what the program did reads its event log: which log, how often it polls it, how many runs it keeps, and when a run that has not ended is taken for one that was killed | the program, which polls an `eventlog.Tail` on its own time into an `eventlog.Reducer`, keeps `eventlog.ReducerOptions.KeepRuns` runs, and judges a run by its `Last` event |
+| How the program words its version: the word for a build that is no release, how much of the commit it shows, and a version injected at build time | the program, from the fields of `cobratree.BuildInfo`, which `cobratree.ReadBuildInfo` returns, and `BuildInfo.Resolve` with what a release build set with -ldflags; `BuildInfo.Short` cuts the commit to the digits the program shows |
+| How the displays look: a theme, in how many colours, or none | `display.TreeOptions.Theme`, `display.CounterOptions.Theme`, `display.PlainOptions.Theme` and `display.SummaryOptions.Theme`, one of `display.Themes`, which `display.ParseTheme` reads, drawn in 256 colours, `Colors16` or `ColorsNone` by `Theme.In`; the zero `Theme` draws in no colour, as before (decisions 19 and 20); `cliprogress.Options.Theme`; `cliprogress.ThemeFor` picks the colours from what the program read of NO_COLOR, TERM and COLORTERM |
+| Where a local web server listens, which user it serves, and how a refusal is written and logged | the address the program passes `localweb.Listen`, the uid it passes `localweb.PeerListener`, and the `Refuse` field, a `localweb.Refuser`, of each check's options; the program prints the address and opens the browser |
+| The names of a local web server's session cookie and CSRF header, and the line a refusal adds to tell the user where the address is | `session.Options.CookiePrefix`, `.CSRFHeader` and `.Refuse`; the program makes the token with `session.NewToken` and prints it in the address |
 | Which fragments a page streams, the topics each depends on, and how long changes gather | the program's store, which calls `sse.Notifier.Notify`, the render it passes `sse.Serve`, and `sse.Options` |
-| What a page may load, and which other origins a development server adds | the policy the program passes `localweb.Headers`, `""` for `localweb.ContentSecurityPolicy`, and `localweb.Origin.Others` |
+| What a page may load, and which other origins a development server adds | the policy the program passes `localweb.Headers`, `""` for `localweb.ContentSecurityPolicy`, and `localweb.OriginPolicy.Others` |
 | Where the record of a running server lives, and whether a browser opens | the runtime directory the program passes `launch.Acquire`, and a directory of its own without one; the program calls `launch.Opener.Skip` and `Open`, prints the address in any case, and removes the redirect file when it stops |
-| The files a page loads and the templates it renders, and working on them without a build | the `fs.FS` and prefix the program passes `assets.New`, the patterns and functions it passes `page.Parse`, and `assets.Options.Dev` and `page.Options.Reload` on a directory of its own |
+| The files a page loads and the templates it renders, and working on them without a build | the `fs.FS` and prefix the program passes `assets.New`, the patterns and functions it passes `page.Parse`, and `assets.Options.Dev` and `page.Options.Dev` on a directory of its own |
+| The checks of a doctor command, their texts, and the exit status of a failed one | the program, which writes its `doctor.Check` values with `doctor.Write` or as JSON, and picks its exit status from `doctor.Worst` |
+| Where a program keeps its files, which of them it shares, and how long it waits for a lock | the paths the program passes `fsutil`, and the wait it passes `fsutil.Lock`; `fsutil.Update` waits `fsutil.DefaultLockWait` |
 
 A Bus hands on what it was told: `Bus.Program`, `Bus.PanicLog` and
 `Bus.Classify` answer for the Bus that `progress.BusFrom` finds in a
@@ -319,7 +331,7 @@ there; and a page of another site that makes its own name resolve to
   `Sec-Fetch-Site` and `Origin`, which a browser sets and no page can
   change. Every port of 127.0.0.1 is the same site, so the SameSite
   attribute of a cookie keeps out none of the pages other programs serve
-  there. A page lets in a navigation from anywhere (`Origin.Navigate`);
+  there. A page lets in a navigation from anywhere (`OriginPolicy.Navigate`);
   what a page asks for itself, its fragments, its stream and its forms, is
   let in only from its own origin.
 - **The headers.** `Headers` sets the policy that lets a page load and
@@ -340,14 +352,14 @@ behind keeps the set of topics it missed, so it renders no more than
 changed. The stream is let in from the page's own origin alone.
 
 A program chains them, outermost first: `Headers`, `Hosts`, `SameOrigin`,
-`session.Sessions.Middleware` and its handler; `Serve` serves the chain with every timeout set. Each
+`session.Manager.Middleware` and its handler; `Serve` serves the chain with every timeout set. Each
 check answers a refused request through a `Refuser`, which the program may
 give to write it in its own form and log the reason; the messages are an
 interface of the kit.
 
 Around the server, `localweb/launch` keeps one per user and opens the
 browser on it (decision 35). A start takes the lock of
-`Acquire`; when `Running` finds the record of a server that still runs,
+`Acquire`, and waits for it no longer than its context; when `Running` finds the record of a server that still runs,
 whose listening socket is the user's, the start opens that one and ends;
 otherwise it listens, `Publish`es its address and drops the lock. The
 `Opener` writes the address, token and all, into a file only the user can
@@ -384,7 +396,8 @@ terminal, finds the same in each:
 
 Text that came from elsewhere, a remote host, a container or a service, is
 escaped with `termtext.Escape`, or `EscapeLines` where its lines are kept,
-before it reaches a terminal, and there is no other escaper: a program that
+which keeps a CRLF line end as it is (decision 42), before it reaches a
+terminal, and there is no other escaper: a program that
 escapes everything with it has one place to fix when a character turns out
 to need escaping too. Decision 7 calls the two by their earlier names,
 `EscapeCell` and `EscapeText`. The forms of the escapes are stable, but the
