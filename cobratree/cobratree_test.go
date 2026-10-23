@@ -111,6 +111,61 @@ func TestStrictTakesNoMoves(t *testing.T) {
 	}
 }
 
+// A runnable root with subcommands and no argument check refuses a word
+// that names no command as a group does, and names a command that moved;
+// bare, it runs.
+func TestStrictMakesARunnableRootStrict(t *testing.T) {
+	newRoot := func(ran *bool) *cobra.Command {
+		root := &cobra.Command{Use: "prog", SilenceErrors: true, SilenceUsage: true, RunE: func(*cobra.Command, []string) error {
+			*ran = true
+			return nil
+		}}
+		get := &cobra.Command{Use: "get"}
+		get.AddCommand(&cobra.Command{Use: "cluster", RunE: run})
+		root.AddCommand(get)
+		cobratree.Strict(root, moved)
+		return root
+	}
+	for _, tc := range []struct {
+		args []string
+		want string
+	}{
+		{[]string{"gte"}, `unknown command "gte" for "prog" (did you mean "get"?)`},
+		{[]string{"status"}, `unknown command "status" for "prog" (it is now "get cluster")`},
+		{[]string{"xyzzy"}, `unknown command "xyzzy" for "prog"`},
+	} {
+		t.Run(strings.Join(tc.args, " "), func(t *testing.T) {
+			ran := false
+			root := newRoot(&ran)
+			root.SetArgs(tc.args)
+			err := root.Execute()
+			if err == nil || err.Error() != tc.want || !cobratree.IsUsage(err) {
+				t.Fatalf("error %v, want the usage error %q", err, tc.want)
+			}
+			if ran {
+				t.Error("the root ran")
+			}
+		})
+	}
+	ran := false
+	root := newRoot(&ran)
+	root.SetArgs([]string{})
+	if err := root.Execute(); err != nil || !ran {
+		t.Errorf("error %v, ran %v; want the root to run", err, ran)
+	}
+}
+
+// A runnable root with an argument check of its own keeps it.
+func TestStrictKeepsTheCheckOfARunnableRoot(t *testing.T) {
+	root := &cobra.Command{Use: "prog [NAME]", Args: cobra.MaximumNArgs(1), RunE: run, SilenceErrors: true, SilenceUsage: true}
+	root.AddCommand(&cobra.Command{Use: "get", RunE: run})
+	cobratree.Strict(root, nil)
+	root.SetArgs([]string{"gte"})
+	if err := root.Execute(); err != nil {
+		t.Errorf("prog gte: %v, want the root to take the word", err)
+	}
+}
+
 // A command's own SuggestionsMinimumDistance holds.
 func TestStrictKeepsTheDistanceOfSuggestions(t *testing.T) {
 	root := tree(nil)
