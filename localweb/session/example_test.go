@@ -20,7 +20,7 @@ import (
 func ExampleManager_Middleware() {
 	token := "LAUNCHTOKEN" // session.NewToken() in a program
 	sessions, err := session.New(session.Options{
-		Token: token, Cookie: "prog_ui_", Header: "X-Prog-CSRF",
+		Token: token, CookiePrefix: "prog_ui_", CSRFHeader: "X-Prog-CSRF",
 		Refuse: func(w http.ResponseWriter, r *http.Request, f localweb.Refusal) {
 			f.Message += "\nOpen the address that prog ui printed in your terminal, or run prog ui again."
 			localweb.Refuse(w, r, f)

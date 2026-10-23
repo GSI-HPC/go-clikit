@@ -26,7 +26,7 @@ const (
 // their middleware around a handler that writes the request's CSRF token.
 func newSessions(t *testing.T, fn func(*session.Options)) http.Handler {
 	t.Helper()
-	o := session.Options{Token: token, Cookie: "prog_ui_", Header: header}
+	o := session.Options{Token: token, CookiePrefix: "prog_ui_", CSRFHeader: header}
 	if fn != nil {
 		fn(&o)
 	}
@@ -75,9 +75,9 @@ func TestNewNeedsATokenACookieAndAHeader(t *testing.T) {
 	t.Parallel()
 
 	for _, o := range []session.Options{
-		{Cookie: "c_", Header: "X-C"},
-		{Token: token, Header: "X-C"},
-		{Token: token, Cookie: "c_"},
+		{CookiePrefix: "c_", CSRFHeader: "X-C"},
+		{Token: token, CSRFHeader: "X-C"},
+		{Token: token, CookiePrefix: "c_"},
 	} {
 		if _, err := session.New(o); err == nil {
 			t.Errorf("New(%+v) took Options with a field missing", o)
@@ -254,7 +254,7 @@ func TestTheOptionsChangeTheLimitTheFieldAndTheRefusal(t *testing.T) {
 	var got localweb.Refusal
 	h := newSessions(t, func(o *session.Options) {
 		o.MaxBody = 100
-		o.Field = "token-of-form"
+		o.CSRFField = "token-of-form"
 		o.Refuse = func(w http.ResponseWriter, _ *http.Request, f localweb.Refusal) {
 			got = f
 			w.WriteHeader(f.Status)
@@ -263,11 +263,53 @@ func TestTheOptionsChangeTheLimitTheFieldAndTheRefusal(t *testing.T) {
 	c, csrf := login(t, h)
 	w := serve(h, http.MethodPost, "/", "token-of-form="+url.QueryEscape(csrf), func(r *http.Request) { r.AddCookie(c) })
 	if w.Code != http.StatusOK {
-		t.Errorf("the token in the field Options.Field: got %d, want 200", w.Code)
+		t.Errorf("the token in the field Options.CSRFField: got %d, want 200", w.Code)
 	}
 	w = serve(h, http.MethodPost, "/", strings.Repeat("x", 101), func(r *http.Request) { r.AddCookie(c) })
 	if w.Code != http.StatusRequestEntityTooLarge || got.Message != "The form is larger than 100 bytes." || got.Reason == "" {
 		t.Errorf("a body of 101 bytes: got %d and %+v", w.Code, got)
+	}
+}
+
+// The former names of the fields are read while the new ones are empty,
+// and the new ones win.
+func TestTheFormerNamesOfTheOptionsStillWork(t *testing.T) {
+	t.Parallel()
+
+	h := newSessions(t, func(o *session.Options) {
+		*o = session.Options{Token: token, Cookie: "prog_ui_", Header: header, Field: "f"}
+	})
+	c, csrf := login(t, h)
+	if c.Name != cookie {
+		t.Errorf("the cookie of Cookie is %q, want %q", c.Name, cookie)
+	}
+	for _, set := range []func(*http.Request){
+		func(r *http.Request) { r.Header.Set(header, csrf) },
+		nil,
+	} {
+		body := "f=" + url.QueryEscape(csrf)
+		w := serve(h, http.MethodPost, "/", body, func(r *http.Request) {
+			r.AddCookie(c)
+			if set != nil {
+				set(r)
+			}
+		})
+		if w.Code != http.StatusOK {
+			t.Errorf("the token in Header or Field: got %d, want 200", w.Code)
+		}
+	}
+
+	h = newSessions(t, func(o *session.Options) {
+		o.Cookie, o.Header, o.Field = "old_", "X-Old", "old"
+		o.CSRFField = "new"
+	})
+	c, csrf = login(t, h)
+	w := serve(h, http.MethodPost, "/", "new="+url.QueryEscape(csrf), func(r *http.Request) { r.AddCookie(c) })
+	if c.Name != cookie || w.Code != http.StatusOK {
+		t.Errorf("the new names: cookie %q and %d, want %q and 200", c.Name, w.Code, cookie)
+	}
+	if session.DefaultField != session.DefaultCSRFField {
+		t.Errorf("DefaultField is %q, want %q", session.DefaultField, session.DefaultCSRFField)
 	}
 }
 
@@ -276,7 +318,7 @@ func TestSessionsIsManager(t *testing.T) {
 	t.Parallel()
 
 	var s *session.Sessions
-	s, err := session.New(session.Options{Token: token, Cookie: "prog_ui_", Header: header})
+	s, err := session.New(session.Options{Token: token, CookiePrefix: "prog_ui_", CSRFHeader: header})
 	if err != nil || s == nil {
 		t.Errorf("New = %v, %v", s, err)
 	}

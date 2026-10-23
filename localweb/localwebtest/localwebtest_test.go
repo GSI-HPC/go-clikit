@@ -72,7 +72,7 @@ func fails(t *testing.T, fn func(tb testing.TB)) []string {
 // form, and an event stream, behind the checks of localweb and a session.
 func server(t *testing.T) *httptest.Server {
 	t.Helper()
-	sessions, err := session.New(session.Options{Token: token, Cookie: "prog_ui_", Header: header})
+	sessions, err := session.New(session.Options{Token: token, CookiePrefix: "prog_ui_", CSRFHeader: header})
 	if err != nil {
 		t.Fatal(err)
 	}
