@@ -25,6 +25,8 @@
 //	github.com/GSI-HPC/go-clikit/localweb/assets          a page's static files at addresses with a hash, cached for good
 //	github.com/GSI-HPC/go-clikit/localweb/page            a page's templates in one set, and the answers to htmx
 //	github.com/GSI-HPC/go-clikit/localweb/htmx            htmx, its SSE extension and idiomorph, checked against their releases
+//	github.com/GSI-HPC/go-clikit/fsutil                   writing a file whole or not at all, a lock beside a shared file, trusted files
+//	github.com/GSI-HPC/go-clikit/doctor                   the checks of a doctor command, in fixed words, as text and as JSON
 //
 // A library package reports what it does through progress, which costs
 // nothing when no command is listening, and runs work for many targets with
@@ -35,7 +37,9 @@
 // call's progress with progress/mcpprogress, and a program reads back the
 // event log it or a child wrote with progress/eventlog. A command built with cobra
 // makes its tree strict about its command line with cobratree, and one
-// that serves a page to its user guards the server with localweb. The kit
+// that serves a page to its user guards the server with localweb. A
+// program writes the files it shares or keeps private with fsutil, and
+// reports the checks of its doctor command with doctor. The kit
 // knows no program: a program's name, the noun for its targets and its
 // rule for exit codes are parameters.
 package clikit
