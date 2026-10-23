@@ -34,5 +34,5 @@ func Example() {
 	// Output:
 	// true true
 	// 200 text/javascript; charset=utf-8
-	// {"allowEval":false,"allowScriptTags":false,"includeIndicatorStyles":false,"selfRequestsOnly":true,"historyCacheSize":0}
+	// {"allowEval":false,"allowScriptTags":false,"includeIndicatorStyles":false,"selfRequestsOnly":true,"historyCacheSize":0,"historyRestoreAsHxRequest":false}
 }
