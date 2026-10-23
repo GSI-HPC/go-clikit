@@ -21,11 +21,15 @@ The packages were written for [clusterctl](https://github.com/GSI-HPC/clusterctl
 command-line tool for administering HPC clusters, and became a module of
 their own when [sind](https://github.com/GSI-HPC/sind), which runs Slurm
 clusters in Docker, set out to use them too. They moved here with their
-history, as clusterctl v0.4.0 shipped them, and their first release will be
-v0.1.0. `progress/cliprogress` and `cobratree` were written here, from the
-command-line code clusterctl and sind each carried
+history, as clusterctl v0.4.0 shipped them, and were first released as
+v0.1.0. Later releases added packages, as their
+[release notes](https://github.com/GSI-HPC/go-clikit/releases) say.
+`progress/cliprogress`, `cobratree`, `fsutil` and `doctor` were written
+here, from the code clusterctl, sind and brig each carried
 ([decision 21](doc/decisions.md#21-the-command-lines-glue-for-progress-is-the-kits),
-[decision 24](doc/decisions.md#24-the-strict-command-tree-is-the-kits-in-cobratree)).
+[decision 24](doc/decisions.md#24-the-strict-command-tree-is-the-kits-in-cobratree),
+[decision 37](doc/decisions.md#37-fsutil-writes-locks-and-checks-the-files-of-a-program),
+[decision 38](doc/decisions.md#38-doctor-reports-a-programs-checks-in-fixed-words-and-text)).
 [`doc/architecture.md`](doc/architecture.md) says how they fit together.
 
 | Package | What it holds |
@@ -50,6 +54,8 @@ command-line code clusterctl and sind each carried
 | `localweb/assets` | a page's static files at addresses with a hash, cached for good |
 | `localweb/page` | a page's templates in one set, and the answers to htmx |
 | `localweb/htmx` | htmx, its SSE extension and idiomorph, checked against their releases |
+| `fsutil` | writing a file whole or not at all, a lock beside a shared file, refusing a file another user could have written |
+| `doctor` | the checks of a doctor command, in fixed words, as text and as JSON |
 
 ## Install
 
