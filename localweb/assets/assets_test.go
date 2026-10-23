@@ -30,7 +30,7 @@ type readFailFS struct{ fstest.MapFS }
 
 func (readFailFS) ReadFile(string) ([]byte, error) { return nil, errors.New("unreadable") }
 
-func newAssets(t *testing.T, fsys fs.FS, o assets.Options) *assets.Assets {
+func newSet(t *testing.T, fsys fs.FS, o assets.Options) *assets.Set {
 	t.Helper()
 	a, err := assets.New(fsys, prefix, o)
 	if err != nil {
@@ -39,7 +39,7 @@ func newAssets(t *testing.T, fsys fs.FS, o assets.Options) *assets.Assets {
 	return a
 }
 
-func get(a *assets.Assets, method, target string) *httptest.ResponseRecorder {
+func get(a *assets.Set, method, target string) *httptest.ResponseRecorder {
 	w := httptest.NewRecorder()
 	a.ServeHTTP(w, httptest.NewRequest(method, target, nil))
 	return w
@@ -82,7 +82,7 @@ func TestNewFailsOnAnFSError(t *testing.T) {
 
 func version(t *testing.T, fsys fs.FS) string {
 	t.Helper()
-	return newAssets(t, fsys, assets.Options{}).Version()
+	return newSet(t, fsys, assets.Options{}).Version()
 }
 
 func TestVersion(t *testing.T) {
@@ -147,7 +147,7 @@ func TestDevVersion(t *testing.T) {
 	t.Parallel()
 
 	fsys := fstest.MapFS{"app.css": {Data: []byte("one")}}
-	a := newAssets(t, fsys, assets.Options{Dev: true})
+	a := newSet(t, fsys, assets.Options{Dev: true})
 	if a.Version() != assets.DevVersion || assets.DevVersion != "dev" {
 		t.Errorf("Version = %q, want %q", a.Version(), assets.DevVersion)
 	}
@@ -178,7 +178,7 @@ func TestDevDoesNotReadTheFilesInNew(t *testing.T) {
 func TestURL(t *testing.T) {
 	t.Parallel()
 
-	a := newAssets(t, fstest.MapFS{"css/app.css": {Data: []byte("x")}}, assets.Options{})
+	a := newSet(t, fstest.MapFS{"css/app.css": {Data: []byte("x")}}, assets.Options{})
 	want := prefix + a.Version() + "/css/app.css"
 	if got := a.URL("css/app.css"); got != want {
 		t.Errorf("URL = %q, want %q", got, want)
@@ -198,7 +198,7 @@ func TestURLs(t *testing.T) {
 		"css/dir.css":   {Mode: fs.ModeDir},
 		"css/sub/x.css": {Data: []byte("x")},
 	}
-	a := newAssets(t, fsys, assets.Options{})
+	a := newSet(t, fsys, assets.Options{})
 	p := prefix + a.Version() + "/"
 	tests := []struct {
 		pattern string
@@ -223,7 +223,7 @@ func TestURLs(t *testing.T) {
 func TestServeHTTP(t *testing.T) {
 	t.Parallel()
 
-	a := newAssets(t, fstest.MapFS{
+	a := newSet(t, fstest.MapFS{
 		"app.css":      {Data: []byte("body{}")},
 		"js/app.js":    {Data: []byte("1;")},
 		"blob.unknown": {Data: []byte("zz")},
@@ -267,7 +267,7 @@ func TestServeHTTP(t *testing.T) {
 func TestServeHTTPRefusesOtherMethods(t *testing.T) {
 	t.Parallel()
 
-	a := newAssets(t, fstest.MapFS{"a.css": {Data: []byte("x")}}, assets.Options{})
+	a := newSet(t, fstest.MapFS{"a.css": {Data: []byte("x")}}, assets.Options{})
 	for _, m := range []string{http.MethodPost, http.MethodPut, http.MethodDelete} {
 		w := get(a, m, a.URL("a.css"))
 		if w.Code != http.StatusMethodNotAllowed || w.Header().Get("Allow") != "GET, HEAD" {
@@ -279,7 +279,7 @@ func TestServeHTTPRefusesOtherMethods(t *testing.T) {
 func TestServeHTTPAnswers404(t *testing.T) {
 	t.Parallel()
 
-	a := newAssets(t, fstest.MapFS{
+	a := newSet(t, fstest.MapFS{
 		"a.css":      {Data: []byte("x")},
 		"dir/b.css":  {Data: []byte("y")},
 		"empty":      {Mode: fs.ModeDir},
@@ -317,7 +317,7 @@ func TestServeHTTPAnswers404(t *testing.T) {
 func TestServeHTTPAnswers404WhenTheReadFails(t *testing.T) {
 	t.Parallel()
 
-	a := newAssets(t, readFailFS{fstest.MapFS{"a.css": {Data: []byte("x")}}}, assets.Options{Dev: true})
+	a := newSet(t, readFailFS{fstest.MapFS{"a.css": {Data: []byte("x")}}}, assets.Options{Dev: true})
 	if w := get(a, http.MethodGet, a.URL("a.css")); w.Code != http.StatusNotFound {
 		t.Errorf("status = %d, want 404", w.Code)
 	}
@@ -357,5 +357,19 @@ func TestContentType(t *testing.T) {
 				t.Errorf("ContentType(%q) = %q, want %q", name, got, want)
 			}
 		})
+	}
+}
+
+// The deprecated name Assets is Set.
+func TestAssetsIsSet(t *testing.T) {
+	t.Parallel()
+
+	var a *assets.Assets
+	a, err := assets.New(fstest.MapFS{"a.css": {Data: []byte("x")}}, prefix, assets.Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if w := get(a, http.MethodGet, a.URL("a.css")); w.Code != http.StatusOK {
+		t.Errorf("status = %d, want %d", w.Code, http.StatusOK)
 	}
 }

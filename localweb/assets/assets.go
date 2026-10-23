@@ -57,23 +57,29 @@ type Options struct {
 	Dev bool
 }
 
-// Assets are the static files of a page, an http.Handler that serves
-// them. Its methods are safe for concurrent use.
-type Assets struct {
+// Set is the static files of a page, an http.Handler that serves them.
+// Its methods are safe for concurrent use.
+type Set struct {
 	fsys    fs.FS
 	prefix  string
 	version string
 	dev     bool
 }
 
+// Assets is the former name of Set.
+//
+// Deprecated: Use Set, which does not repeat the name of the package
+// (decision 36).
+type Assets = Set
+
 // New returns the files of fsys, served under prefix, a path that starts
 // and ends with a slash, such as "/static/". Unless o.Dev is set, it reads
 // every file once to make the version, and an error of fsys is its error.
-func New(fsys fs.FS, prefix string, o Options) (*Assets, error) {
+func New(fsys fs.FS, prefix string, o Options) (*Set, error) {
 	if !strings.HasPrefix(prefix, "/") || !strings.HasSuffix(prefix, "/") {
 		return nil, fmt.Errorf("assets: the prefix %q does not start and end with a slash", prefix)
 	}
-	a := &Assets{fsys: fsys, prefix: prefix, version: DevVersion, dev: o.Dev}
+	a := &Set{fsys: fsys, prefix: prefix, version: DevVersion, dev: o.Dev}
 	if o.Dev {
 		return a, nil
 	}
@@ -101,19 +107,19 @@ func New(fsys fs.FS, prefix string, o Options) (*Assets, error) {
 
 // Version returns the version in the addresses of the files: twelve hex
 // digits of their hash, or DevVersion.
-func (a *Assets) Version() string { return a.version }
+func (a *Set) Version() string { return a.version }
 
 // URL returns the address of the file name, such as
 // "/static/0123456789ab/app.css" for "app.css". It does not look whether
 // the file is there.
-func (a *Assets) URL(name string) string {
+func (a *Set) URL(name string) string {
 	return a.prefix + a.version + "/" + name
 }
 
 // URLs returns the addresses of the files whose names match pattern, as
 // fs.Glob matches them, in the order of their names, such as every
 // "css/*.css" of a page. A pattern that is malformed matches nothing.
-func (a *Assets) URLs(pattern string) []string {
+func (a *Set) URLs(pattern string) []string {
 	names, _ := fs.Glob(a.fsys, pattern)
 	urls := make([]string, 0, len(names))
 	for _, name := range names {
@@ -130,7 +136,7 @@ func (a *Assets) URLs(pattern string) []string {
 // the prefix; and 405 for any other method. A file is served with a
 // Content-Type from a fixed list, never from the host's own, and
 // application/octet-stream for an extension the list does not have.
-func (a *Assets) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (a *Set) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet && r.Method != http.MethodHead {
 		w.Header().Set("Allow", "GET, HEAD")
 		http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
@@ -159,7 +165,7 @@ func (a *Assets) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 // read returns the content of the regular file name.
-func (a *Assets) read(name string) ([]byte, error) {
+func (a *Set) read(name string) ([]byte, error) {
 	info, err := fs.Stat(a.fsys, name)
 	if err != nil {
 		return nil, err
