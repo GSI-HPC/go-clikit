@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strconv"
 	"strings"
 
 	"github.com/GSI-HPC/go-clikit/progress"
@@ -48,7 +49,7 @@ type MapOptions[T any] struct {
 	// as its exit code, must not depend on whether a Bus is there.
 	Classify func(error) progress.Class
 	// Summarize sums up the items, as the error the step ends with; nil
-	// is Failure, with Noun. A program gives it the error its commands
+	// is Failure's error, with Noun. A program gives it the error its commands
 	// exit with, as Failure's text with an exit code of its own.
 	// Summary.Canceled says that every item that failed ended canceled,
 	// which the end of ctx does whether it was interrupted or ran out of
@@ -59,10 +60,14 @@ type MapOptions[T any] struct {
 	// or Acquire returned, which is the context's only if they returned
 	// it.
 	Summarize func(Summary) error
-	// Noun names the items in the error the default Summarize, Failure,
-	// ends the step with, such as "hosts"; empty names none. A Summarize
-	// of the program's is not given it.
-	Noun string
+	// Noun says how many items there are, n of them, in the program's own
+	// word for them, such as "480 hosts", in the error the default
+	// Summarize ends the step with: "3 of 480 hosts failed: ...". It has
+	// the shape of the Noun of display.PlainOptions and
+	// cliprogress.Options, so that one function serves all three. Nil
+	// leaves the noun out: "3 of 480 failed: ...". A Summarize of the
+	// program's is not given it.
+	Noun func(n int) string
 	// Acquire, when it is set, takes what an item's work needs besides its
 	// place in the pool, such as a place on each host it goes to, and
 	// returns the function that gives that back once the work is done; a
@@ -282,7 +287,7 @@ func Map[T, R any](ctx context.Context, items []T, o MapOptions[T], fn func(ctx 
 	if o.Summarize != nil {
 		err = o.Summarize(s)
 	} else {
-		err = Failure(o.Noun, s)
+		err = summarize(o.Noun, s)
 	}
 	step.End(err)
 	return out, err
@@ -463,6 +468,16 @@ type Failed struct {
 // need not say so; it is ClassTarget otherwise. It is nil when none
 // failed.
 func Failure(noun string, s Summary) error {
+	var count func(int) string
+	if noun != "" {
+		count = func(n int) string { return fmt.Sprintf("%d %s", n, noun) }
+	}
+	return summarize(count, s)
+}
+
+// summarize is Failure with the noun as MapOptions.Noun has it: "k of
+// <noun(n)> failed: <names>", or "k of n failed: <names>" when noun is nil.
+func summarize(noun func(n int) string, s Summary) error {
 	if len(s.Failed) == 0 {
 		return nil
 	}
@@ -474,16 +489,16 @@ func Failure(noun string, s Summary) error {
 			kept = append(kept, f.Err)
 		}
 	}
-	what := "failed"
-	if noun != "" {
-		what = noun + " failed"
+	of := strconv.Itoa(s.Total)
+	if noun != nil {
+		of = noun(s.Total)
 	}
 	class := progress.ClassTarget
 	if s.Canceled {
 		class = progress.ClassCanceled
 	}
 	return &failedItems{
-		message: fmt.Sprintf("%d of %d %s: %s", len(names), s.Total, what, list(names)),
+		message: fmt.Sprintf("%d of %s failed: %s", len(names), of, list(names)),
 		errs:    kept,
 		class:   class,
 	}
