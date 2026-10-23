@@ -12,13 +12,13 @@
 // behind the checks of package localweb, which refuse the requests of
 // other sites and of other Host names:
 //
-//	sessions, err := session.New(session.Options{Token: token, Cookie: "prog_ui_", Header: "X-Prog-CSRF"})
+//	sessions, err := session.New(session.Options{Token: token, CookiePrefix: "prog_ui_", CSRFHeader: "X-Prog-CSRF"})
 //	h := localweb.Headers("")(localweb.Hosts(b.Answers, localweb.HostsOptions{})(
 //		localweb.SameOrigin(localweb.OriginPolicy{Navigate: true})(sessions.Middleware(mux))))
 //
-// A page puts CSRF(r.Context()) into its forms, in the field Options.Field,
-// and into the header Options.Header of the requests its script sends,
-// such as htmx's hx-headers.
+// A page puts CSRF(r.Context()) into its forms, in the field
+// Options.CSRFField, and into the header Options.CSRFHeader of the
+// requests its script sends, such as htmx's hx-headers.
 //
 // The cookie is HttpOnly, so no script reads it, and SameSite=Strict, so
 // that a browser leaves it out of a request that another site starts. Its
@@ -33,6 +33,7 @@
 package session
 
 import (
+	"cmp"
 	"context"
 	"crypto/rand"
 	"crypto/subtle"
@@ -53,9 +54,14 @@ const (
 	// TokenParam is the query parameter that carries the launch token in
 	// the address the program prints.
 	TokenParam = "token"
-	// DefaultField is the form field of the CSRF token when Options.Field
-	// is empty.
-	DefaultField = "csrf"
+	// DefaultCSRFField is the form field of the CSRF token when
+	// Options.CSRFField is empty.
+	DefaultCSRFField = "csrf"
+	// DefaultField is the former name of DefaultCSRFField.
+	//
+	// Deprecated: Use DefaultCSRFField, which says which token the field
+	// carries (decision 36).
+	DefaultField = DefaultCSRFField
 	// DefaultMaxBody is the most bytes the body of a request that may
 	// change something holds when Options.MaxBody is zero.
 	DefaultMaxBody = 64 << 10
@@ -76,15 +82,15 @@ func NewToken() string {
 type Options struct {
 	// Token is the launch token, from NewToken.
 	Token string
-	// Cookie is the start of the session cookie's name, such as
+	// CookiePrefix is the start of the session cookie's name, such as
 	// "prog_ui_"; the port of the request's Host follows.
-	Cookie string
-	// Header is the request header that carries the CSRF token, such as
-	// "X-Prog-CSRF".
-	Header string
-	// Field is the form field that carries the CSRF token, for a form a
-	// browser sends without script; "" is DefaultField.
-	Field string
+	CookiePrefix string
+	// CSRFHeader is the request header that carries the CSRF token, such
+	// as "X-Prog-CSRF".
+	CSRFHeader string
+	// CSRFField is the form field that carries the CSRF token, for a form
+	// a browser sends without script; "" is DefaultCSRFField.
+	CSRFField string
 	// MaxBody is the most bytes the body of a request that may change
 	// something holds; 0 is DefaultMaxBody.
 	MaxBody int64
@@ -92,6 +98,24 @@ type Options struct {
 	// that serves pages adds the line that tells the user where to find
 	// the address to open.
 	Refuse localweb.Refuser
+
+	// Cookie is the former name of CookiePrefix, read while CookiePrefix
+	// is empty.
+	//
+	// Deprecated: Use CookiePrefix; the port follows it (decision 36).
+	Cookie string
+	// Header is the former name of CSRFHeader, read while CSRFHeader is
+	// empty.
+	//
+	// Deprecated: Use CSRFHeader, which says which token it carries
+	// (decision 36).
+	Header string
+	// Field is the former name of CSRFField, read while CSRFField is
+	// empty.
+	//
+	// Deprecated: Use CSRFField, which says which token it carries
+	// (decision 36).
+	Field string
 }
 
 // Manager holds the sessions of one launch.
@@ -104,13 +128,13 @@ type Manager struct {
 }
 
 // New returns the Manager of the launch o.Token. It refuses an Options
-// without a token, a cookie name or a header name.
+// without a token, a cookie prefix or a CSRF header.
 func New(o Options) (*Manager, error) {
-	if o.Token == "" || o.Cookie == "" || o.Header == "" {
-		return nil, errors.New("session: Options needs a Token, a Cookie and a Header")
-	}
-	if o.Field == "" {
-		o.Field = DefaultField
+	o.CookiePrefix = cmp.Or(o.CookiePrefix, o.Cookie)
+	o.CSRFHeader = cmp.Or(o.CSRFHeader, o.Header)
+	o.CSRFField = cmp.Or(o.CSRFField, o.Field, DefaultCSRFField)
+	if o.Token == "" || o.CookiePrefix == "" || o.CSRFHeader == "" {
+		return nil, errors.New("session: Options needs a Token, a CookiePrefix and a CSRFHeader")
 	}
 	if o.MaxBody == 0 {
 		o.MaxBody = DefaultMaxBody
@@ -147,8 +171,8 @@ func CSRF(ctx context.Context) string {
 //   - A request without the cookie of a session is refused, 403 Forbidden.
 //   - A request that may change something has its body capped at
 //     Options.MaxBody, and its form parsed by the time next runs; it must
-//     carry the session's CSRF token in Options.Header or, failing that,
-//     in the form field Options.Field.
+//     carry the session's CSRF token in Options.CSRFHeader or, failing
+//     that, in the form field Options.CSRFField.
 func (s *Manager) Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		port, ok := requestPort(r.Host)
@@ -193,7 +217,7 @@ func (s *Manager) exchange(w http.ResponseWriter, r *http.Request, port string) 
 	// Secure would keep the cookie from plain HTTP, which is all a
 	// loopback listener without a certificate speaks.
 	http.SetCookie(w, &http.Cookie{
-		Name: s.o.Cookie + port, Value: id, Path: "/",
+		Name: s.o.CookiePrefix + port, Value: id, Path: "/",
 		HttpOnly: true, SameSite: http.SameSiteStrictMode,
 	})
 	q.Del(TokenParam)
@@ -207,7 +231,7 @@ func (s *Manager) exchange(w http.ResponseWriter, r *http.Request, port string) 
 
 // session returns the CSRF token of the request's session, if it has one.
 func (s *Manager) session(r *http.Request, port string) (string, bool) {
-	c, err := r.Cookie(s.o.Cookie + port)
+	c, err := r.Cookie(s.o.CookiePrefix + port)
 	if err != nil {
 		return "", false
 	}
@@ -230,9 +254,9 @@ func (s *Manager) checkWrite(w http.ResponseWriter, r *http.Request, csrf string
 		s.o.Refuse(w, r, f)
 		return false
 	}
-	sent := r.Header.Get(s.o.Header)
+	sent := r.Header.Get(s.o.CSRFHeader)
 	if sent == "" {
-		sent = r.PostForm.Get(s.o.Field)
+		sent = r.PostForm.Get(s.o.CSRFField)
 	}
 	if !sameSecret(sent, csrf) {
 		s.o.Refuse(w, r, localweb.Refusal{
