@@ -96,8 +96,9 @@ still change in a minor release (see Compatibility).
   `Worst`, `Count` and `Write`.
 - `fsutil/`: `fsutil.go`, the package comment, `WriteAtomic`, `Update`,
   `DefaultLockWait`, `EnsureDir`, `CheckTrusted` and `ErrUntrusted`;
-  `lock_unix.go`, `Lock` and its file, with `holder_linux.go`, the holder of a lock read from
-  `/proc/locks`, and `owner_unix.go`, the owner of a file.
+  `lock_unix.go`, `Lock` and its file, with `holder_linux.go`, the
+  holder of a lock read from `/proc/locks`; `owner_unix.go`, the owner of
+  a file, the check of `EnsureDir` and the sync of a directory.
   `lock_other.go`, `holder_other.go` and `owner_other.go` are for
   systems that are not Unix, or not Linux.
 - `cobratree/`: `cobratree.go`, the package comment, `Strict` and its
