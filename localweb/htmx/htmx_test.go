@@ -35,7 +35,7 @@ func TestFilesAreTheUpstreamReleases(t *testing.T) {
 			sum := sha256.Sum256(data)
 			if got := hex.EncodeToString(sum[:]); got != tt.sum {
 				t.Errorf("sha256 of %s = %s, want %s: the bytes must be the upstream release's, "+
-					"and a new version changes Version and this sum together", tt.name, got, tt.sum)
+					"and a new version changes its version constant and this sum together", tt.name, got, tt.sum)
 			}
 		})
 	}
@@ -48,8 +48,26 @@ func TestScriptHoldsItsVersion(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if want := `version:"` + htmx.Version + `"`; !strings.Contains(string(data), want) {
-		t.Errorf("%s does not contain %s: Version and the file must change together", htmx.Script, want)
+	if want := `version:"` + htmx.ScriptVersion + `"`; !strings.Contains(string(data), want) {
+		t.Errorf("%s does not contain %s: ScriptVersion and the file must change together", htmx.Script, want)
+	}
+}
+
+// The deprecated name Version is ScriptVersion.
+func TestVersionIsScriptVersion(t *testing.T) {
+	t.Parallel()
+
+	if htmx.Version != htmx.ScriptVersion {
+		t.Errorf("Version = %q, want ScriptVersion %q", htmx.Version, htmx.ScriptVersion)
+	}
+}
+
+// The deprecated name IdiomorphVersion is MorphVersion.
+func TestIdiomorphVersionIsMorphVersion(t *testing.T) {
+	t.Parallel()
+
+	if htmx.IdiomorphVersion != htmx.MorphVersion {
+		t.Errorf("IdiomorphVersion = %q, want MorphVersion %q", htmx.IdiomorphVersion, htmx.MorphVersion)
 	}
 }
 
