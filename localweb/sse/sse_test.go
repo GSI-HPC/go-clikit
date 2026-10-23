@@ -93,6 +93,7 @@ func TestFormat(t *testing.T) {
 		{sse.Event{Name: "runs", Data: "<p>1</p>"}, "event: runs\ndata: <p>1</p>\n\n"},
 		{sse.Event{Name: "runs", Data: "<p>\n1\r\n</p>"}, "event: runs\ndata: <p>\ndata: 1&#13;\ndata: </p>\n\n"},
 		{sse.Event{Name: "empty"}, "event: empty\ndata: \n\n"},
+		{sse.Event{Name: "runs\r\ndata: x\n\nevent: y\r", Data: "1"}, "event: runsdata: xevent: y\ndata: 1\n\n"},
 	}
 	for _, tt := range tests {
 		if got := sse.Format(tt.e); got != tt.want {

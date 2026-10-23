@@ -66,6 +66,7 @@ const (
 // Event is one event of a stream: a fragment of a page.
 type Event struct {
 	// Name is the event's name, the fragment's; it holds no line break.
+	// Serve refuses a name with one, and Format drops it.
 	Name string
 	// Data is the fragment's HTML.
 	Data string
@@ -219,6 +220,9 @@ func checkNames(events []Event) error {
 	return nil
 }
 
+// nameDropper drops the line breaks of an event's name.
+var nameDropper = strings.NewReplacer("\r", "", "\n", "")
+
 // send writes each event whose data differs from what was sent last under
 // its name, and flushes.
 func (st *stream) send(events []Event) error {
@@ -246,12 +250,15 @@ func (st *stream) end(err error) error {
 
 // Format returns e as the lines of one Server-Sent Event: its name, a data
 // line for each line of its data, and an empty line. A carriage return
-// also ends a line of the stream, so it is written as the character
-// reference &#13;, which HTML reads the same.
+// also ends a line of the stream, so it is written in the data as the
+// character reference &#13;, which HTML reads the same. A carriage return
+// or a line feed in the name is dropped, so that no name adds a field or
+// an event to the stream (doc/decisions.md, decision 40); Serve refuses
+// such a name before it sends anything.
 func Format(e Event) string {
 	var b strings.Builder
 	b.WriteString("event: ")
-	b.WriteString(e.Name)
+	b.WriteString(nameDropper.Replace(e.Name))
 	b.WriteByte('\n')
 	for line := range strings.SplitSeq(strings.ReplaceAll(e.Data, "\r", "&#13;"), "\n") {
 		b.WriteString("data: ")
