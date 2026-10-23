@@ -46,9 +46,9 @@ func rewrite(t testing.TB, lines []eventlog.Line) string {
 			if log != nil {
 				t.Fatalf("a second first line: %+v", l)
 			}
-			log = progress.NewLog(&out, progress.LogOptions{Run: l.Run, Program: l.Program, Version: l.Version,
+			log = progress.NewLog(&out, progress.LogOptions{RunID: l.RunID, Program: l.Program, Version: l.Version,
 				AdvanceEvery: -1, FlushEvery: -1})
-			log.Begin(progress.Run{Trace: l.Trace})
+			log.Begin(progress.RunInfo{Trace: l.Trace})
 			continue
 		}
 		log.Handle(l.Event)
@@ -72,8 +72,8 @@ func TestDecodeReadsTheGoldenLog(t *testing.T) {
 		if err != nil {
 			t.Fatalf("line %d: %v", i+1, err)
 		}
-		if l.Run != "0123456789abcdef" || l.Trace.Trace.String() != "4bf92f3577b34da6a3ce929d0e0e4736" {
-			t.Errorf("line %d: run %q, trace %v", i+1, l.Run, l.Trace.Trace)
+		if l.RunID != "0123456789abcdef" || l.Trace.ID.String() != "4bf92f3577b34da6a3ce929d0e0e4736" {
+			t.Errorf("line %d: run %q, trace %v", i+1, l.RunID, l.Trace.ID)
 		}
 		if m := leftOut.FindStringSubmatch(s); m != nil {
 			if n, _ := strconv.Atoi(m[1]); l.LeftOut != n {
@@ -165,7 +165,7 @@ func TestDecodeSanitises(t *testing.T) {
 	for _, c := range []struct {
 		what, got, want string
 	}{
-		{"the run", l.Run, `r\x1b`},
+		{"the run", l.RunID, `r\x1b`},
 		{"the name", e.Name, `a\x1b[31mb`},
 		{"the node", e.Node, long},
 		{"the host", e.Host, long[:progress.MaxField]},
@@ -238,21 +238,21 @@ func TestDecodeTheFirstLine(t *testing.T) {
 		traced bool
 	}{
 		{"no parent", `{"v":1,"type":"trace","run":"r","trace":"` + trace + `","program":"prog\u0007"}`,
-			eventlog.Line{Run: "r", Begin: true, Program: `prog\x07`, Trace: progress.TraceContext{}}, true},
+			eventlog.Line{RunID: "r", Run: "r", Begin: true, Program: `prog\x07`, Trace: progress.TraceContext{}}, true},
 		{"a parent", `{"v":1,"type":"trace","run":"r","trace":"` + trace + `","parent":"00f067aa0ba902b7","traceFlags":"01","traceState":"a=b"}`,
-			eventlog.Line{Run: "r", Begin: true, Trace: progress.TraceContext{Parent: 0x00f067aa0ba902b7, Flags: 1, State: "a=b"}}, true},
+			eventlog.Line{RunID: "r", Run: "r", Begin: true, Trace: progress.TraceContext{Parent: 0x00f067aa0ba902b7, Flags: 1, State: "a=b"}}, true},
 		{"a tracestate not kept", `{"v":1,"type":"trace","run":"r","trace":"` + trace + `","parent":"00f067aa0ba902b7","traceFlags":"01","traceState":"a=\u001b"}`,
-			eventlog.Line{Run: "r", Begin: true, Trace: progress.TraceContext{Parent: 0x00f067aa0ba902b7, Flags: 1}}, true},
+			eventlog.Line{RunID: "r", Run: "r", Begin: true, Trace: progress.TraceContext{Parent: 0x00f067aa0ba902b7, Flags: 1}}, true},
 		{"a parent without flags", `{"v":1,"type":"trace","run":"r","trace":"` + trace + `","parent":"00f067aa0ba902b7"}`,
-			eventlog.Line{Run: "r", Begin: true, Trace: progress.TraceContext{}}, true},
+			eventlog.Line{RunID: "r", Run: "r", Begin: true, Trace: progress.TraceContext{}}, true},
 		{"a short trace", `{"v":1,"type":"trace","run":"r","trace":"4bf9"}`,
-			eventlog.Line{Run: "r", Begin: true}, false},
+			eventlog.Line{RunID: "r", Run: "r", Begin: true}, false},
 		{"a trace not hexadecimal", `{"v":1,"type":"trace","run":"r","trace":"` + strings.Repeat("z", 32) + `"}`,
-			eventlog.Line{Run: "r", Begin: true}, false},
+			eventlog.Line{RunID: "r", Run: "r", Begin: true}, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			if tc.traced {
-				tc.want.Trace.Trace = mustTrace(t, trace)
+				tc.want.Trace.ID = mustTrace(t, trace)
 			}
 			got, err := eventlog.Decode([]byte(tc.line))
 			if err != nil || !reflect.DeepEqual(got, tc.want) {
@@ -269,7 +269,7 @@ func mustTrace(t testing.TB, s string) progress.TraceID {
 	if !ok {
 		t.Fatalf("no trace id: %q", s)
 	}
-	return tc.Trace
+	return tc.ID
 }
 
 // What Decode reads, written again by a Log and read again, is what it
@@ -285,7 +285,7 @@ func FuzzDecode(f *testing.F) {
 		if err != nil {
 			return
 		}
-		begin := eventlog.Line{Run: l.Run, Begin: true, Trace: l.Trace}
+		begin := eventlog.Line{RunID: l.RunID, Begin: true, Trace: l.Trace}
 		if l.Begin {
 			begin = l
 		}
@@ -301,7 +301,7 @@ func FuzzDecode(f *testing.F) {
 		}
 		if !l.Begin {
 			// An event's line says only the trace id of its run.
-			l.Trace = progress.TraceContext{Trace: l.Trace.Trace}
+			l.Trace = progress.TraceContext{ID: l.Trace.ID}
 		}
 		if !reflect.DeepEqual(again, l) {
 			t.Errorf("Decode(%s) = %+v, but written again and read, %+v", b, l, again)

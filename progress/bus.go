@@ -30,8 +30,8 @@ type BusOptions struct {
 	// Trace is the trace the spans belong to, as ParseTraceContext reads
 	// it from another program that handed it on. Its Parent, Flags and
 	// State say where the trace came from; they are recorded, for an
-	// event log, and change nothing else. A zero Trace.Trace draws a
-	// trace at random, and the rest of Trace is then ignored.
+	// event log, and change nothing else. A zero Trace.ID draws a trace
+	// at random, and the rest of Trace is then ignored.
 	Trace TraceContext
 	// PanicLog receives the stack of a sink that panicked, the front
 	// end's diagnostics; nil is the process's standard error.
@@ -39,7 +39,7 @@ type BusOptions struct {
 	// Program names the program in the line that says a sink panicked,
 	// "prog: …", so that it is not read as a line of the work's, and
 	// on the first line of an event log that names none of its own (see
-	// Run); empty leaves the name out.
+	// RunInfo); empty leaves the name out.
 	Program string
 	// Classify is the fallback of the classes End gives the errors of
 	// spans, asked for an error that none of Classify's first three rules
@@ -110,10 +110,10 @@ func NewBus(o BusOptions) *Bus {
 	if b.panicLog == nil {
 		b.panicLog = os.Stderr
 	}
-	if b.trace.Trace == (TraceID{}) {
+	if b.trace.ID == (TraceID{}) {
 		b.trace = TraceContext{}
 		// crypto/rand never fails; it ends the process when it cannot.
-		_, _ = rand.Read(b.trace.Trace[:])
+		_, _ = rand.Read(b.trace.ID[:])
 	}
 	// The base is drawn whatever the trace, so that runs that continue
 	// one trace do not share span ids.
@@ -130,8 +130,15 @@ func NewBus(o BusOptions) *Bus {
 	return b
 }
 
-// Trace returns the trace the Bus's spans belong to.
-func (b *Bus) Trace() TraceID { return b.trace.Trace }
+// TraceID returns the trace the Bus's spans belong to, the ID of its
+// TraceContext.
+func (b *Bus) TraceID() TraceID { return b.trace.ID }
+
+// Trace returns the trace the Bus's spans belong to, as TraceID does.
+//
+// Deprecated: Use TraceID. BusOptions.Trace is a TraceContext, and a
+// method of the same name that returns a TraceID misled (decision 36).
+func (b *Bus) Trace() TraceID { return b.TraceID() }
 
 // TraceContext returns the trace the Bus's spans belong to, and where it
 // came from.
@@ -172,8 +179,8 @@ func (b *Bus) Classify(err error) Class {
 // one that panics. b.mu is held.
 func (b *Bus) begin() {
 	for _, e := range b.sinks {
-		ts, ok := e.sink.(TraceSink)
-		if ok && !e.dead.Load() && !b.safely(func() { ts.Begin(Run{Trace: b.trace, Program: b.program}) }) {
+		ts, ok := e.sink.(RunSink)
+		if ok && !e.dead.Load() && !b.safely(func() { ts.Begin(RunInfo{Trace: b.trace, Program: b.program}) }) {
 			b.kill(e)
 		}
 	}

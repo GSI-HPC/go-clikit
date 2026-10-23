@@ -14,7 +14,7 @@ import "github.com/GSI-HPC/go-clikit/progress"
 // gives the sink each event once, in the order of its run's Seq: an
 // event of a run whose Seq is not past the last it gave, as the log read
 // again after a Reset has, is left out, so that Reset changes nothing. A
-// sink that is a progress.TraceSink is told of each run once, at the first
+// sink that is a progress.RunSink is told of each run once, at the first
 // line of the run, before the run's events. The events of every run the
 // log holds go to the sink; a log of its own for the child holds one.
 //
@@ -46,14 +46,14 @@ func (f *forward) Line(b []byte) {
 	if err != nil {
 		return
 	}
-	r := f.runs[l.Run]
+	r := f.runs[l.RunID]
 	if r == nil {
 		r = &forwarded{}
-		f.runs[l.Run] = r
+		f.runs[l.RunID] = r
 	}
 	if l.Begin {
-		if ts, ok := f.sink.(progress.TraceSink); ok && !r.begun {
-			ts.Begin(progress.Run{Trace: l.Trace, Program: l.Program})
+		if ts, ok := f.sink.(progress.RunSink); ok && !r.begun {
+			ts.Begin(progress.RunInfo{Trace: l.Trace, Program: l.Program, Version: l.Version})
 		}
 		r.begun = true
 		return

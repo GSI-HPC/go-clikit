@@ -124,8 +124,12 @@ type LogOptions struct {
 	// Version is the version of the program that writes the log, which its
 	// first line names.
 	Version string
-	// Run names the run on every line; empty draws 16 hexadecimal digits
-	// at random.
+	// RunID names the run on every line, as eventlog.Run.ID reads it
+	// back; empty draws 16 hexadecimal digits at random.
+	RunID string
+	// Run is the old name of RunID, read when RunID is empty.
+	//
+	// Deprecated: Use RunID, the one name of a run's ID (decision 36).
 	Run string
 	// AdvanceEvery is the least time between two advances of a span that
 	// the log writes, by the events' times; the advances in between are
@@ -171,7 +175,7 @@ type sampling struct {
 // NewLog returns a Log that writes to w, and starts the goroutine that
 // writes; Close stops it.
 func NewLog(w io.Writer, o LogOptions) *Log {
-	l := &Log{w: w, run: o.Run, o: o,
+	l := &Log{w: w, run: cmp.Or(o.RunID, o.Run), o: o,
 		wake: make(chan struct{}, 1), kept: make(chan struct{}, 1),
 		stop: make(chan struct{}), stopped: make(chan struct{})}
 	if l.run == "" {
@@ -244,14 +248,15 @@ type logEvent struct {
 }
 
 // Begin writes the run the events belong to, the log's first line: its
-// trace, and the program, LogOptions.Program or else r.Program.
-func (l *Log) Begin(r Run) {
+// trace, the program, LogOptions.Program or else r.Program, and its
+// version, LogOptions.Version or else r.Version.
+func (l *Log) Begin(r RunInfo) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	tc := r.Trace
-	l.trace = tc.Trace.String()
+	l.trace = tc.ID.String()
 	line := logTrace{V: LogVersion, Type: "trace", Run: l.run, Trace: l.trace,
-		Program: cmp.Or(l.o.Program, r.Program), Version: l.o.Version}
+		Program: cmp.Or(l.o.Program, r.Program), Version: cmp.Or(l.o.Version, r.Version)}
 	if tc.Parent != 0 {
 		line.Parent = tc.Parent.String()
 		line.TraceFlags = fmt.Sprintf("%02x", tc.Flags)

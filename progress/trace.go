@@ -18,8 +18,8 @@ import (
 // and logged all the same.
 // A Bus takes its trace context as BusOptions.Trace.
 type TraceContext struct {
-	// Trace is the trace the spans belong to.
-	Trace TraceID
+	// ID is the trace the spans belong to.
+	ID TraceID
 	// Parent is the other program's span the work runs under; zero when
 	// the trace began with the Bus.
 	Parent SpanID
@@ -71,11 +71,11 @@ func ParseTraceContext(traceparent, tracestate string) (tc TraceContext, ok bool
 	if !okTrace || !okParent || !okFlags {
 		return TraceContext{}, false
 	}
-	copy(tc.Trace[:], trace)
+	copy(tc.ID[:], trace)
 	for _, b := range parent {
 		tc.Parent = tc.Parent<<8 | SpanID(b)
 	}
-	if tc.Trace == (TraceID{}) || tc.Parent == 0 {
+	if tc.ID == (TraceID{}) || tc.Parent == 0 {
 		return TraceContext{}, false
 	}
 	tc.Flags = flags[0]
@@ -103,11 +103,11 @@ func NewTraceContext(r io.Reader) (TraceContext, error) {
 		return TraceContext{}, fmt.Errorf("reading a new trace context: %w", err)
 	}
 	var tc TraceContext
-	copy(tc.Trace[:], b[:16])
+	copy(tc.ID[:], b[:16])
 	for _, c := range b[16:] {
 		tc.Parent = tc.Parent<<8 | SpanID(c)
 	}
-	if tc.Trace == (TraceID{}) || tc.Parent == 0 {
+	if tc.ID == (TraceID{}) || tc.Parent == 0 {
 		return TraceContext{}, errors.New("the source of a new trace context gave an id of zeros")
 	}
 	tc.Flags = 0x01
@@ -118,17 +118,17 @@ func NewTraceContext(r io.Reader) (TraceContext, error) {
 // format, version 00 and lowercase hexadecimal digits: the trace id, the
 // parent's span id and the trace flags, as in
 // 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01, which
-// ParseTraceContext reads back to the same Trace, Parent and Flags. A
+// ParseTraceContext reads back to the same ID, Parent and Flags. A
 // program puts it in the TRACEPARENT of a program it starts.
 //
 // It returns "" for a trace context with no trace or no parent, which no
 // traceparent can name. It leaves State out: a program that passes the
 // tracestate on does so itself, in TRACESTATE, from tc.State.
 func (tc TraceContext) Traceparent() string {
-	if tc.Trace == (TraceID{}) || tc.Parent == 0 {
+	if tc.ID == (TraceID{}) || tc.Parent == 0 {
 		return ""
 	}
-	return fmt.Sprintf("00-%s-%s-%02x", tc.Trace, tc.Parent, tc.Flags)
+	return fmt.Sprintf("00-%s-%s-%02x", tc.ID, tc.Parent, tc.Flags)
 }
 
 // lowerHex decodes s, which has to be hexadecimal digits in lower case.

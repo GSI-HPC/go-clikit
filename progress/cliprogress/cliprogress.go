@@ -3,9 +3,9 @@
 
 // Package cliprogress is the command line's side of progress: the words a
 // flag such as --progress takes, the rule that picks a display from them
-// and from what the program found out about its streams, and a Run, which
-// makes the Bus, the display, the summary and the event log of one command
-// and takes them down again, in order, once the command has ended.
+// and from what the program found out about its streams, and a Session,
+// which makes the Bus, the display, the summary and the event log of one
+// command and takes them down again, in order, once the command has ended.
 //
 // The words are auto, tty, counter, plain and none, and the event log is a
 // file:
@@ -38,18 +38,19 @@
 // the package catches.
 //
 // A program calls Start as a command begins and runs the command under
-// Run.Context, in a span of its own. Start writes its notes, picks the
-// display, opens the event log and makes the Bus; it makes none when nothing
-// is shown and no log is written, so that standard error then holds what it
-// would without the kit, byte for byte. While a display is drawn, the
-// program puts its own writers of standard error through Run.Writer,
-// standard output too where it shows on the same terminal, and those of
-// goroutines beside the command, such as a logger's, through Run.Lines. Once
-// the command's span has ended, Run.Finish closes the Bus, takes the display
-// off the terminal, closes the event log and writes the summary; the program
-// then puts its writers back and writes the command's error. A command that
-// asks a question, before it deletes something, say, asks it with Ask, which
-// takes the display off the terminal until the answer comes.
+// Session.Context, in a span of its own. Start writes its notes, picks the
+// display, opens the event log and makes the Bus; it makes none when
+// nothing is shown and no log is written, so that standard error then holds
+// what it would without the kit, byte for byte. While a display is drawn,
+// the program puts its own writers of standard error through
+// Session.Writer, standard output too where it shows on the same terminal,
+// and those of goroutines beside the command, such as a logger's, through
+// Session.Lines. Once the command's span has ended, Session.Finish closes
+// the Bus, takes the display off the terminal, closes the event log and
+// writes the summary; the program then puts its writers back and writes the
+// command's error. A command that asks a question, before it deletes
+// something, say, asks it with Ask, which takes the display off the
+// terminal until the answer comes.
 //
 // The event log is appended to a file this user alone may read, created with
 // mode 0600. A regular file that is there already has to be one this user
@@ -245,7 +246,7 @@ type Options struct {
 	// Stderr.
 	PanicLog io.Writer
 	// Manual makes the display without starting its drawing, so that it
-	// draws a frame only when Run.Draw is called, as a test does on a
+	// draws a frame only when Session.Draw is called, as a test does on a
 	// clock it moves.
 	Manual bool
 }

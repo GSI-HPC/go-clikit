@@ -61,7 +61,7 @@ func terminal(screen *progresstest.Screen, c *clock) cliprogress.Options {
 
 // command runs a command of two seconds under r, with a step that fails
 // after one, and ends it with err.
-func command(r *cliprogress.Run, c *clock, err error) {
+func command(r *cliprogress.Session, c *clock, err error) {
 	ctx, cmd := progress.Start(r.Context(), progress.KindCommand, "delete cluster")
 	_, step := progress.Start(ctx, progress.KindStep, "mesh")
 	c.add(time.Second)

@@ -149,12 +149,12 @@ func (r *Reducer) Line(b []byte) {
 	if err != nil {
 		return
 	}
-	if _, dropped := r.gone[l.Run]; dropped {
+	if _, dropped := r.gone[l.RunID]; dropped {
 		return
 	}
-	ru := r.runs[l.Run]
+	ru := r.runs[l.RunID]
 	if ru == nil {
-		ru = r.add(l.Run)
+		ru = r.add(l.RunID)
 	}
 	ru.dirty = true
 	r.changed[ru.id] = ru.place
@@ -162,8 +162,8 @@ func (r *Reducer) Line(b []byte) {
 		ru.trace, ru.program, ru.version = l.Trace, l.Program, l.Version
 		return
 	}
-	if ru.trace.Trace == (progress.TraceID{}) {
-		ru.trace.Trace = l.Trace.Trace
+	if ru.trace.ID == (progress.TraceID{}) {
+		ru.trace.ID = l.Trace.ID
 	}
 	e := l.Event
 	if e.Time.After(ru.last) {

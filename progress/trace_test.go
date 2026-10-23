@@ -76,8 +76,8 @@ func TestParseTraceContext(t *testing.T) {
 				}
 				return
 			}
-			if got.Trace.String() != tc.wantTrace || got.Parent.String() != tc.wantParentID {
-				t.Errorf("trace %s, parent %s; want %s and %s", got.Trace, got.Parent, tc.wantTrace, tc.wantParentID)
+			if got.ID.String() != tc.wantTrace || got.Parent.String() != tc.wantParentID {
+				t.Errorf("trace %s, parent %s; want %s and %s", got.ID, got.Parent, tc.wantTrace, tc.wantParentID)
 			}
 			if got.Flags != tc.flags || got.State != tc.wantState {
 				t.Errorf("flags %02x and state %q, want %02x and %q", got.Flags, got.State, tc.flags, tc.wantState)
@@ -125,7 +125,7 @@ func TestRunsThatContinueOneTraceShareNoSpanID(t *testing.T) {
 	}
 
 	bus := progress.NewBus(progress.BusOptions{Trace: progress.TraceContext{Parent: tc.Parent, Flags: 1, State: "rojo=1"}})
-	if got := bus.TraceContext(); got.Trace == (progress.TraceID{}) || got.Trace == tc.Trace || got.Parent != 0 || got.State != "" {
+	if got := bus.TraceContext(); got.ID == (progress.TraceID{}) || got.ID == tc.ID || got.Parent != 0 || got.State != "" {
 		t.Errorf("a parent without a trace gave %+v, want a trace of its own and nothing else", got)
 	}
 }
@@ -150,8 +150,8 @@ func TestNewTraceContext(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewTraceContext: %v", err)
 	}
-	if tc.Trace.String() != trace || tc.Parent.String() != parent || tc.Flags != 0x01 || tc.State != "" {
-		t.Errorf("got trace %s, parent %s, flags %02x, state %q; want %s, %s, 01 and none", tc.Trace, tc.Parent, tc.Flags, tc.State, trace, parent)
+	if tc.ID.String() != trace || tc.Parent.String() != parent || tc.Flags != 0x01 || tc.State != "" {
+		t.Errorf("got trace %s, parent %s, flags %02x, state %q; want %s, %s, 01 and none", tc.ID, tc.Parent, tc.Flags, tc.State, trace, parent)
 	}
 	if src.Len() != 2 {
 		t.Errorf("%d bytes left in the source, want 2: exactly 24 are read", src.Len())
@@ -208,15 +208,15 @@ func TestNewTraceContextSources(t *testing.T) {
 	if err != nil {
 		t.Fatalf("a source of one byte at a time: %v", err)
 	}
-	if got.Trace.String() != strings.Repeat("ff", 16) || got.Parent.String() != strings.Repeat("ff", 8) {
-		t.Errorf("got trace %s and parent %s from all ones", got.Trace, got.Parent)
+	if got.ID.String() != strings.Repeat("ff", 16) || got.Parent.String() != strings.Repeat("ff", 8) {
+		t.Errorf("got trace %s and parent %s from all ones", got.ID, got.Parent)
 	}
 
 	// The next read of one source gives the next trace context.
 	src := bytes.NewReader(append(bytes.Clone(ones), bytes.Repeat([]byte{0x01}, 24)...))
 	first, err1 := progress.NewTraceContext(src)
 	second, err2 := progress.NewTraceContext(src)
-	if err1 != nil || err2 != nil || first.Trace == second.Trace || first.Parent == second.Parent {
+	if err1 != nil || err2 != nil || first.ID == second.ID || first.Parent == second.Parent {
 		t.Errorf("two reads gave %+v (%v) and %+v (%v)", first, err1, second, err2)
 	}
 }
@@ -232,7 +232,7 @@ func TestTraceparent(t *testing.T) {
 		parent = "00f067aa0ba902b7"
 	)
 	full := progress.TraceContext{
-		Trace:  progress.TraceID{0x4b, 0xf9, 0x2f, 0x35, 0x77, 0xb3, 0x4d, 0xa6, 0xa3, 0xce, 0x92, 0x9d, 0x0e, 0x0e, 0x47, 0x36},
+		ID:     progress.TraceID{0x4b, 0xf9, 0x2f, 0x35, 0x77, 0xb3, 0x4d, 0xa6, 0xa3, 0xce, 0x92, 0x9d, 0x0e, 0x0e, 0x47, 0x36},
 		Parent: 0x00f067aa0ba902b7,
 	}
 	with := func(flags byte, state string) progress.TraceContext {
@@ -251,7 +251,7 @@ func TestTraceparent(t *testing.T) {
 		{"a tracestate is left out", with(0x01, "rojo=1"), "00-" + trace + "-" + parent + "-01"},
 		{"the zero value", progress.TraceContext{}, ""},
 		{"no trace", progress.TraceContext{Parent: full.Parent, Flags: 0x01}, ""},
-		{"no parent", progress.TraceContext{Trace: full.Trace, Flags: 0x01}, ""},
+		{"no parent", progress.TraceContext{ID: full.ID, Flags: 0x01}, ""},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -263,7 +263,7 @@ func TestTraceparent(t *testing.T) {
 				return
 			}
 			back, ok := progress.ParseTraceContext(got, "")
-			if !ok || back.Trace != tc.tc.Trace || back.Parent != tc.tc.Parent || back.Flags != tc.tc.Flags {
+			if !ok || back.ID != tc.tc.ID || back.Parent != tc.tc.Parent || back.Flags != tc.tc.Flags {
 				t.Errorf("ParseTraceContext(%q) = %+v, %v; want the trace, parent and flags of %+v", got, back, ok, tc.tc)
 			}
 		})
