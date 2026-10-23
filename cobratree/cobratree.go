@@ -66,7 +66,10 @@ import (
 //     argument: unknown command "word" for "prog group". The closest
 //     subcommand is suggested, within cobra's SuggestionsMinimumDistance,
 //     2 unless the command sets its own; with none, a command that moved
-//     names its new place.
+//     names its new place. Such a command becomes runnable, as it has to
+//     be to refuse a word, so its usage gains the line "prog group
+//     [flags]" above "prog group [command]", and what reads the tree, a
+//     generator of manuals among them, sees a command that runs.
 //   - A root that holds subcommands and runs, with no argument check of
 //     its own, refuses any argument in the same words, as cobra refuses
 //     one in its own. A runnable command below the root keeps cobra's
