@@ -38,7 +38,9 @@ func (unreachable) ProgressClass() progress.Class { return progress.ClassTranspo
 func (e unreachable) Unwrap() error { return e.error }
 
 // onBMC describes a node by its service processor.
-func onBMC(node string) fanout.Item { return fanout.Item{Node: node, Host: node + ".mgmt.example.org"} }
+func onBMC(node string) fanout.ItemInfo {
+	return fanout.ItemInfo{Node: node, Host: node + ".mgmt.example.org"}
+}
 
 func TestMapKeepsTheOrderOfTheItems(t *testing.T) {
 	t.Parallel()
@@ -245,23 +247,23 @@ func TestMapStartsATargetWithTheWorkOfItsItem(t *testing.T) {
 
 	for _, tc := range []struct {
 		name string
-		item fanout.Item
+		item fanout.ItemInfo
 		unit progress.Unit
 		size int64
 	}{
-		{"unsized", fanout.Item{Node: "exe1"}, 0, 0},
-		{"sized", fanout.Item{Node: "exe1", Unit: progress.Bytes, Size: 2 << 30}, progress.Bytes, 2 << 30},
-		{"size not known", fanout.Item{Node: "exe1", Unit: progress.Bytes, Size: -1}, progress.Bytes, 0},
-		{"unit without a size", fanout.Item{Node: "exe1", Unit: progress.Items}, progress.Items, 0},
-		{"percent", fanout.Item{Node: "exe1", Unit: progress.Percent}, progress.Percent, 100},
+		{"unsized", fanout.ItemInfo{Node: "exe1"}, 0, 0},
+		{"sized", fanout.ItemInfo{Node: "exe1", Unit: progress.Bytes, Size: 2 << 30}, progress.Bytes, 2 << 30},
+		{"size not known", fanout.ItemInfo{Node: "exe1", Unit: progress.Bytes, Size: -1}, progress.Bytes, 0},
+		{"unit without a size", fanout.ItemInfo{Node: "exe1", Unit: progress.Items}, progress.Items, 0},
+		{"percent", fanout.ItemInfo{Node: "exe1", Unit: progress.Percent}, progress.Percent, 100},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
 			ctx, w := progresstest.Watch(context.Background(), t)
-			fanout.Map(ctx, []fanout.Item{tc.item}, fanout.MapOptions[fanout.Item]{Step: "copy",
-				Describe: func(i fanout.Item) fanout.Item { return i }},
-				func(context.Context, fanout.Item) (struct{}, error) { return struct{}{}, nil })
+			fanout.Map(ctx, []fanout.ItemInfo{tc.item}, fanout.MapOptions[fanout.ItemInfo]{Step: "copy",
+				Describe: func(i fanout.ItemInfo) fanout.ItemInfo { return i }},
+				func(context.Context, fanout.ItemInfo) (struct{}, error) { return struct{}{}, nil })
 			start := targetStart(t, w.Events(), "exe1")
 			if start.Unit != tc.unit || start.Size != tc.size {
 				t.Errorf("target starts with unit %v and size %d, want unit %v and size %d",
@@ -281,14 +283,14 @@ const mapAllocsPerItem = 3
 func TestMapWithoutABusAllocatesOnlyItsBookkeeping(t *testing.T) {
 	for _, unit := range []progress.Unit{0, progress.Bytes} {
 		allocs := func(n int) float64 {
-			items := make([]fanout.Item, n)
+			items := make([]fanout.ItemInfo, n)
 			for i := range items {
-				items[i] = fanout.Item{Node: "exe1", Unit: unit, Size: 4096}
+				items[i] = fanout.ItemInfo{Node: "exe1", Unit: unit, Size: 4096}
 			}
-			opts := fanout.MapOptions[fanout.Item]{Describe: func(i fanout.Item) fanout.Item { return i }}
+			opts := fanout.MapOptions[fanout.ItemInfo]{Describe: func(i fanout.ItemInfo) fanout.ItemInfo { return i }}
 			return testing.AllocsPerRun(10, func() {
 				fanout.Map(context.Background(), items, opts,
-					func(context.Context, fanout.Item) (struct{}, error) { return struct{}{}, nil })
+					func(context.Context, fanout.ItemInfo) (struct{}, error) { return struct{}{}, nil })
 			})
 		}
 		if more := allocs(200) - allocs(100); more > 100*mapAllocsPerItem {
@@ -305,13 +307,13 @@ func TestMapBoundsATargetBeforeItRuns(t *testing.T) {
 	t.Parallel()
 
 	ctx, w := progresstest.Watch(context.Background(), t)
-	items := []fanout.Item{
+	items := []fanout.ItemInfo{
 		{Node: "exe1"},
 		{Node: "exe2", Unit: progress.Bytes, Size: 4096},
 	}
-	fanout.Map(ctx, items, fanout.MapOptions[fanout.Item]{Step: "copy", Limit: 1,
-		Describe: func(i fanout.Item) fanout.Item { return i }},
-		func(context.Context, fanout.Item) (struct{}, error) { return struct{}{}, nil })
+	fanout.Map(ctx, items, fanout.MapOptions[fanout.ItemInfo]{Step: "copy", Limit: 1,
+		Describe: func(i fanout.ItemInfo) fanout.ItemInfo { return i }},
+		func(context.Context, fanout.ItemInfo) (struct{}, error) { return struct{}{}, nil })
 	start := targetStart(t, w.Events(), "exe2")
 	if start.State != progress.StateQueued {
 		t.Errorf("target exe2 starts %v, want queued", start.State)
@@ -321,14 +323,14 @@ func TestMapBoundsATargetBeforeItRuns(t *testing.T) {
 	}
 }
 
-// An Item without a Node names its target as fmt.Sprint prints the item,
+// An ItemInfo without a Node names its target as fmt.Sprint prints the item,
 // and keeps the rest of what Describe said.
 func TestMapNamesAnItemWithoutANodeAsItPrints(t *testing.T) {
 	t.Parallel()
 
 	ctx, w := progresstest.Watch(context.Background(), t)
 	fanout.Map(ctx, []int{7}, fanout.MapOptions[int]{Step: "scan",
-		Describe: func(int) fanout.Item { return fanout.Item{Role: "head"} }},
+		Describe: func(int) fanout.ItemInfo { return fanout.ItemInfo{Role: "head"} }},
 		func(context.Context, int) (struct{}, error) { return struct{}{}, nil })
 	want := `step scan total=1 limit=16 [fold]: ok
   target 7 role=head: ok
@@ -593,7 +595,7 @@ func TestMapTakesTheProgramFromTheBus(t *testing.T) {
 	}
 }
 
-// Without a Summarize of the program's, the step ends with Failure's error,
+// Without a Summarize of the program's, the step ends with a FailureError,
 // which counts the items with Noun, a function of their number, or with the
 // number alone when Noun is nil; a Summarize is called when nothing failed
 // too, with a Summary that is not canceled.
@@ -628,6 +630,11 @@ func TestMapSummarizesTheItems(t *testing.T) {
 				})
 			if err == nil || err.Error() != tc.want {
 				t.Errorf("Map = %v, want %s", err, tc.want)
+			}
+			var fe *fanout.FailureError
+			if !errors.As(err, &fe) || fe.Summary.Total != tc.items || len(fe.Summary.Failed) != 1 ||
+				fe.Summary.Failed[0].Name != "exe1" {
+				t.Errorf("errors.As found %+v, want the Summary of exe1 failed", fe)
 			}
 			if first, _, _ := strings.Cut(w.Finish(), "\n"); !strings.HasSuffix(first, "failed (target): "+tc.want) {
 				t.Errorf("the step ended %q, want it failed with %s", first, tc.want)
@@ -987,4 +994,25 @@ func TestMapKeepsWhatBrokeAnItemBesidesAGoexit(t *testing.T) {
 	if got := w.Finish(); got != want {
 		t.Errorf("tree:\n%s\nwant:\n%s", got, want)
 	}
+}
+
+// The old names of ItemInfo and FailedItem stay as aliases for one minor
+// release (decision 36): a Describe that returns an Item, and a Summarize
+// that reads a Failed, still serve.
+func TestMapTakesTheOldNames(t *testing.T) {
+	t.Parallel()
+
+	ctx, w := progresstest.Watch(context.Background(), t)
+	var failed []fanout.Failed
+	_, err := fanout.Map(ctx, []int{1}, fanout.MapOptions[int]{Step: "scan",
+		Describe: func(int) fanout.Item { return fanout.Item{Node: "exe1"} },
+		Summarize: func(s fanout.Summary) error {
+			failed = s.Failed
+			return fanout.Failure("hosts", s)
+		}},
+		func(context.Context, int) (struct{}, error) { return struct{}{}, errors.New("exe1: down") })
+	if len(failed) != 1 || failed[0].Name != "exe1" || fmt.Sprint(err) != "1 of 1 hosts failed: exe1" {
+		t.Errorf("Map = %v, with %+v failed, want exe1 failed", err, failed)
+	}
+	w.Finish()
 }

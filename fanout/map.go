@@ -27,9 +27,10 @@ type MapOptions[T any] struct {
 	// Limit is how many items are worked on at once; below one is
 	// DefaultLimit.
 	Limit int
-	// Describe says what a display names an item by, as an Item. Nil, or
-	// an Item with no Node, names an item the way fmt.Sprint prints it.
-	Describe func(T) Item
+	// Describe says what a display names an item by, as an ItemInfo. Nil,
+	// or an ItemInfo with no Node, names an item the way fmt.Sprint prints
+	// it.
+	Describe func(T) ItemInfo
 	// PanicLog receives the stack of a panic in the work, in Acquire or
 	// in the release it gave, the front end's diagnostics. Nil is the
 	// PanicLog of the Bus ctx carries, as progress.Bus.PanicLog tells it,
@@ -49,8 +50,9 @@ type MapOptions[T any] struct {
 	// as its exit code, must not depend on whether a Bus is there.
 	Classify func(error) progress.Class
 	// Summarize sums up the items, as the error the step ends with; nil
-	// is Failure's error, with Noun. A program gives it the error its commands
-	// exit with, as Failure's text with an exit code of its own.
+	// is a *FailureError of the Summary and Noun when an item failed, and
+	// nil otherwise. A program gives it the error its commands exit with,
+	// such as a FailureError that it wraps with an exit code of its own.
 	// Summary.Canceled says that every item that failed ended canceled,
 	// which the end of ctx does whether it was interrupted or ran out of
 	// time, and an error Classify classes as canceled does as well.
@@ -89,9 +91,9 @@ type MapOptions[T any] struct {
 	Acquire func(ctx context.Context, item T) (release func(), err error)
 }
 
-// Item is what MapOptions.Describe says of an item: what its target is
+// ItemInfo is what MapOptions.Describe says of an item: what its target is
 // named by, and the attributes of progress.Fields a display shows of it.
-type Item struct {
+type ItemInfo struct {
 	// Node names the item's target, as its span's name and as
 	// progress.Fields.Node, and is the name the summary of the items that
 	// failed gives it: the node, or whatever else the item is. Empty is
@@ -109,6 +111,12 @@ type Item struct {
 	Unit progress.Unit
 	Size int64
 }
+
+// Item is the old name of ItemInfo.
+//
+// Deprecated: Use ItemInfo, which says that it describes an item rather
+// than is one (decision 36).
+type Item = ItemInfo
 
 // Outcome is what the work for one item came to.
 type Outcome[R any] struct {
@@ -147,23 +155,23 @@ type Outcome[R any] struct {
 // rather than its worker end without a word. The release is called however
 // fn ended, before the item's target ends. Map returns once every call has
 // returned, and returns as well the error its step ended with, what
-// o.Summarize, or Failure, made of the items that failed: nil when none
-// did, and of ClassCanceled when every one that failed ended canceled. A
-// library returns it as the error of its own work, of the class its step
-// was given, which the outcomes alone cannot rebuild, since an item cut
-// short keeps the error its work returned.
+// o.Summarize made of the items that failed, or by default a *FailureError:
+// nil when none did, and of ClassCanceled when every one that failed ended
+// canceled. A library returns it as the error of its own work, of the class
+// its step was given, which the outcomes alone cannot rebuild, since an item
+// cut short keeps the error its work returned.
 //
 // The work is reported under the span ctx carries as a step, o.Step, with
 // a target for each item, as every pool reports it: every target is
 // announced, queued, before the first one runs, with the work its item
-// gives it, if any, as Item says; each is marked running when
+// gives it, if any, as ItemInfo says; each is marked running when
 // it takes its place and ended before it gives the place up, so that a
 // display never counts more running than the limit; those the pool left
 // out end canceled once it is done, so that the count reaches its total;
 // and the step ends once the last has, with what o.Summarize makes of the
 // Summary of the items that failed, which says whether every one of them
-// ended canceled, as the end of ctx leaves a pool, which Failure, the
-// default, then ends canceled.
+// ended canceled, as the end of ctx leaves a pool, which the default
+// *FailureError then ends canceled.
 //
 // fn is called with the context of its item's target, so that the calls it
 // makes are reported under it.
@@ -278,16 +286,17 @@ func Map[T, R any](ctx context.Context, items []T, o MapOptions[T], fn func(ctx 
 			spans[i].End(leftOut{out[i].Err})
 		}
 		if out[i].Err != nil && !errors.Is(out[i].Err, progress.ErrSkipped) {
-			s.Failed = append(s.Failed, Failed{Name: names[i], Err: out[i].Err})
+			s.Failed = append(s.Failed, FailedItem{Name: names[i], Err: out[i].Err})
 			s.Canceled = s.Canceled && canceled[i]
 		}
 	}
 	s.Canceled = s.Canceled && len(s.Failed) > 0
 	var err error
-	if o.Summarize != nil {
+	switch {
+	case o.Summarize != nil:
 		err = o.Summarize(s)
-	} else {
-		err = summarize(o.Noun, s)
+	case len(s.Failed) > 0:
+		err = &FailureError{Summary: s, Noun: o.Noun}
 	}
 	step.End(err)
 	return out, err
@@ -317,8 +326,8 @@ func (o MapOptions[T]) endsCanceled(err error) bool {
 }
 
 // describe says what a display names an item by.
-func (o MapOptions[T]) describe(item T) Item {
-	var d Item
+func (o MapOptions[T]) describe(item T) ItemInfo {
+	var d ItemInfo
 	if o.Describe != nil {
 		d = o.Describe(item)
 	}
@@ -432,13 +441,14 @@ var errGoexit = [...]error{
 }
 
 // Summary is what the items of a fan-out came to, as MapOptions.Summarize
-// and Failure are given it. Fields may be added to it in a minor release.
+// is given it and a FailureError holds it. Fields may be added to it in a
+// minor release.
 type Summary struct {
 	// Total is how many items there were.
 	Total int
 	// Failed are the items that failed, in the order of the items: not
 	// those that ended skipped.
-	Failed []Failed
+	Failed []FailedItem
 	// Canceled says that at least one item failed and every item that
 	// failed ended canceled, as the end of the context ends the items,
 	// whether it was interrupted or ran out of time (decision 11), and
@@ -446,62 +456,97 @@ type Summary struct {
 	Canceled bool
 }
 
-// Failed is one item that failed, as Summary lists it.
-type Failed struct {
-	// Name is what the item is named by, Item.Node.
+// FailedItem is one item that failed, as Summary lists it.
+type FailedItem struct {
+	// Name is what the item is named by, ItemInfo.Node.
 	Name string
 	// Err is the item's error, Outcome.Err.
 	Err error
 }
 
-// Failure sums up the items of a fan-out that failed, as s has them:
-// "k of n <noun> failed: <names>", or "k of n failed: <names>" without a
-// noun, with each error that is not nil underneath, so that errors.Is and
-// errors.As still find a cancellation among them. The names are written
-// as a node set when each reads as one host name in one and none repeats,
-// and otherwise as a list separated by commas, in the order given, so that
-// a name such as "config volume" is not read as two hosts and the list
-// names as many as the count. Its progress class is ClassCanceled when
-// s.Canceled is true, as Map sets it when every item that failed ended
-// canceled, such as when the context ended, by an interrupt or a
-// deadline, since the error of an item is what its work returned, which
-// need not say so; it is ClassTarget otherwise. It is nil when none
-// failed.
-func Failure(noun string, s Summary) error {
-	var count func(int) string
-	if noun != "" {
-		count = func(n int) string { return fmt.Sprintf("%d %s", n, noun) }
-	}
-	return summarize(count, s)
+// Failed is the old name of FailedItem.
+//
+// Deprecated: Use FailedItem, a noun, which Summary.Failed lists (decision
+// 36).
+type Failed = FailedItem
+
+// FailureError is the error that sums up the items of a fan-out that
+// failed, which Map ends its step with and returns when MapOptions.Summarize
+// is nil, and only when an item failed. errors.As finds it, and with it the
+// Summary, also under the error of a program's Summarize that wraps one.
+//
+// Its text is "k of <noun> failed: <names>", with the noun as Noun says it
+// for Summary.Total, or "k of n failed: <names>" when Noun is nil. The
+// names are written as a node set when each reads as one host name in one
+// and none repeats, and otherwise as a list separated by commas, in the
+// order given, so that a name such as "config volume" is not read as two
+// hosts and the list names as many as the count. The text is made when
+// Error is called, from the Summary as it is then.
+//
+// It unwraps to the error of each item that failed, those that are not nil,
+// so that errors.Is and errors.As still find a cancellation among them. Its
+// progress class is ClassCanceled when Summary.Canceled is true, as Map sets
+// it when every item that failed ended canceled, such as when the context
+// ended, by an interrupt or a deadline, since the error of an item is what
+// its work returned, which need not say so; it is ClassTarget otherwise.
+type FailureError struct {
+	// Summary is what the items came to.
+	Summary Summary
+	// Noun says how many items there are, n of them, as MapOptions.Noun
+	// does; nil leaves the noun out.
+	Noun func(n int) string
 }
 
-// summarize is Failure with the noun as MapOptions.Noun has it: "k of
-// <noun(n)> failed: <names>", or "k of n failed: <names>" when noun is nil.
-func summarize(noun func(n int) string, s Summary) error {
+// Error counts and names the items that failed.
+func (e *FailureError) Error() string {
+	names := make([]string, len(e.Summary.Failed))
+	for i, f := range e.Summary.Failed {
+		names[i] = f.Name
+	}
+	of := strconv.Itoa(e.Summary.Total)
+	if e.Noun != nil {
+		of = e.Noun(e.Summary.Total)
+	}
+	return fmt.Sprintf("%d of %s failed: %s", len(names), of, list(names))
+}
+
+// Unwrap returns the error of each item that failed, those that are not
+// nil, in the order of the items.
+func (e *FailureError) Unwrap() []error {
+	var errs []error
+	for _, f := range e.Summary.Failed {
+		if f.Err != nil {
+			errs = append(errs, f.Err)
+		}
+	}
+	return errs
+}
+
+// ProgressClass says why the fan-out failed as a whole, rather than as
+// whichever of its items' errors says a class first: ClassCanceled when
+// Summary.Canceled is true, and ClassTarget otherwise.
+func (e *FailureError) ProgressClass() progress.Class {
+	if e.Summary.Canceled {
+		return progress.ClassCanceled
+	}
+	return progress.ClassTarget
+}
+
+// Failure returns a *FailureError of s, with "<n> <noun>" as its noun, or
+// none when noun is empty, and nil when no item failed.
+//
+// Deprecated: Make a &FailureError{Summary: s} when an item failed, with a
+// Noun that is a function of the count, as MapOptions.Noun is, rather than
+// a plural (decision 36).
+func Failure(noun string, s Summary) error {
 	if len(s.Failed) == 0 {
 		return nil
 	}
-	names := make([]string, len(s.Failed))
-	var kept []error
-	for i, f := range s.Failed {
-		names[i] = f.Name
-		if f.Err != nil {
-			kept = append(kept, f.Err)
-		}
+	e := &FailureError{Summary: s}
+	if noun != "" {
+		e.Noun = func(n int) string { return fmt.Sprintf("%d %s", n, noun) }
 	}
-	of := strconv.Itoa(s.Total)
-	if noun != nil {
-		of = noun(s.Total)
-	}
-	class := progress.ClassTarget
-	if s.Canceled {
-		class = progress.ClassCanceled
-	}
-	return &failedItems{
-		message: fmt.Sprintf("%d of %s failed: %s", len(names), of, list(names)),
-		errs:    kept,
-		class:   class,
-	}
+	return e
 }
 
 // list names items as a node set when every name reads as one host name in
@@ -524,19 +569,3 @@ func list(names []string) string {
 	}
 	return set.String()
 }
-
-// failedItems is the summary of a fan-out that did not succeed everywhere,
-// with the error of each item that failed underneath it.
-type failedItems struct {
-	message string
-	errs    []error
-	class   progress.Class
-}
-
-func (e *failedItems) Error() string { return e.message }
-
-func (e *failedItems) Unwrap() []error { return e.errs }
-
-// ProgressClass says why the fan-out failed as a whole, rather than as
-// whichever of its items' errors says a class first.
-func (e *failedItems) ProgressClass() progress.Class { return e.class }

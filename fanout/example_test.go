@@ -55,7 +55,7 @@ func ExampleMap() {
 }
 
 // Describe says what a display names an item by: the node its target is
-// named after, the host the work goes to and the item's role. An Item
+// named after, the host the work goes to and the item's role. An ItemInfo
 // without a Node names the item as fmt.Sprint prints it.
 func ExampleMapOptions_describe() {
 	type machine struct {
@@ -68,8 +68,8 @@ func ExampleMapOptions_describe() {
 	machines := []machine{{"exe01", "compute"}, {"mds01", "storage"}}
 	fanout.Map(ctx, machines, fanout.MapOptions[machine]{
 		Step: "reset",
-		Describe: func(m machine) fanout.Item {
-			return fanout.Item{Node: m.name, Host: m.name + "-bmc", Role: m.role}
+		Describe: func(m machine) fanout.ItemInfo {
+			return fanout.ItemInfo{Node: m.name, Host: m.name + "-bmc", Role: m.role}
 		},
 	}, func(context.Context, machine) (struct{}, error) { return struct{}{}, nil })
 	bus.Close()
@@ -83,7 +83,7 @@ func ExampleMapOptions_describe() {
 	// mds01 mds01-bmc storage
 }
 
-// An Item with a Unit and a Size starts its target bounded, so that a queued
+// An ItemInfo with a Unit and a Size starts its target bounded, so that a queued
 // target shows its size before it runs. Each worker counts the bytes it
 // copies through progress.CountWriter, and the targets' amounts reach the
 // Capture's tree as they copy.
@@ -100,8 +100,8 @@ func ExampleMapOptions_work() {
 	outcomes, err := fanout.Map(ctx, images, fanout.MapOptions[image]{
 		Step:  "copy",
 		Limit: 2,
-		Describe: func(im image) fanout.Item {
-			return fanout.Item{Node: im.node, Unit: progress.Bytes, Size: im.size}
+		Describe: func(im image) fanout.ItemInfo {
+			return fanout.ItemInfo{Node: im.node, Unit: progress.Bytes, Size: im.size}
 		},
 	}, func(ctx context.Context, im image) (int64, error) {
 		return io.Copy(progress.CountWriter(ctx, io.Discard), bytes.NewReader(make([]byte, im.size)))
@@ -164,22 +164,32 @@ func ExampleBatches() {
 	// exe06: no answer
 }
 
-// Failure sums up the items that failed, as the error a step ends with. A
-// program's MapOptions.Summarize builds on it, to give the error an exit
-// code of its own.
-func ExampleFailure() {
-	err := fanout.Failure("hosts", fanout.Summary{
+// A FailureError sums up the items that failed, as the error a step ends
+// with by default. A program's MapOptions.Summarize builds on it, to give
+// the error an exit code of its own, and errors.As still finds it, with its
+// Summary, under the program's error.
+func ExampleFailureError() {
+	summary := fanout.Summary{
 		Total: 480,
-		Failed: []fanout.Failed{
+		Failed: []fanout.FailedItem{
 			{Name: "exe0007", Err: errors.New("exe0007: no answer")},
 			{Name: "exe0008", Err: context.Canceled},
 		},
-	})
+	}
+	hosts := func(n int) string { return fmt.Sprintf("%d hosts", n) }
+	err := &fanout.FailureError{Summary: summary, Noun: hosts}
 	fmt.Println(err)
 	fmt.Println(errors.Is(err, context.Canceled), progress.Classify(err, nil))
+
+	exit := fmt.Errorf("exit status 3: %w", err)
+	var failure *fanout.FailureError
+	if errors.As(exit, &failure) {
+		fmt.Println(failure.Summary.Failed[0].Name, "is one of", len(failure.Summary.Failed))
+	}
 	// Output:
 	// 2 of 480 hosts failed: exe[0007-0008]
 	// true target
+	// exe0007 is one of 2
 }
 
 // A skip, an error of progress.Skip, leaves an item out on purpose: its
@@ -249,8 +259,8 @@ func ExampleKeyed_acquire() {
 
 	outcomes, err := fanout.Map(context.Background(), jobs, fanout.MapOptions[job]{
 		Step: "uptime",
-		Describe: func(j job) fanout.Item {
-			return fanout.Item{Node: j.node}
+		Describe: func(j job) fanout.ItemInfo {
+			return fanout.ItemInfo{Node: j.node}
 		},
 		Acquire: func(ctx context.Context, j job) (func(), error) {
 			return keys.Acquire(ctx, j.gateway, j.node)

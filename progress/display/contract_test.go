@@ -159,7 +159,8 @@ func checkEnd(t *testing.T, got, want string) {
 
 // uptime runs on each node, one at a time, drawing a frame once it has
 // started, and fails on exe0002; the command writes what each node said
-// once the pool is done, as a command that collects output does.
+// once the pool is done, as a command that collects output does, and ends
+// with the error that sums up the hosts that failed.
 func uptime(s *session, call bool) error {
 	nodes := []string{"exe0001", "exe0002", "exe0003"}
 	outcomes, _ := fanout.Map(s.ctx, nodes, fanout.MapOptions[string]{Step: "run", Limit: 1},
@@ -178,12 +179,12 @@ func uptime(s *session, call bool) error {
 	for i, o := range outcomes {
 		if o.Err != nil {
 			_, _ = fmt.Fprintf(s.errOut, "%s: %v\n", nodes[i], o.Err)
-			summary.Failed = append(summary.Failed, fanout.Failed{Name: nodes[i], Err: o.Err})
+			summary.Failed = append(summary.Failed, fanout.FailedItem{Name: nodes[i], Err: o.Err})
 			continue
 		}
 		_, _ = fmt.Fprintf(s.out, "%s: %s\n", nodes[i], o.Value)
 	}
-	return fanout.Failure("hosts", summary)
+	return &fanout.FailureError{Summary: summary, Noun: func(n int) string { return fmt.Sprintf("%d hosts", n) }}
 }
 
 // The counter is drawn on the terminal, and taken off before anything else
