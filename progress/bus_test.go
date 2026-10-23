@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"reflect"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -1270,5 +1271,26 @@ func TestTheBusTellsWhatItKnowsOfTheProgram(t *testing.T) {
 		if tc.bus != nil {
 			tc.bus.Close()
 		}
+	}
+}
+
+// runSink keeps the runs it is told of.
+type runSink struct{ runs []progress.RunInfo }
+
+func (s *runSink) Begin(r progress.RunInfo) { s.runs = append(s.runs, r) }
+func (s *runSink) Handle(progress.Event)    {}
+
+// A RunSink is told of the run once, before any event: its trace, the
+// program and where the Bus writes the stack of a sink that panicked.
+func TestARunSinkIsToldOfTheRun(t *testing.T) {
+	t.Parallel()
+
+	var log bytes.Buffer
+	s := &runSink{}
+	bus := progress.NewBus(progress.BusOptions{Sinks: []progress.Sink{s}, Program: "sind", PanicLog: &log})
+	bus.Close()
+	want := []progress.RunInfo{{Trace: bus.TraceContext(), Program: "sind", PanicLog: &log}}
+	if !reflect.DeepEqual(s.runs, want) {
+		t.Errorf("the runs = %+v, want %+v", s.runs, want)
 	}
 }

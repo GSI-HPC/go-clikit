@@ -32,6 +32,7 @@ package progress
 import (
 	"encoding/hex"
 	"fmt"
+	"io"
 	"strings"
 	"time"
 )
@@ -536,6 +537,11 @@ type RunInfo struct {
 	// and leaves empty; a reader of an event log, such as eventlog's
 	// Forwarder, passes on the version the log's first line names.
 	Version string
+	// PanicLog is where the Bus writes the stack of a sink that panicked,
+	// as Bus.PanicLog returns it, so that a sink that recovers panics of
+	// its own writes them there too; a reader of an event log leaves it
+	// nil.
+	PanicLog io.Writer
 }
 
 // Run is the old name of RunInfo.
