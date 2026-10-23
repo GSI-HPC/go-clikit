@@ -234,7 +234,7 @@ func testTheCounterOfAPowerOnInBatches(t *testing.T) {
 			_, _ = fmt.Fprintf(s.errOut, "powering on %s (%d of %d)\n", batch, i+1, n)
 		},
 	}, func(time.Duration) { s.draw() })
-	batches := fanout.Batches(s.ctx, nodeset.MustParse("exe[1-4]"), o, func(ctx context.Context, batch *nodeset.NodeSet) error {
+	_, err := fanout.Batches(s.ctx, nodeset.MustParse("exe[1-4]"), o, func(ctx context.Context, batch *nodeset.NodeSet) error {
 		outcomes, _ := fanout.Map(ctx, batch.Expand(), fanout.MapOptions[string]{Limit: 1},
 			func(_ context.Context, node string) (struct{}, error) {
 				s.draw()
@@ -250,7 +250,6 @@ func testTheCounterOfAPowerOnInBatches(t *testing.T) {
 		}
 		return nil
 	})
-	err := batches[1].Err
 	s.checkFrames(t, `
 powering on exe[1-2] (1 of 2)
 power on · batch 1/2 · 0/4 · 1 running · 3 queued · 0:01.0

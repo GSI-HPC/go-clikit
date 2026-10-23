@@ -134,10 +134,11 @@ func ExampleEach() {
 }
 
 // Batches runs a node set in batches, one after the other, with a pause
-// between them; a batch that fails stops the rest.
+// between them; a batch that fails stops the rest. It returns the error that
+// ended the run, the one its step ended with, as Map does.
 func ExampleBatches() {
 	nodes := nodeset.MustParse("exe[01-10]")
-	batches := fanout.Batches(context.Background(), nodes, fanout.BatchOptions{
+	batches, err := fanout.Batches(context.Background(), nodes, fanout.BatchOptions{
 		Step:  "power on",
 		Size:  4,
 		Pause: time.Millisecond,
@@ -153,12 +154,14 @@ func ExampleBatches() {
 	for _, b := range batches {
 		fmt.Println(b.Nodes, b.Started, b.Err)
 	}
+	fmt.Println(err)
 	// Output:
 	// batch 1 of 3: exe[01-04]
 	// batch 2 of 3: exe[05-07]
 	// exe[01-04] true <nil>
 	// exe[05-07] true exe06: no answer
 	// exe[08-10] false not tried: an earlier batch failed
+	// exe06: no answer
 }
 
 // Failure sums up the items that failed, as the error a step ends with. A

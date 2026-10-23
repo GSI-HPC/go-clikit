@@ -114,7 +114,7 @@ func TestTheSummary(t *testing.T) {
 		}, "exec: done in 1h02m03s"},
 		{"batches left out count as their nodes", func(ctx context.Context, c *clock) error {
 			nodes := nodeset.MustParse("exe[1-6]")
-			batches := fanout.Batches(ctx, nodes, fanout.BatchOptions{Step: "power on", Size: 2},
+			_, err := fanout.Batches(ctx, nodes, fanout.BatchOptions{Step: "power on", Size: 2},
 				func(ctx context.Context, batch *nodeset.NodeSet) error {
 					var err error
 					if batch.Contains("exe3") {
@@ -124,12 +124,12 @@ func TestTheSummary(t *testing.T) {
 					return err
 				})
 			c.Add(time.Second)
-			return batches[1].Err
+			return err
 		}, "exec: failed in 1.0s: 3 ok, 1 failed, 2 skipped"},
 		{"nodes in a batch left out count once with what counted them before", func(ctx context.Context, c *clock) error {
 			nodes := nodeset.MustParse("exe[1-4]")
 			step(ctx, "power off", nodes.Expand(), nil)
-			batches := fanout.Batches(ctx, nodes, fanout.BatchOptions{Step: "power on", Size: 2},
+			_, err := fanout.Batches(ctx, nodes, fanout.BatchOptions{Step: "power on", Size: 2},
 				func(ctx context.Context, batch *nodeset.NodeSet) error {
 					var err error
 					if batch.Contains("exe1") {
@@ -139,7 +139,7 @@ func TestTheSummary(t *testing.T) {
 					return err
 				})
 			c.Add(5 * time.Second)
-			return batches[0].Err
+			return err
 		}, "exec: failed in 5.0s: 1 ok, 1 failed, 2 skipped"},
 		{"a batch left out that names no nodes counts as its Total", func(ctx context.Context, c *clock) error {
 			stepCtx, s := progress.Start(ctx, progress.KindStep, "power on",

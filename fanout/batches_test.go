@@ -4,6 +4,7 @@
 package fanout_test
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -104,7 +105,10 @@ func TestBatchesSplitTheSetEvenly(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			s := &sender{}
-			batches := fanout.Batches(context.Background(), set(t, tc.set), s.options(tc.size, 0), s.run)
+			batches, err := fanout.Batches(context.Background(), set(t, tc.set), s.options(tc.size, 0), s.run)
+			if err != nil {
+				t.Errorf("Batches = %v, want nil", err)
+			}
 			var got []string
 			for _, b := range batches {
 				if !b.Started || b.Err != nil {
@@ -164,7 +168,10 @@ func TestBatchesStopAfterAFailedBatch(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		s := &sender{fail: map[string]bool{"exe4": true}}
 		start := time.Now()
-		batches := fanout.Batches(context.Background(), set(t, "exe[1-8]"), s.options(2, time.Second), s.run)
+		batches, err := fanout.Batches(context.Background(), set(t, "exe[1-8]"), s.options(2, time.Second), s.run)
+		if err == nil || !errors.Is(err, batches[1].Err) {
+			t.Errorf("Batches = %v, want the error of batch 2, %v", err, batches[1].Err)
+		}
 		want := []string{
 			"note: exe[1-2] (1 of 4)", "run exe[1-2]",
 			"note: waiting 1s", "waited 1s",
@@ -211,7 +218,10 @@ func TestBatchesStopWhenInterrupted(t *testing.T) {
 				})
 			}
 			start := time.Now()
-			batches := fanout.Batches(ctx, set(t, "exe[1-6]"), o, s.run)
+			batches, err := fanout.Batches(ctx, set(t, "exe[1-6]"), o, s.run)
+			if !errors.Is(err, context.Canceled) {
+				t.Errorf("Batches = %v, want the interrupt", err)
+			}
 			if took := time.Since(start); took != 10*time.Second {
 				t.Errorf("the batches took %s, want the 10s until the interrupt", took)
 			}
@@ -232,10 +242,13 @@ func TestBatchesStopWhenInterrupted(t *testing.T) {
 		synctest.Test(t, func(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			s := &sender{}
-			batches := fanout.Batches(ctx, set(t, "exe[1-6]"), s.options(2, 0), func(ctx context.Context, batch *nodeset.NodeSet) error {
+			batches, err := fanout.Batches(ctx, set(t, "exe[1-6]"), s.options(2, 0), func(ctx context.Context, batch *nodeset.NodeSet) error {
 				cancel()
 				return s.run(ctx, batch)
 			})
+			if !errors.Is(err, context.Canceled) {
+				t.Errorf("Batches = %v, want the interrupt", err)
+			}
 			if got, want := strings.Join(s.log, "\n"), "note: exe[1-2] (1 of 3)\nrun exe[1-2]"; got != want {
 				t.Errorf("got:\n%s\nwant:\n%s", got, want)
 			}
@@ -338,7 +351,7 @@ func TestBatchesReportTheirWork(t *testing.T) {
 			}
 			return s.run(ctx, batch)
 		}
-		batches := fanout.Batches(ctx, set(t, "exe[1-6]"), s.options(2, 5*time.Second), run)
+		batches, _ := fanout.Batches(ctx, set(t, "exe[1-6]"), s.options(2, 5*time.Second), run)
 		if b := batches[1]; !b.Started || !errors.Is(b.Err, progress.ErrSkipped) {
 			t.Errorf("batch 2 = %+v, want it run and skipped", b)
 		}
@@ -371,7 +384,7 @@ func TestBatchesReportTheirWork(t *testing.T) {
 			}
 			return s.run(ctx, batch)
 		}
-		batches := fanout.Batches(ctx, set(t, "exe[1-6]"), s.options(2, 5*time.Second), run)
+		batches, _ := fanout.Batches(ctx, set(t, "exe[1-6]"), s.options(2, 5*time.Second), run)
 		if !errors.Is(batches[2].Err, context.Canceled) {
 			t.Errorf("the batch left out ended %v, want the interrupt", batches[2].Err)
 		}
@@ -412,4 +425,60 @@ func TestBatchesReportTheirWork(t *testing.T) {
 			t.Errorf("tree:\n%s\nwant:\n%s", got, want)
 		}
 	})
+}
+
+// Batches returns the error its step ended with: the error of the batch
+// that failed, which an interrupt after it does not replace, or else the
+// context's when its end left batches out, or else nil, however many
+// batches skipped.
+func TestBatchesReturnTheErrorThatEndedTheRun(t *testing.T) {
+	t.Parallel()
+
+	for _, tc := range []struct {
+		name string
+		// fail fails the node, skip skips the batch that holds the node,
+		// and cancel interrupts the run in the batch that holds the node.
+		fail, skip, cancel string
+		want               string
+		step               string
+	}{
+		{name: "every batch ran", step: "ok"},
+		{name: "a batch skipped", skip: "exe1", step: "ok"},
+		{name: "a batch failed", fail: "exe3", want: "exe3: no answer",
+			step: "failed (target): exe3: no answer"},
+		{name: "an interrupt after a failure", fail: "exe3", cancel: "exe3", want: "exe3: no answer",
+			step: "failed (target): exe3: no answer"},
+		{name: "an interrupt left batches out", cancel: "exe3", want: "context canceled",
+			step: "canceled (canceled): context canceled"},
+		{name: "an interrupt in the last batch", cancel: "exe5", step: "ok"},
+	} {
+		inBubble(t, tc.name, func(t *testing.T) {
+			ctx, w := progresstest.Watch(context.Background(), t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+			s := &sender{fail: map[string]bool{tc.fail: true}}
+			batches, err := fanout.Batches(ctx, set(t, "exe[1-6]"), fanout.BatchOptions{Step: "power on", Size: 2},
+				func(ctx context.Context, batch *nodeset.NodeSet) error {
+					if batch.Contains(tc.skip) {
+						return progress.Skip("in maintenance")
+					}
+					if batch.Contains(tc.cancel) {
+						cancel()
+					}
+					return s.run(ctx, batch)
+				})
+			if fmt.Sprint(err) != cmp.Or(tc.want, "<nil>") {
+				t.Errorf("Batches = %v, want %s", err, cmp.Or(tc.want, "nil"))
+			}
+			if tc.fail != "" && !errors.Is(err, batches[1].Err) {
+				t.Errorf("Batches = %v, not the error of the batch that failed, %v", err, batches[1].Err)
+			}
+			if tc.want == "context canceled" && !errors.Is(err, context.Canceled) {
+				t.Errorf("Batches = %v, want the context's error", err)
+			}
+			if first, _, _ := strings.Cut(w.Finish(), "\n"); first != "step power on total=6 [fold]: "+tc.step {
+				t.Errorf("the step ended %q, want it %s", first, tc.step)
+			}
+		})
+	}
 }
