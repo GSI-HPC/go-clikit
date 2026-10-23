@@ -147,10 +147,7 @@ func (s *Sessions) Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		port, ok := requestPort(r.Host)
 		if !ok {
-			s.o.Refuse(w, r, localweb.Refusal{
-				Status: http.StatusMisdirectedRequest, Message: "This server answers to its loopback address only.",
-				Reason: "Host is " + r.Host,
-			})
+			s.o.Refuse(w, r, localweb.MisdirectedRefusal(r.Host))
 			return
 		}
 		if localweb.SafeMethod(r.Method) && r.URL.Query().Has(TokenParam) {

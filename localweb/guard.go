@@ -62,6 +62,20 @@ func NoStore(next http.Handler) http.Handler {
 	})
 }
 
+// MisdirectedRefusal returns the refusal of a request whose Host header,
+// host, names another server: 421 Misdirected Request, with a message
+// that does not say which Host the server answers to. Hosts and
+// localweb/session answer with it, and a program that checks Host itself
+// can too. Its message is an interface of the kit (doc/decisions.md,
+// decisions 34 and 40).
+func MisdirectedRefusal(host string) Refusal {
+	return Refusal{
+		Status:  http.StatusMisdirectedRequest,
+		Message: "This server answers to its loopback address only.",
+		Reason:  "Host is " + host,
+	}
+}
+
 // HostsOptions configures Hosts.
 type HostsOptions struct {
 	// Refuse answers a refused request; nil is Refuse.
@@ -85,11 +99,7 @@ func Hosts(answers func(host string) bool, o HostsOptions) func(http.Handler) ht
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if !answers(r.Host) {
-				refuse(w, r, Refusal{
-					Status:  http.StatusMisdirectedRequest,
-					Message: "This server answers to its loopback address only.",
-					Reason:  "Host is " + r.Host,
-				})
+				refuse(w, r, MisdirectedRefusal(r.Host))
 				return
 			}
 			next.ServeHTTP(w, r)
