@@ -6,7 +6,9 @@
 One section per decision, in the order they were taken. Each says what the
 situation was, what was decided, and what that costs. A decision is never
 edited: a later one supersedes or refines it, and the earlier one's status
-names it.
+names it. A note under the status may correct what a decision foresaw and
+did not happen, such as a release or a package it planned; it decides
+nothing.
 
 | | Decision | Status |
 | --- | --- | --- |
@@ -1363,6 +1365,10 @@ recorded no requirement for it.
 
 Status: accepted, refined by [34](#34-localweb-guards-a-local-web-server-keeps-its-sessions-and-streams-its-pages) and [35](#35-localweb-starts-a-server-once-opens-the-browser-on-it-and-serves-its-files-and-pages)
 
+Note: `localweb` shipped in v0.8.0 (decision 34) and v0.9.0 (decision 35),
+not in v0.9.0 and v0.10.0 as this decision planned, and before `fsutil`
+and `doctor`, which came in v0.10.0.
+
 ### Context
 
 sind, brig and sdash each serve a web page to the user who started the
@@ -1419,6 +1425,12 @@ others only if someone remembers it.
 ## 26. golang.org/x/sys also in fsutil and localweb
 
 Status: accepted, refined by [35](#35-localweb-starts-a-server-once-opens-the-browser-on-it-and-serves-its-files-and-pages) and [37](#37-fsutil-writes-locks-and-checks-the-files-of-a-program). Refines [22](#22-the-kit-may-require-golangorgxsys-in-cliprogress-alone).
+
+Note: no `localweb` package asks for `LOCAL_PEERCRED`: the peer check
+reads `/proc` on Linux and fails closed elsewhere (decision 34), so the
+`localweb` root takes `syscall` alone. The flock is in `localweb/launch`
+(decision 35), which alone of the `localweb` packages imports
+`golang.org/x/sys`, and `fsutil` exists since decision 37.
 
 ### Context
 

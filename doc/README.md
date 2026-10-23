@@ -36,7 +36,8 @@ which pkg.go.dev publishes:
 - A change of behaviour updates the doc comments, and the document here that
   describes it, in the same pull request.
 - A decision is never edited; a later one supersedes or refines it, and the
-  earlier one's status names it.
+  earlier one's status names it. A note under the status corrects only what
+  the decision foresaw and did not happen.
 - The golden log, `progress/testdata/log-v1.jsonl`, pins the format
   `event-log.md` describes.
 
