@@ -35,3 +35,20 @@ func TestOldConstantNames(t *testing.T) {
 		}
 	}
 }
+
+// The old names of the options stay for one minor release (decision 36),
+// and set what the new ones set.
+func TestOldOptionNames(t *testing.T) {
+	ctx, bus, capture := watched(t, progress.BusOptions{})
+	_, call := progress.Start(ctx, progress.KindCall, "GET",
+		progress.WithFlags(progress.FlagDryRun), progress.HTTP("GET", "/redfish/v1"))
+	call.End(nil)
+	bus.Close()
+	e := capture.Events()[0]
+	if e.Flags != progress.FlagDryRun {
+		t.Errorf("WithFlags gave %v, want %v", e.Flags, progress.FlagDryRun)
+	}
+	if got, want := [2]string{e.Method, e.Path}, [2]string{"GET", "/redfish/v1"}; got != want {
+		t.Errorf("HTTP gave %q, want %q", got, want)
+	}
+}

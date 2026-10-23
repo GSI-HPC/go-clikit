@@ -450,7 +450,8 @@ type Fields struct {
 	// Source is the kind of source a secret or a credential was read
 	// from, such as "age", "sops", "prompt" or "command"; never the value.
 	Source string
-	// Timeout is the bound of a call, or the length of a wait.
+	// Timeout is the bound of a call, or the length of a wait, as the
+	// work gave it; nothing enforces it.
 	Timeout time.Duration
 	// Exit is the exit code of a command, nil when there was none. Exit,
 	// when set, points to a value every sink of the event shares; a sink
@@ -567,10 +568,15 @@ type Classifier interface {
 //
 // Start takes every option. Update takes Total, Message and Work only, and
 // ignores the others. End takes every option that sets a field, but not
-// Queued or WithFlags, which only Start can give; it is where a field
+// Queued or Flagged, which only Start can give; it is where a field
 // learned late is set, such as an address known only once the work has
 // started, or the Exit of a command. A field an option does not set keeps
 // the value it had.
+//
+// An option is a bare noun, mostly the name of the field it sets, such as
+// Host or Total; With names only WithBus, which returns a context. An
+// option whose noun is taken, as Flags is by its type, takes another word
+// for the same thing, never a With (decision 36).
 type Option func(*options)
 
 type options struct {
@@ -615,8 +621,14 @@ func (o *options) apply(opts []Option) {
 // the start.
 func Queued() Option { return func(o *options) { o.queued = true } }
 
-// WithFlags gives a span flags when it starts.
-func WithFlags(f Flags) Option { return func(o *options) { o.flags |= f } }
+// Flagged gives a span flags when it starts.
+func Flagged(f Flags) Option { return func(o *options) { o.flags |= f } }
+
+// WithFlags gives a span flags when it starts, as Flagged does.
+//
+// Deprecated: Use Flagged. An option is a bare noun, and With names only a
+// helper that returns a context, such as WithBus (decision 36).
+func WithFlags(f Flags) Option { return Flagged(f) }
 
 // Node sets Node.
 func Node(s string) Option { return func(o *options) { o.Node = s } }
@@ -641,10 +653,16 @@ func Batch(i, n int) Option {
 // Message sets Message.
 func Message(s string) Option { return func(o *options) { o.Message = s } }
 
-// HTTP sets the Method and Path of an HTTP request.
-func HTTP(method, path string) Option {
+// HTTPRequest sets the Method and Path of an HTTP request, as HTTPStatus
+// sets its answer.
+func HTTPRequest(method, path string) Option {
 	return func(o *options) { o.Method, o.Path = method, path }
 }
+
+// HTTP sets the Method and Path of an HTTP request, as HTTPRequest does.
+//
+// Deprecated: Use HTTPRequest, which pairs with HTTPStatus (decision 36).
+func HTTP(method, path string) Option { return HTTPRequest(method, path) }
 
 // HTTPStatus sets HTTPStatus.
 func HTTPStatus(code int) Option { return func(o *options) { o.HTTPStatus = code } }
@@ -655,10 +673,13 @@ func Cache(s string) Option { return func(o *options) { o.Cache = s } }
 // Source sets Source.
 func Source(s string) Option { return func(o *options) { o.Source = s } }
 
-// Timeout sets Timeout.
+// Timeout sets Timeout. It records the bound of a call or the length of a
+// wait for a display and the event log, and enforces nothing: the work
+// keeps to its bound itself, with a context or a timer of its own.
 func Timeout(d time.Duration) Option { return func(o *options) { o.Timeout = d } }
 
-// Exit sets Exit.
+// Exit sets Exit, the exit status of a command the span ran, such as a
+// remote one. It records the status, and ends no process.
 func Exit(code int) Option { return func(o *options) { o.exit, o.hasExit = code, true } }
 
 // Work says that a span reports work in u, out of size; a size of 0 or less

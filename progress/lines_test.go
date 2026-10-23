@@ -55,7 +55,7 @@ func showing(t *testing.T, o progress.BusOptions) (context.Context, *progress.Sp
 		bus.Close()
 		progresstest.Check(t, capture.Events())
 	})
-	ctx, _ := progress.Start(progress.WithBus(context.Background(), bus), progress.KindStep, "uptime", progress.WithFlags(progress.FlagShowLines))
+	ctx, _ := progress.Start(progress.WithBus(context.Background(), bus), progress.KindStep, "uptime", progress.Flagged(progress.FlagShowLines))
 	ctx, call := progress.Start(ctx, progress.KindCall, "ssh")
 	return ctx, call, capture
 }
@@ -68,7 +68,7 @@ func TestTeeIsTheWriterItselfWhenNothingWantsTheLines(t *testing.T) {
 	defer noLines.Close()
 	defer wantsLines.Close()
 	shows := func(b *progress.Bus, f progress.Flags) context.Context {
-		ctx, _ := progress.Start(progress.WithBus(context.Background(), b), progress.KindCall, "ssh", progress.WithFlags(f))
+		ctx, _ := progress.Start(progress.WithBus(context.Background(), b), progress.KindCall, "ssh", progress.Flagged(f))
 		return ctx
 	}
 	ended, span := progress.Start(shows(wantsLines, progress.FlagShowLines), progress.KindCall, "ssh")
