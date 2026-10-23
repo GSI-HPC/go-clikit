@@ -8,7 +8,7 @@
 // something sends back.
 //
 // The program makes the token with NewToken, prints its address with the
-// token in the query parameter TokenParam, and puts Sessions.Middleware
+// token in the query parameter TokenParam, and puts Manager.Middleware
 // behind the checks of package localweb, which refuse the requests of
 // other sites and of other Host names:
 //
@@ -94,8 +94,8 @@ type Options struct {
 	Refuse localweb.Refuser
 }
 
-// Sessions are the sessions of one launch.
-type Sessions struct {
+// Manager holds the sessions of one launch.
+type Manager struct {
 	o Options
 
 	mu sync.Mutex
@@ -103,9 +103,9 @@ type Sessions struct {
 	csrf map[string]string
 }
 
-// New returns the sessions of the launch o.Token. It refuses an Options
+// New returns the Manager of the launch o.Token. It refuses an Options
 // without a token, a cookie name or a header name.
-func New(o Options) (*Sessions, error) {
+func New(o Options) (*Manager, error) {
 	if o.Token == "" || o.Cookie == "" || o.Header == "" {
 		return nil, errors.New("session: Options needs a Token, a Cookie and a Header")
 	}
@@ -118,14 +118,20 @@ func New(o Options) (*Sessions, error) {
 	if o.Refuse == nil {
 		o.Refuse = localweb.Refuse
 	}
-	return &Sessions{o: o, csrf: map[string]string{}}, nil
+	return &Manager{o: o, csrf: map[string]string{}}, nil
 }
+
+// Sessions is the former name of Manager.
+//
+// Deprecated: Use Manager, which does not nearly repeat the name of the
+// package (decision 36).
+type Sessions = Manager
 
 // csrfKey is the context key of a request's CSRF token.
 type csrfKey struct{}
 
 // CSRF returns the CSRF token of the session of the request whose context
-// is ctx, or "" outside Sessions.Middleware.
+// is ctx, or "" outside Manager.Middleware.
 func CSRF(ctx context.Context) string {
 	s, _ := ctx.Value(csrfKey{}).(string)
 	return s
@@ -143,7 +149,7 @@ func CSRF(ctx context.Context) string {
 //     Options.MaxBody, and its form parsed by the time next runs; it must
 //     carry the session's CSRF token in Options.Header or, failing that,
 //     in the form field Options.Field.
-func (s *Sessions) Middleware(next http.Handler) http.Handler {
+func (s *Manager) Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		port, ok := requestPort(r.Host)
 		if !ok {
@@ -171,7 +177,7 @@ func (s *Sessions) Middleware(next http.Handler) http.Handler {
 
 // exchange starts a session for a request with the launch token, and
 // redirects to its address without the token.
-func (s *Sessions) exchange(w http.ResponseWriter, r *http.Request, port string) {
+func (s *Manager) exchange(w http.ResponseWriter, r *http.Request, port string) {
 	q := r.URL.Query()
 	if !sameSecret(q.Get(TokenParam), s.o.Token) {
 		s.o.Refuse(w, r, localweb.Refusal{
@@ -200,7 +206,7 @@ func (s *Sessions) exchange(w http.ResponseWriter, r *http.Request, port string)
 }
 
 // session returns the CSRF token of the request's session, if it has one.
-func (s *Sessions) session(r *http.Request, port string) (string, bool) {
+func (s *Manager) session(r *http.Request, port string) (string, bool) {
 	c, err := r.Cookie(s.o.Cookie + port)
 	if err != nil {
 		return "", false
@@ -214,7 +220,7 @@ func (s *Sessions) session(r *http.Request, port string) (string, bool) {
 // checkWrite lets through a request that may change something only when it
 // carries the session's CSRF token, and caps and parses its body. It
 // answers the request itself when it refuses it.
-func (s *Sessions) checkWrite(w http.ResponseWriter, r *http.Request, csrf string) bool {
+func (s *Manager) checkWrite(w http.ResponseWriter, r *http.Request, csrf string) bool {
 	r.Body = http.MaxBytesReader(w, r.Body, s.o.MaxBody)
 	if err := r.ParseForm(); err != nil {
 		f := localweb.Refusal{Status: http.StatusBadRequest, Message: "The form is malformed.", Reason: err.Error()}

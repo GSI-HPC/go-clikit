@@ -271,6 +271,17 @@ func TestTheOptionsChangeTheLimitTheFieldAndTheRefusal(t *testing.T) {
 	}
 }
 
+// Sessions is still the manager, under its former name.
+func TestSessionsIsManager(t *testing.T) {
+	t.Parallel()
+
+	var s *session.Sessions
+	s, err := session.New(session.Options{Token: token, Cookie: "prog_ui_", Header: header})
+	if err != nil || s == nil {
+		t.Errorf("New = %v, %v", s, err)
+	}
+}
+
 // Outside the middleware a request has no CSRF token, and every token is
 // new.
 func TestCSRFIsEmptyOutsideASessionAndTokensDiffer(t *testing.T) {
