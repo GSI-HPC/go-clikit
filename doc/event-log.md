@@ -41,7 +41,7 @@ runs that write to a pipe or to NFS at once each need a file of their own.
 | --- | --- |
 | `v` | The version of the format, `1` |
 | `type` | `trace` |
-| `run` | The run, 16 hexadecimal digits drawn for each `Log` unless `LogOptions.Run` names it, the same on every line of the run |
+| `run` | The run, 16 hexadecimal digits drawn for each `Log` unless `LogOptions.RunID` names it, the same on every line of the run |
 | `trace` | The trace the run's spans belong to, 32 hexadecimal digits |
 | `parent`, `traceFlags`, `traceState` | When the run continues a trace another program began, as `ParseTraceContext` reads it from a W3C `traceparent` and `tracestate`: the span of that program's the run works under, 16 hexadecimal digits; the trace flags, two; and the tracestate as it was given |
 | `program`, `version` | The program that wrote the log and its version, as `LogOptions` name them; the program is the Bus's, `BusOptions.Program`, when `LogOptions` names none |
@@ -136,8 +136,11 @@ of its events as a `progress.Event`, the one the Bus sent the log but for
 the text of a line of output, which the log never held. It leaves out a
 key it does not know, a value it does not know of a key whose values are
 the kit's, and a key whose value is of the wrong type; it refuses a line
-of another version, of a type it does not know, or an event without a
-time or, but for a `suspend` or `resume`, without its span. It sanitises
+of another version, with an error that matches `ErrVersion`, so that a
+program can tell its user that the log is newer than the reader, a line
+of a type it does not know, and an event without a time or, but for a
+`suspend` or `resume`, without its span. A `Reducer` counts the lines it
+refused in `Skipped`. It sanitises
 every text as a Bus does, cut to the same bounds, so that a log another
 program wrote, or one changed by hand, reaches a terminal or a page no
 less safe than one the kit wrote. A test reads the golden log, writes it
@@ -151,17 +154,19 @@ of `progress/cliprogress`: the copy with ".1" after the log's name is
 read first, and read on while a command that had the log open when it
 was moved still writes there. A log cut short, or made again, is read
 again from its start, and the reader it feeds is told to forget what it
-had. `Forward` gives the events of the lines it reads to a
-`progress.Sink`, each once, by the `seq` of its run, so that a log read
-again gives no event twice: what a server that runs a command as a
-child, with the child's log in a file of its own, sends on as the
-child's progress. `Reducer` folds the lines into runs, each the tree of
+had. The `Forwarder` of `NewForwarder` gives the events of one run, the
+run of the trace the server handed the child, to a `progress.Sink`, each
+once, by the `seq` of the run, so that a log read again gives no event
+twice, and drops the lines of every other run: what a server that runs a
+command as a child, with the child's log in a file of its own, sends on
+as the child's progress. `Reducer` folds the lines into runs, each the tree of
 the spans of its command, the first span of the kind `command`, as a
 view of what a program did draws them; a span whose parent the log does
-not hold is the command's. It keeps `Options.Keep` runs, 100 by default,
-dropping the oldest that has ended first, and `Options.MaxSpans` spans
-of a run, 131072 by default, and tells which runs changed since it was
-last asked.
+not hold is the command's. It keeps `ReducerOptions.KeepRuns` runs,
+`DefaultKeepRuns`, 100, by default, dropping the oldest that has ended first,
+else the oldest, and `ReducerOptions.MaxSpans` spans of a run,
+`DefaultMaxSpans`, 131072, by default, tells which runs changed since it
+was last asked, and returns one run by its ID.
 
 ## The golden log
 

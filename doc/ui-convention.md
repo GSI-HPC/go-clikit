@@ -24,7 +24,7 @@ letters of a go-to key name the **role** of the page, not its content.
 | Keys | Role | Notes |
 | --- | --- | --- |
 | `g h` | Home: the overview the program opens on | |
-| `g d` | Diagnostics: the doctor and its checks | sind and brig use `g d` for this already; sdash moves its diagnostics here |
+| `g d` | Diagnostics: the doctor and its checks | sind and brig use `g d` for this already; sdash moves its diagnostics here. The checks are those `doctor` reports, in its words |
 | `g c` | Configuration: the settings of the program | sind's `g c` for clusters moves to a domain letter |
 | `g a` | Activity: the runs, the events, the audit trail | |
 | `g` + other letter | A page of the program's domain, such as clusters or nodes | The program picks a letter that is not in this table, and lists it in its `?` view |
@@ -68,7 +68,11 @@ works without it. Nothing that must survive or be shared goes there.
 - A page that uses htmx loads the scripts of `localweb/htmx` and sets
   `<meta name="htmx-config" content='…'>` to `htmx.Config`, so that htmx
   keeps to the CSP
-  ([decision 35](decisions.md#35-localweb-starts-a-server-once-opens-the-browser-on-it-and-serves-its-files-and-pages)).
+  ([decision 35](decisions.md#35-localweb-starts-a-server-once-opens-the-browser-on-it-and-serves-its-files-and-pages)),
+  and asks for the whole page when the browser goes back or forward
+  ([decision 41](decisions.md#41-launch-waits-under-a-context-page-limits-its-includes-and-htmx-restores-history-as-a-page)).
+  A handler answers a request with a fragment only when `page.IsHTMX`
+  says so.
 
 ## Accessibility floor
 

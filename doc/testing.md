@@ -135,7 +135,7 @@ it. `Choose` has a table of what the flag and the variable ask for on a
 terminal, on a dumb one and in a pipe, with every error and note it returns.
 `Start` runs with `Options.Manual` on a `progresstest.Screen` that the
 Options call a terminal of 80 columns, on a clock the test moves, and
-`Run.Draw` draws each frame; one test starts the tree's own goroutine in a
+`Session.Draw` draws each frame; one test starts the tree's own goroutine in a
 `testing/synctest` bubble, and sees it say the command was interrupted.
 
 The private file of the event log is tested inside the package, through
@@ -161,6 +161,20 @@ cannot parse, before the command, after it and on a command the tree
 traverses, each a usage error. What the toolchain records is tested inside
 the package, on a `debug.BuildInfo` per kind of build: none, a checkout,
 one of a tag, one with changes, and `go install` of a release.
+
+## Files and the doctor
+
+`fsutil` is tested on directories the test makes. Each refusal of
+`EnsureDir` and `CheckTrusted` has a test, the owner of a file a test
+gives where the test is not root; a write that stops between the write
+and the rename leaves the file as it was; and `Lock` is tested with a
+second holder of the lock, for its timeout, which names the holder on
+Linux, and for the end of its context.
+
+`doctor` holds the text `Write` writes to a golden string, byte for
+byte, as it is an interface (decision 38), and its JSON to the exact
+keys; a detail that holds a control character is escaped, and a status
+that is none of the three counts as failed.
 
 ## The pools
 
@@ -190,14 +204,16 @@ makes: two starts in one process take turns on the lock, a record of
 each odd kind is refused, and `Running` on Linux finds a server of a
 real process and listener of the test's user. The checks of another
 user's file or socket take the user ID as a value, so they hold as root
-too. `assets` and `page` are tested on `fstest.MapFS`, changed between
-requests where a file is read anew, and `htmx` holds each script to its
-SHA-256.
+too; a start that waits for the lock ends with its context. `assets` and
+`page` are tested on `fstest.MapFS`, changed between requests where a
+file is read anew, `page` with a template that includes itself, and
+`htmx` holds each script to its SHA-256.
 
 `localweb/localwebtest` is how a program tests its server, and how the
 kit tests `session` and `sse`: `Login` signs in with the launch token as
-the user's browser does, and the client sends each request with the
-headers of a page of the server's own origin; `Reader` reads the events
+the user's browser does and follows the redirect to the page, the
+client sends each request with the headers of a page of the server's
+own origin, and `CSRF` reads a page's CSRF token; `Reader` reads the events
 of a stream, which the tests of `sse` hold to the baseline, the
 coalescing and the deduplication.
 
@@ -208,8 +224,9 @@ for the rows a display draws in colour, for the work a span reports, for
 a line of an event log another program wrote, and for a fragment a page
 streams:
 
-- `termtext.FuzzEscape`: neither escaper leaves a rune its policy names, and
-  escaping twice changes nothing;
+- `termtext.FuzzEscape`: neither escaper leaves a rune its policy names,
+  but the carriage return of a CRLF line end that `EscapeLines` keeps
+  (decision 42), and escaping twice changes nothing;
 - `termtext.FuzzTruncate`: a cut row is a prefix of the text, cut on a rune,
   that fits its columns and is the longest that does, text that fits
   already is left as it is, and `Width` keeps to the bounds the widths of
@@ -231,9 +248,9 @@ streams:
   keeps of its text, with every colour sequence whole and none after the
   cut, and a row holding an escape that was shortened ends by setting the
   colours back;
-- `sse.FuzzFormat`: whatever HTML a fragment holds, a reader of the
-  stream reads back one event, with its name and its HTML, so no fragment
-  ends its event early or starts another.
+- `sse.FuzzFormat`: whatever name and HTML a fragment holds, a reader of
+  the stream reads back one event, with its name, less any line break,
+  and its HTML, so no fragment ends its event early or starts another.
 
 `make fuzz` runs each for `FUZZTIME`, 60 s unless told otherwise, and
 `FUZZ=progress:FuzzSanitize` runs one. CI runs each for a minute on every
