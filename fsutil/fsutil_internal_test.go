@@ -68,7 +68,7 @@ func TestWriteAtomicRefusesAnotherUsersLink(t *testing.T) {
 		t.Fatal(err)
 	}
 	me := stranger(t, link)
-	if err := writeAtomic(link, []byte("owned"), 0o644, me, os.Rename); !errors.Is(err, ErrUntrusted) {
+	if err := writeAtomic(link, []byte("owned"), 0o644, options{}, me, os.Rename); !errors.Is(err, ErrUntrusted) {
 		t.Errorf("err = %v, want ErrUntrusted", err)
 	}
 	if data, _ := os.ReadFile(target); string(data) != "keep" {
@@ -88,7 +88,7 @@ func TestWriteAtomicStopsBeforeTheRename(t *testing.T) {
 	}
 	stop := errors.New("stopped")
 	var temporary string
-	err := writeAtomic(path, []byte("new"), 0o600, os.Geteuid(), func(from, _ string) error {
+	err := writeAtomic(path, []byte("new"), 0o600, options{}, os.Geteuid(), func(from, _ string) error {
 		temporary = from
 		if data, _ := os.ReadFile(from); string(data) != "new" {
 			t.Errorf("the temporary file holds %q before the rename", data)
@@ -103,6 +103,34 @@ func TestWriteAtomicStopsBeforeTheRename(t *testing.T) {
 	}
 	if _, err := os.Lstat(temporary); !errors.Is(err, fs.ErrNotExist) || filepath.Dir(temporary) != dir {
 		t.Errorf("the temporary file %s was left behind, or was not beside the file: %v", temporary, err)
+	}
+}
+
+// With ExactMode, the new content of a file whose mode is too wide is in
+// a file of exactly perm before the rename, so that it is never readable
+// with the mode the file had.
+func TestWriteAtomicExactModeBeforeTheRename(t *testing.T) {
+	t.Parallel()
+
+	path := filepath.Join(t.TempDir(), "state")
+	if err := os.WriteFile(path, []byte("old"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(path, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	err := writeAtomic(path, []byte("new"), 0o600, options{exact: true}, os.Geteuid(), func(from, to string) error {
+		info, err := os.Stat(from)
+		if err != nil {
+			return err
+		}
+		if got := info.Mode().Perm(); got != 0o600 {
+			t.Errorf("the temporary file has mode %v before the rename, want 0600", got)
+		}
+		return os.Rename(from, to)
+	})
+	if err != nil {
+		t.Fatalf("writeAtomic: %v", err)
 	}
 }
 
@@ -124,7 +152,7 @@ func TestWriteAtomicKeepsTheOwner(t *testing.T) {
 	uid, gid := ids(t, path)
 	// As root, me is the user that WriteAtomic writes as; as anyone else,
 	// a write that believes it is root's keeps the owner the file has.
-	if err := writeAtomic(path, []byte("two"), 0o600, 0, os.Rename); err != nil {
+	if err := writeAtomic(path, []byte("two"), 0o600, options{}, 0, os.Rename); err != nil {
 		t.Fatalf("writeAtomic: %v", err)
 	}
 	if u, g := ids(t, path); u != uid || g != gid {

@@ -33,6 +33,24 @@ func ExampleWriteAtomic() {
 	// Output: {"runs":1}
 }
 
+// A program keeps a private file private, even when someone widened its
+// mode since the last write.
+func ExampleExactMode() {
+	dir, _ := os.MkdirTemp("", "prog-")
+	defer func() { _ = os.RemoveAll(dir) }()
+	path := filepath.Join(dir, "token")
+	_ = os.WriteFile(path, []byte("old"), 0o600)
+	_ = os.Chmod(path, 0o644) // another program's doing
+
+	if err := fsutil.WriteAtomic(path, []byte("new"), 0o600, fsutil.ExactMode()); err != nil {
+		fmt.Println(err)
+		return
+	}
+	info, _ := os.Stat(path)
+	fmt.Println(info.Mode().Perm())
+	// Output: -rw-------
+}
+
 // Several runs of a program count in one shared file, under its lock, and
 // none of their counts is lost.
 func ExampleUpdate() {

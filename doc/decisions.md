@@ -48,7 +48,7 @@ nothing.
 | [34](#34-localweb-guards-a-local-web-server-keeps-its-sessions-and-streams-its-pages) | localweb guards a local web server, keeps its sessions and streams its pages | accepted, refined by [35](#35-localweb-starts-a-server-once-opens-the-browser-on-it-and-serves-its-files-and-pages) and [40](#40-localweb-takes-one-form-for-each-hook-and-stops-its-streams-with-the-server) |
 | [35](#35-localweb-starts-a-server-once-opens-the-browser-on-it-and-serves-its-files-and-pages) | localweb starts a server once, opens the browser on it, and serves its files and pages | accepted, refined by [41](#41-launch-waits-under-a-context-page-limits-its-includes-and-htmx-restores-history-as-a-page) |
 | [36](#36-the-shapes-and-names-of-the-api-are-settled-before-v1) | The shapes and names of the API are settled before v1 | accepted |
-| [37](#37-fsutil-writes-locks-and-checks-the-files-of-a-program) | fsutil writes, locks and checks the files of a program | accepted |
+| [37](#37-fsutil-writes-locks-and-checks-the-files-of-a-program) | fsutil writes, locks and checks the files of a program | accepted, refined by [47](#47-fsutil-gives-a-file-that-exists-exactly-perm-when-asked) |
 | [38](#38-doctor-reports-a-programs-checks-in-fixed-words-and-text) | doctor reports a program's checks in fixed words and text | accepted |
 | [39](#39-cobratree-marks-every-error-of-the-command-line-and-strict-takes-options) | cobratree marks every error of the command line, and Strict takes options | accepted |
 | [40](#40-localweb-takes-one-form-for-each-hook-and-stops-its-streams-with-the-server) | localweb takes one form for each hook, and stops its streams with the server | accepted |
@@ -58,6 +58,7 @@ nothing.
 | [44](#44-progress-names-each-thing-once-and-a-nil-bus-is-safe) | progress names each thing once, and a nil Bus is safe | accepted |
 | [45](#45-eventlog-tells-a-newer-log-apart-and-forwards-one-run) | eventlog tells a newer log apart, and forwards one run | accepted |
 | [46](#46-displays-themes-cannot-be-changed-and-its-names-follow-decision-36) | display's themes cannot be changed, and its names follow decision 36 | accepted |
+| [47](#47-fsutil-gives-a-file-that-exists-exactly-perm-when-asked) | fsutil gives a file that exists exactly perm when asked | accepted |
 
 ## 1. Apache-2.0, and GSI holds the copyright
 
@@ -2107,7 +2108,7 @@ These rules hold for the API of every package, and a new API keeps them:
 
 ## 37. fsutil writes, locks and checks the files of a program
 
-Status: accepted. Refines [26](#26-golangorgxsys-also-in-fsutil-and-localweb).
+Status: accepted, refined by [47](#47-fsutil-gives-a-file-that-exists-exactly-perm-when-asked). Refines [26](#26-golangorgxsys-also-in-fsutil-and-localweb).
 
 ### Context
 
@@ -2627,3 +2628,35 @@ NM-02).
 
 - A program that changed a theme by assigning its variable loses that;
   none of the kit's users does.
+
+## 47. fsutil gives a file that exists exactly perm when asked
+
+Status: accepted. Refines [37](#37-fsutil-writes-locks-and-checks-the-files-of-a-program).
+
+### Context
+
+`WriteAtomic` keeps the mode of a file that exists, so that a file several
+administrators share stays writable by all of them (decision 37). brig
+writes private files, such as its records of VMs and the keys of its
+hosts, and wants each to have exactly the mode it asks for, even when
+someone widened the mode since the last write. Its `paths.WriteFile`
+therefore changes the mode of the file that exists before it calls
+`WriteAtomic`: a second system call, outside the write, and a step every
+program with private files would have to copy.
+
+### Decision
+
+- `WriteAtomic` and `Update` take options, `...Option`, after their
+  arguments, as `cobratree.Strict` does (decisions 36 and 39).
+- The option `ExactMode()` gives a file that exists exactly `perm`, as a
+  new file gets. The temporary file has that mode before the content is
+  written, so that the new content is never readable with the wider mode.
+  The group, and the owner when root writes, are kept as before.
+- Without the option, nothing changes: a file that exists keeps its mode
+  without write permission for others.
+
+### Costs
+
+- A function value of the type `func(string, []byte, os.FileMode) error`
+  no longer holds `WriteAtomic`, and one of the type of `Update` no
+  longer holds `Update`. A call compiles as before.
