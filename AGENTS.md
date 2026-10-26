@@ -139,6 +139,17 @@ still change in a minor release (see Compatibility).
   the three scripts, whose licence `REUSE.toml` records.
 - Every package has an `example_test.go`. Failing fuzz inputs go under the
   package's `testdata/fuzz/`.
+- `site/`: the documentation site, built with Hugo and published to
+  GitHub Pages (decision 48). `content/` holds the pages, which mount the
+  documents of `doc/` and show the examples of the packages as they are;
+  `layouts/` and `assets/` the theme; `data/packages.json` the place of
+  each package on the map; `static/casts/` the recordings of the displays
+  and `data/imports.json` the imports, which `internal/docsite` writes;
+  `releases.py` lists the releases from the tags as the site is built.
+- `internal/docsite/`: tests that hold the site to the code: the
+  recordings, the map, every pkg.go.dev link and example a page names,
+  and the lines of the event log it quotes; `example_test.go` holds the
+  code of the guides that no package's examples show.
 - `doc/`: `README.md` maps the documentation; `architecture.md` says how
   the packages fit together, `event-log.md` describes the event log,
   `testing.md` says how the kit is tested, `decisions.md` records what was
@@ -149,6 +160,8 @@ still change in a minor release (see Compatibility).
   tests, coverage, fuzzing, lint, Markdown, REUSE, govulncheck and the tag
   verification test.
   `release.yml`: verifies a pushed `v*` tag and publishes the release.
+  `pages.yml`: builds the site on each pull request, and publishes it
+  from `main`.
 - `.github/actions/setup-go`: Go at the newest patch of the `floor` (go.mod)
   or `current` (mise.toml) release line.
 - `.agents/skills/`: skills for coding agents; `.claude/skills` links there.
@@ -156,7 +169,7 @@ still change in a minor release (see Compatibility).
 ## Commands
 
 ```bash
-mise install          # Go and golangci-lint at the versions CI uses
+mise install          # Go, golangci-lint and Hugo at the versions CI uses
 make lint             # golangci-lint v2 (.golangci.yml, gofmt + goimports)
 make test             # go test -race ./...
 make floor            # vet and test with the go line of go.mod
@@ -169,6 +182,8 @@ make vuln             # govulncheck
 make reuse            # reuse lint (pip install reuse)
 make lint-docs        # markdownlint-cli2 (needs npx)
 make test-release     # the tag verification script against scratch tags
+make site             # check the site against the code and build it (needs hugo)
+make site-recordings  # write the site's recordings and map anew from the code
 ```
 
 go-test-coverage: `go install github.com/vladopajic/go-test-coverage/v2@latest`.
@@ -271,8 +286,9 @@ go-test-coverage: `go install github.com/vladopajic/go-test-coverage/v2@latest`.
   and carry a `Co-Authored-By: Claude …` trailer. Keep both; the README AI
   disclosure relies on them.
 - A change that takes a decision adds it to `doc/decisions.md`. A change
-  of behaviour updates the doc comments, and the document in `doc/` that
-  describes it, in the same PR.
+  of behaviour updates the doc comments, and the document in `doc/` and the
+  page of `site/` that describe it, in the same PR. A new package gets a
+  page and a place on the site's map.
 
 ## Skills
 

@@ -59,6 +59,7 @@ nothing.
 | [45](#45-eventlog-tells-a-newer-log-apart-and-forwards-one-run) | eventlog tells a newer log apart, and forwards one run | accepted |
 | [46](#46-displays-themes-cannot-be-changed-and-its-names-follow-decision-36) | display's themes cannot be changed, and its names follow decision 36 | accepted |
 | [47](#47-fsutil-gives-a-file-that-exists-exactly-perm-when-asked) | fsutil gives a file that exists exactly perm when asked | accepted |
+| [48](#48-the-kit-has-a-documentation-site-beside-pkggodev) | The kit has a documentation site, beside pkg.go.dev | accepted |
 
 ## 1. Apache-2.0, and GSI holds the copyright
 
@@ -2660,3 +2661,61 @@ program with private files would have to copy.
 - A function value of the type `func(string, []byte, os.FileMode) error`
   no longer holds `WriteAtomic`, and one of the type of `Update` no
   longer holds `Update`. A call compiles as before.
+
+## 48. The kit has a documentation site, beside pkg.go.dev
+
+Status: accepted.
+
+### Context
+
+pkg.go.dev shows each package alone, its names in alphabetical order, and
+the README and `doc/README.md` sent a reader there for everything but the
+design. A reader who meets the kit learns there what each name does, but
+not which of the 22 packages to import, how a span gets from a library to
+a display, or what the tree looks like while it runs. `doc/architecture.md`
+says the first two, for someone who changes the kit, in 400 lines and
+without a picture. `doc/README.md` named a documentation site as
+deliberately absent, since pkg.go.dev, the signed tags and `AGENTS.md`
+said what it would. The maintainer asked for one that complements
+pkg.go.dev, with a richer introduction, diagrams and motion where it
+explains.
+
+### Decision
+
+- `site/` holds a Hugo site, which `.github/workflows/pages.yml` builds on
+  each pull request and publishes to GitHub Pages from `main`, at
+  <https://gsi-hpc.github.io/go-clikit/>. Hugo is a tool, pinned in
+  `mise.toml` as golangci-lint is, and no requirement of the module
+  (decision 3).
+- The site complements pkg.go.dev and copies no reference: a tour,
+  concepts, guides, a page per package and a map of the packages, and
+  every name links to its entry on pkg.go.dev.
+- Each text has one source. The documents of `doc/` are pages of the site
+  as they are. The code a page shows is read from the package's
+  `example_test.go` when the site is built, so it is code the tests run;
+  the code of a guide that no package's example shows, the `main` of a
+  program, is an example of `internal/docsite`, which the tests compile.
+- The tests of `internal/docsite` keep the site true to the code: the
+  recordings of the displays are frames the displays draw on a fake
+  clock, golden files under `site/static/casts`; the imports the map
+  draws are those `go list` reports, in `site/data/imports.json`; every
+  package has a page and a place on the map; and every link to
+  pkg.go.dev and every example a page names is a name the package has.
+  `go test ./internal/docsite -update` writes the golden files anew.
+- Nothing in the tree names a version (decision 4): the workflow writes
+  the list of releases and the version the site shows from the tags, as
+  it builds.
+- Motion is used where it explains: the recordings of the displays, which
+  a reader can stop and play in each theme, and the steps of a diagram.
+  With reduced motion asked for, neither moves, and each shows its last
+  frame. Every page reads in full without its script.
+
+### Costs
+
+- A change of behaviour that a concept or guide page describes updates
+  that page in the same pull request, as it updates the documents of
+  `doc/`.
+- A new package needs a page and a place on the map, and a change to what
+  a display draws needs the recordings written anew, or the tests fail.
+- The site is published only once a maintainer sets GitHub Actions as the
+  source of the repository's Pages.
