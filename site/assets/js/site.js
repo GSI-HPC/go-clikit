@@ -1,9 +1,9 @@
 // SPDX-FileCopyrightText: 2026 GSI Helmholtz Centre for Heavy Ion Research GmbH <http://www.gsi.de>
 // SPDX-License-Identifier: Apache-2.0
 //
-// The site's few behaviours: the colour scheme, the menu on a phone, the
-// search, the copy button, the recordings of the displays and the step
-// animations. Every page reads in full without this script.
+// The site's few behaviours: the colour scheme, the width of the page,
+// the menu on a phone, the search, the copy button, the recordings of the
+// displays and the step animations. Every page reads in full without this script.
 (function () {
   'use strict';
   var root = document.documentElement;
@@ -24,6 +24,20 @@
       var dark = root.dataset.theme ? root.dataset.theme === 'dark' : !matchMedia('(prefers-color-scheme: light)').matches;
       root.dataset.theme = dark ? 'light' : 'dark';
       store('scheme', root.dataset.theme);
+    });
+  }
+
+  // The width of the page: normal, wide or the full window.
+  var width = document.getElementById('width');
+  if (width) {
+    var widths = ['normal', 'wide', 'full'];
+    var showWidth = function () { width.title = 'Page width: ' + (root.dataset.width || 'normal'); };
+    showWidth();
+    width.addEventListener('click', function () {
+      var next = widths[(widths.indexOf(root.dataset.width || 'normal') + 1) % widths.length];
+      if (next === 'normal') delete root.dataset.width; else root.dataset.width = next;
+      store('width', next);
+      showWidth();
     });
   }
 
