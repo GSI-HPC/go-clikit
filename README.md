@@ -5,6 +5,7 @@
 
 [![Go Reference](https://pkg.go.dev/badge/github.com/GSI-HPC/go-clikit.svg)](https://pkg.go.dev/github.com/GSI-HPC/go-clikit)
 [![CI](https://github.com/GSI-HPC/go-clikit/actions/workflows/ci.yml/badge.svg)](https://github.com/GSI-HPC/go-clikit/actions/workflows/ci.yml)
+[![Docs](https://github.com/GSI-HPC/go-clikit/actions/workflows/pages.yml/badge.svg)](https://gsi-hpc.github.io/go-clikit/)
 
 **The runtime GSI-HPC's command-line tools share.** Report progress as spans
 carried in a `context.Context`, and let the command choose how to show it: a
@@ -13,6 +14,8 @@ event log for programs. Run work in bounded pools that report their targets.
 Escape untrusted text before it reaches a terminal. A library that reports
 spans costs nothing when no command is listening.
 
+**[Documentation →](https://gsi-hpc.github.io/go-clikit/)**: a tour, the
+concepts, guides, a page per package and a map of them all.
 **[API reference on pkg.go.dev →](https://pkg.go.dev/github.com/GSI-HPC/go-clikit)**
 
 ## Status

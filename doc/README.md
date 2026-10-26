@@ -6,7 +6,10 @@
 This directory records how the kit is built and why, for someone who
 changes it. How to use each package is in its doc comments and examples,
 which pkg.go.dev publishes:
-<https://pkg.go.dev/github.com/GSI-HPC/go-clikit>.
+<https://pkg.go.dev/github.com/GSI-HPC/go-clikit>. The documentation
+site, <https://gsi-hpc.github.io/go-clikit/>, built from `site/`,
+introduces the kit to someone who uses it, and shows these documents as
+pages of its own (decision 48).
 
 | Document | What it covers |
 | --- | --- |
@@ -22,7 +25,7 @@ which pkg.go.dev publishes:
 
 | For | Where |
 | --- | --- |
-| A program that uses the kit | The doc comments and examples, on pkg.go.dev, and the [README](../README.md) for installing and versions |
+| A program that uses the kit | The [documentation site](https://gsi-hpc.github.io/go-clikit/) for the concepts and guides, the doc comments and examples on pkg.go.dev for each name, and the [README](../README.md) for installing and versions |
 | Someone choosing a display in a program that uses the kit | That program's manual: the kit documents the mechanism, each program its flags and environment variables |
 | A contributor, person or agent | [AGENTS.md](../AGENTS.md): commands, conventions and rules |
 | Someone reporting a vulnerability | [SECURITY.md](../SECURITY.md) |
@@ -40,7 +43,10 @@ which pkg.go.dev publishes:
   the decision foresaw and did not happen.
 - The golden log, `progress/testdata/log-v1.jsonl`, pins the format
   `event-log.md` describes.
+- The tests of `internal/docsite` hold the site to the code: its
+  recordings of the displays, its map of the imports, the names it links
+  on pkg.go.dev, the examples it shows and the lines of the event log it
+  quotes.
 
-Deliberately absent: a documentation site, a changelog, a `CONTRIBUTING.md`
-and a README per package. pkg.go.dev, the signed tags and `AGENTS.md` say
-what they would.
+Deliberately absent: a changelog, a `CONTRIBUTING.md` and a README per
+package. The signed tags, `AGENTS.md` and pkg.go.dev say what they would.
