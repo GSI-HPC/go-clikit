@@ -94,7 +94,8 @@ still change in a minor release (see Compatibility).
   `json.go`, `WriteJSON`.
 - `doctor/`: `doctor.go`, the package comment, `Status`, `Check`,
   `Worst`, `Count` and `Write`.
-- `fsutil/`: `fsutil.go`, the package comment, `WriteAtomic`, `Update`,
+- `fsutil/`: `fsutil.go`, the package comment, `WriteAtomic`, `Option`,
+  `ExactMode`, `Update`,
   `DefaultLockWait`, `EnsureDir`, `CheckTrusted` and `ErrUntrusted`;
   `lock_unix.go`, `Lock` and its file, with `holder_linux.go`, the
   holder of a lock read from `/proc/locks`; `owner_unix.go`, the owner of

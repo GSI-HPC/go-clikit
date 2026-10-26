@@ -94,12 +94,16 @@ func TestWriteAtomic(t *testing.T) {
 		name     string
 		existing os.FileMode // 0 for no file
 		perm     os.FileMode
+		opts     []fsutil.Option
 		want     os.FileMode
 	}{
-		{"a new file gets exactly perm, whatever the umask", 0, 0o666, 0o666},
-		{"a new private file", 0, 0o600, 0o600},
-		{"a file keeps its mode", 0o664, 0o600, 0o664},
-		{"a file loses write permission for others", 0o666, 0o600, 0o664},
+		{"a new file gets exactly perm, whatever the umask", 0, 0o666, nil, 0o666},
+		{"a new private file", 0, 0o600, nil, 0o600},
+		{"a file keeps its mode", 0o664, 0o600, nil, 0o664},
+		{"a file loses write permission for others", 0o666, 0o600, nil, 0o664},
+		{"a new file with ExactMode", 0, 0o640, []fsutil.Option{fsutil.ExactMode()}, 0o640},
+		{"a file made private with ExactMode", 0o644, 0o600, []fsutil.Option{fsutil.ExactMode()}, 0o600},
+		{"a file made wider with ExactMode", 0o600, 0o666, []fsutil.Option{fsutil.ExactMode()}, 0o666},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
@@ -109,7 +113,7 @@ func TestWriteAtomic(t *testing.T) {
 				mkdir(t, dir, 0o700)
 				write(t, path, "old", tc.existing)
 			}
-			if err := fsutil.WriteAtomic(path, []byte("new"), tc.perm); err != nil {
+			if err := fsutil.WriteAtomic(path, []byte("new"), tc.perm, tc.opts...); err != nil {
 				t.Fatalf("WriteAtomic: %v", err)
 			}
 			if got := content(path); got != "new" {

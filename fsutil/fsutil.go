@@ -66,20 +66,51 @@ const maxLinks = 40
 // when root writes it; write permission for others is never kept. A new
 // file gets exactly perm, set after it is made, whatever the umask.
 //
+// With [ExactMode], a file that exists gets exactly perm too, as a new
+// one does, and keeps its group and owner as before.
+//
 // A symbolic link at path is written through, not replaced, for at most
 // 40 links. A link that neither this user nor root owns is refused with an
 // error that matches [ErrUntrusted]: whoever put it there would choose
 // which file is written.
-func WriteAtomic(path string, data []byte, perm os.FileMode) error {
-	return writeAtomic(path, data, perm, os.Geteuid(), os.Rename)
+func WriteAtomic(path string, data []byte, perm os.FileMode, opts ...Option) error {
+	return writeAtomic(path, data, perm, collect(opts), os.Geteuid(), os.Rename)
 }
 
-// writeAtomic is WriteAtomic for the user me, which is os.Geteuid and
-// which a test makes another, with the rename that a test makes fail.
-func writeAtomic(path string, data []byte, perm os.FileMode, me int, rename func(from, to string) error) error {
+// An Option sets how [WriteAtomic] and [Update] write a file: ExactMode.
+type Option func(*options)
+
+// options are what the Options given to WriteAtomic or Update set.
+type options struct {
+	exact bool
+}
+
+// collect returns what opts set.
+func collect(opts []Option) options {
+	var o options
+	for _, opt := range opts {
+		opt(&o)
+	}
+	return o
+}
+
+// ExactMode gives a file that exists exactly the perm of the write, as a
+// new file gets, rather than the mode it has: a private file whose mode
+// another program widened is private again, and its new content is never
+// readable with the wider mode. Without ExactMode, a file that exists
+// keeps its mode, so that a file several administrators share stays
+// writable by all of them.
+func ExactMode() Option {
+	return func(o *options) { o.exact = true }
+}
+
+// writeAtomic is WriteAtomic with the options o for the user me, which is
+// os.Geteuid and which a test makes another, with the rename that a test
+// makes fail.
+func writeAtomic(path string, data []byte, perm os.FileMode, o options, me int, rename func(from, to string) error) error {
 	file, info, err := resolve(path, me)
 	if err == nil {
-		err = replace(file, info, data, perm, me, rename)
+		err = replace(file, info, data, perm, o, me, rename)
 	}
 	if err != nil {
 		return fmt.Errorf("write %s: %w", path, err)
@@ -88,15 +119,17 @@ func writeAtomic(path string, data []byte, perm os.FileMode, me int, rename func
 }
 
 // replace writes data over the file path, whose information is info, or
-// nil when there is no file yet, as WriteAtomic says.
-func replace(path string, info fs.FileInfo, data []byte, perm os.FileMode, me int, rename func(from, to string) error) error {
+// nil when there is no file yet, as WriteAtomic says with the options o.
+func replace(path string, info fs.FileInfo, data []byte, perm os.FileMode, o options, me int, rename func(from, to string) error) error {
 	dir := filepath.Dir(path)
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return err
 	}
 	uid, gid := -1, -1
 	if info != nil {
-		perm = info.Mode().Perm() &^ 0o002
+		if !o.exact {
+			perm = info.Mode().Perm() &^ 0o002
+		}
 		if u, g, ok := owner(info); ok {
 			gid = g
 			if me == 0 {
@@ -190,12 +223,12 @@ func linkTarget(path string) (string, error) {
 // Update changes the file at path under [Lock], with [DefaultLockWait]: it
 // reads the file, hands its content to change, which gets nil when there
 // is no file yet, and writes what change returns with [WriteAtomic], with
-// perm for a new file. When change returns an error, nothing is written
-// and Update returns that error.
+// perm for a new file and opts. When change returns an error, nothing is
+// written and Update returns that error.
 //
 // The lock is the lock of the file a symbolic link at path points at, so
 // that writers that go through the link and around it take the same one.
-func Update(ctx context.Context, path string, perm os.FileMode, change func([]byte) ([]byte, error)) error {
+func Update(ctx context.Context, path string, perm os.FileMode, change func([]byte) ([]byte, error), opts ...Option) error {
 	me := os.Geteuid()
 	file, _, err := resolve(path, me)
 	if err != nil {
@@ -215,7 +248,7 @@ func Update(ctx context.Context, path string, perm os.FileMode, change func([]by
 		data, err = change(data)
 	}
 	if err == nil {
-		err = writeAtomic(file, data, perm, me, os.Rename)
+		err = writeAtomic(file, data, perm, collect(opts), me, os.Rename)
 	}
 	return err
 }

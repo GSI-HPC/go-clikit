@@ -126,3 +126,23 @@ func TestUpdateWaitsForTheLock(t *testing.T) {
 		t.Errorf("err = %v, want context.Canceled", err)
 	}
 }
+
+// Update hands its options to the write: with ExactMode, a file whose
+// mode was widened is private again.
+func TestUpdateExactMode(t *testing.T) {
+	t.Parallel()
+
+	path := write(t, filepath.Join(t.TempDir(), "file"), "old", 0o644)
+	err := fsutil.Update(context.Background(), path, 0o600, func(b []byte) ([]byte, error) {
+		return append(b, "+new"...), nil
+	}, fsutil.ExactMode())
+	if err != nil {
+		t.Fatalf("Update: %v", err)
+	}
+	if got := content(path); got != "old+new" {
+		t.Errorf("the file holds %q, want %q", got, "old+new")
+	}
+	if got := mode(t, path); got != 0o600 {
+		t.Errorf("mode = %v, want 0600", got)
+	}
+}
