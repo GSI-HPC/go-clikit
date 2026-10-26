@@ -26,7 +26,7 @@ one trace.
 <text x="580" y="150" class="mono" fill="var(--text)">progress.NewLog(f, …)</text>
 <rect x="330" y="120" width="160" height="60" rx="8" fill="var(--well)" stroke="var(--line)"/>
 <text x="410" y="146" text-anchor="middle" class="mono" fill="#d0d0d0">progress.jsonl</text>
-<text x="410" y="166" text-anchor="middle" class="mono" font-size="11" fill="#86a6ab">one event a line</text>
+<text x="410" y="166" text-anchor="middle" class="mono" font-size="11" fill="#a5adcb">one event a line</text>
 <g stroke="var(--mute)" stroke-width="1.5" fill="none" marker-end="url(#ca)">
 <line x1="262" y1="74" x2="555" y2="74"/>
 <line x1="556" y1="148" x2="494" y2="148"/>

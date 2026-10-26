@@ -24,7 +24,7 @@ control can show a name in another order than it has.
 <g data-only="2">
 <text x="20" y="110" fill="var(--bad)">raw: the terminal obeys</text>
 <rect x="20" y="120" width="720" height="70" rx="6" fill="var(--well)" stroke="var(--bad)"/>
-<rect x="20" y="120" width="720" height="20" rx="6" fill="#1d3640"/><text x="34" y="135" fill="#d0d0d0" font-size="11">owned</text>
+<rect x="20" y="120" width="720" height="20" rx="6" fill="#363a4f"/><text x="34" y="135" fill="#d0d0d0" font-size="11">owned</text>
 <text x="34" y="170" fill="#d0d0d0">backup FAILED</text>
 </g>
 <g data-only="3">

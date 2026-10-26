@@ -42,8 +42,8 @@ two must take turns. A {{< api "progress/display" "Terminal" >}} does this:
 {{< fig caption="The region at the bottom, and what scrolls above it. The command's own lines and the lines a display leaves go above the region." >}}
 <svg viewBox="0 0 760 240" role="img" aria-label="A terminal: lines of the command scroll above; the region of the display stays at the bottom.">
 <g class="mono" font-size="13">
-<rect x="10" y="10" width="740" height="220" rx="10" fill="#081216" stroke="var(--line)"/>
-<text x="30" y="40" fill="#86a6ab">$ clusterctl reinstall exe[01-12]</text>
+<rect x="10" y="10" width="740" height="220" rx="10" fill="#181926" stroke="var(--line)"/>
+<text x="30" y="40" fill="#a5adcb">$ clusterctl reinstall exe[01-12]</text>
 <text x="30" y="64" fill="#d0d0d0">note: exe03 has no BMC; using IPMI</text>
 <text x="30" y="88" fill="#d0d0d0">✓ fetching the base image  5.0s  2.0 GiB</text>
 <line x1="20" y1="104" x2="740" y2="104" stroke="#00af87" stroke-dasharray="6 5"/>

@@ -15,7 +15,7 @@ and sends on the child's progress.
 {{< fig caption="A Tail polls the log and gives each whole line to a Feed." >}}
 <svg viewBox="0 0 820 190" role="img" aria-label="A log file is polled by a Tail, which feeds a Reducer for a view or a Forwarder for a sink.">
 <g font-size="13" class="mono">
-<rect x="10" y="65" width="170" height="56" rx="8" fill="var(--well)" stroke="var(--line)"/><text x="28" y="92" fill="#d0d0d0">progress.jsonl</text><text x="28" y="110" fill="#86a6ab" font-size="11">grows, rotates</text>
+<rect x="10" y="65" width="170" height="56" rx="8" fill="var(--well)" stroke="var(--line)"/><text x="28" y="92" fill="#d0d0d0">progress.jsonl</text><text x="28" y="110" fill="#a5adcb" font-size="11">grows, rotates</text>
 <rect x="240" y="65" width="140" height="56" rx="8" fill="var(--deck)" stroke="var(--isl-progress)"/><text x="262" y="98" fill="var(--fg)">Tail.Poll</text>
 <rect x="450" y="20" width="160" height="56" rx="8" fill="var(--deck)" stroke="var(--isl-progress)"/><text x="470" y="53" fill="var(--fg)">Reducer</text>
 <rect x="450" y="110" width="160" height="56" rx="8" fill="var(--deck)" stroke="var(--isl-progress)"/><text x="470" y="143" fill="var(--fg)">Forwarder</text>
