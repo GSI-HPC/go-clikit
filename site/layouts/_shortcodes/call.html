@@ -1,0 +1,11 @@
+{{- /*
+SPDX-FileCopyrightText: 2026 GSI Helmholtz Centre for Heavy Ion Research GmbH <http://www.gsi.de>
+SPDX-License-Identifier: Apache-2.0
+*/ -}}
+{{- /* {{% call note %}}…{{% /call %}}: a NOTE, CAUTION or WARNING, as an
+   ASD-STE100 manual writes them. */ -}}
+{{- $kind := .Get 0 | default "note" -}}
+<div class="call {{ $kind }}" role="note"><b>{{ upper $kind }}</b>
+{{ .Inner | .Page.RenderString (dict "display" "block") }}
+</div>
+{{- /**/ -}}

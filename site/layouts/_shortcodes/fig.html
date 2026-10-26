@@ -1,0 +1,7 @@
+{{- /*
+SPDX-FileCopyrightText: 2026 GSI Helmholtz Centre for Heavy Ion Research GmbH <http://www.gsi.de>
+SPDX-License-Identifier: Apache-2.0
+*/ -}}
+{{- /* {{< fig caption="…" >}}<svg>…</svg>{{< /fig >}}: a diagram. */ -}}
+<figure class="fig"><div class="art">{{ .Inner | safeHTML }}</div>{{ with .Get "caption" }}<figcaption>{{ . | markdownify }}</figcaption>{{ end }}</figure>
+{{- /**/ -}}

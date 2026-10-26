@@ -1,0 +1,7 @@
+{{- /*
+SPDX-FileCopyrightText: 2026 GSI Helmholtz Centre for Heavy Ion Research GmbH <http://www.gsi.de>
+SPDX-License-Identifier: Apache-2.0
+*/ -}}
+{{- /* {{< decision 21 >}}: a link to a decision of doc/decisions.md. */ -}}
+<a href="{{ "reference/decisions/" | relURL }}#decision-{{ .Get 0 }}">decision {{ .Get 0 }}</a>
+{{- /**/ -}}

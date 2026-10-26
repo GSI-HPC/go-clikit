@@ -1,0 +1,32 @@
+{{- /*
+SPDX-FileCopyrightText: 2026 GSI Helmholtz Centre for Heavy Ion Research GmbH <http://www.gsi.de>
+SPDX-License-Identifier: Apache-2.0
+*/ -}}
+{{ define "main" }}
+{{- $path := .Params.import }}
+{{- $pkg := index (where site.Data.packages "path" $path) 0 }}
+{{- $imp := index (where site.Data.imports "path" $path) 0 }}
+{{- $group := index (where (partial "groups.html" .) "id" $pkg.group) 0 }}
+<p class="crumb"><a href="{{ "packages/" | relURL }}">packages</a> › {{ $group.name }} › {{ $path }}</p>
+<div class="page-head">
+  <div>
+    <h1>{{ path.Base $path }}</h1>
+    <p class="imp"><span>import</span> "{{ site.Params.module }}/{{ $path }}"</p>
+    {{- with .Description }}<p class="lede">{{ . }}</p>{{ end }}
+    <div class="facts">
+      <span>since {{ $pkg.since }}</span>
+      <span>imports: {{ with $imp.imports }}{{ delimit . ", " }}{{ else }}no package of the kit{{ end }}</span>
+      {{- with $imp.requires }}<span>requires: {{ delimit . ", " }}</span>{{ end }}
+      <span>decisions {{ range $i, $d := $pkg.decisions }}{{ if $i }} · {{ end }}<a href="{{ "reference/decisions/" | relURL }}#decision-{{ $d }}">{{ $d }}</a>{{ end }}</span>
+    </div>
+  </div>
+  {{ partial "map.html" (dict "focus" $path "mini" true) }}
+</div>
+<div class="doc">
+  <article class="prose">
+    {{ .Content }}
+    {{ partial "next.html" . }}
+  </article>
+  {{ partial "toc.html" . }}
+</div>
+{{ end }}

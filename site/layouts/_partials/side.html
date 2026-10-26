@@ -1,0 +1,36 @@
+{{- /*
+SPDX-FileCopyrightText: 2026 GSI Helmholtz Centre for Heavy Ion Research GmbH <http://www.gsi.de>
+SPDX-License-Identifier: Apache-2.0
+*/ -}}
+{{- $cur := . }}
+<aside class="side" id="side" aria-label="Pages">
+  {{- range slice "concepts" "guides" }}
+  {{- with site.GetPage (printf "/%s" .) }}
+  <h2><a href="{{ .RelPermalink }}">{{ .Title }}</a></h2>
+  <ul>
+    {{- range .Pages.ByWeight }}
+    <li><a href="{{ .RelPermalink }}"{{ if eq $cur . }} class="on" aria-current="page"{{ end }}><span class="g">╎</span>{{ .LinkTitle }}</a></li>
+    {{- end }}
+  </ul>
+  {{- end }}
+  {{- end }}
+  <h2><a href="{{ "packages/" | relURL }}">Packages</a></h2>
+  <ul>
+    {{- range $g := partial "groups.html" . }}
+    <li class="grp">{{ $g.name }}</li>
+    {{- range where site.Data.packages "group" $g.id }}
+    {{- $p := site.GetPage (printf "/packages/%s" (path.Base .path)) }}
+    {{- $depth := len (split .path "/") }}
+    <li><a href="{{ with $p }}{{ .RelPermalink }}{{ end }}"{{ if eq $cur $p }} class="on" aria-current="page"{{ end }} title="{{ .path }}"><span class="g">{{ if gt $depth 1 }}╎ ╎{{ else }}╎{{ end }}</span>{{ path.Base .path }}</a></li>
+    {{- end }}
+    {{- end }}
+  </ul>
+  {{- with site.GetPage "/reference" }}
+  <h2><a href="{{ .RelPermalink }}">{{ .Title }}</a></h2>
+  <ul>
+    {{- range .Pages.ByWeight }}
+    <li><a href="{{ .RelPermalink }}"{{ if eq $cur . }} class="on" aria-current="page"{{ end }}><span class="g">╎</span>{{ .LinkTitle }}</a></li>
+    {{- end }}
+  </ul>
+  {{- end }}
+</aside>

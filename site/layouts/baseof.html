@@ -1,0 +1,63 @@
+{{- /*
+SPDX-FileCopyrightText: 2026 GSI Helmholtz Centre for Heavy Ion Research GmbH <http://www.gsi.de>
+SPDX-License-Identifier: Apache-2.0
+*/ -}}
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>{{ if .IsHome }}{{ site.Title }}: {{ site.Params.description | truncate 70 }}{{ else }}{{ .Title }} · {{ site.Title }}{{ end }}</title>
+<meta name="description" content="{{ with .Description }}{{ . }}{{ else }}{{ site.Params.description }}{{ end }}">
+<script>try { var s = localStorage.getItem('scheme'); if (s) document.documentElement.dataset.theme = s; } catch (e) {}</script>
+{{- with resources.Get "css/site.css" | minify | fingerprint }}
+<link rel="stylesheet" href="{{ .RelPermalink }}" integrity="{{ .Data.Integrity }}">
+{{- end }}
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%230b171c'/%3E%3Cpath d='M4 4l4 4-4 4' stroke='%2300af87' stroke-width='2' fill='none'/%3E%3C/svg%3E">
+</head>
+<body>
+<a class="skip" href="#content">Go to the content</a>
+<header class="top">
+  <button class="menu-btn" id="menu" type="button" aria-expanded="false" aria-controls="side">menu</button>
+  <a class="brand" href="{{ "" | relURL }}"><span>❯</span> go-clikit</a>
+  <nav aria-label="Main">
+    {{- $page := . }}
+    {{- range site.Menus.main }}
+    <a href="{{ .URL }}"{{ if or ($page.IsMenuCurrent "main" .) ($page.HasMenuCurrent "main" .) (and .Page (or (eq $page .Page) ($page.IsDescendant .Page))) }} class="on" aria-current="page"{{ end }}>{{ .Name }}</a>
+    {{- end }}
+  </nav>
+  <div class="tools">
+    <button class="search-btn" type="button" data-search><kbd>/</kbd><span class="label">Search the docs</span></button>
+    {{- with site.Params.release }}
+    <a class="chip" href="{{ site.Params.repo }}/releases/tag/{{ . }}" title="The newest release">{{ . }}</a>
+    {{- end }}
+    <button id="scheme" type="button" aria-label="Change between dark and light">◐</button>
+    <a class="ext" href="{{ site.Params.pkgsite }}">pkg.go.dev ↗</a>
+  </div>
+</header>
+<div class="shell">
+  {{ partial "side.html" . }}
+  <main id="content">
+    {{ block "main" . }}{{ end }}
+    <footer class="foot">
+      <span>Apache-2.0 · GSI Helmholtz Centre for Heavy Ion Research GmbH</span>
+      <a href="{{ site.Params.repo }}">Source on GitHub</a>
+      <a href="{{ site.Params.pkgsite }}">API reference on pkg.go.dev</a>
+      {{- with .File }}{{ if not $.Params.docfile }}
+      <a href="{{ site.Params.repo }}/blob/main/site/content/{{ .Path }}">Change this page</a>
+      {{- end }}{{ end }}
+      {{- with .Params.docfile }}
+      <a href="{{ site.Params.repo }}/blob/main/doc/{{ . }}">Change this page</a>
+      {{- end }}
+    </footer>
+  </main>
+</div>
+<dialog class="search" id="search" data-index="{{ "index.json" | relURL }}" aria-label="Search">
+  <input id="search-input" type="search" placeholder="Search: a package, a name, a task" autocomplete="off" aria-label="Search the docs">
+  <ul id="search-list"></ul>
+</dialog>
+{{- with resources.Get "js/site.js" | minify | fingerprint }}
+<script src="{{ .RelPermalink }}" integrity="{{ .Data.Integrity }}" defer></script>
+{{- end }}
+</body>
+</html>

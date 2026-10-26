@@ -1,0 +1,19 @@
+{{- /*
+SPDX-FileCopyrightText: 2026 GSI Helmholtz Centre for Heavy Ion Research GmbH <http://www.gsi.de>
+SPDX-License-Identifier: Apache-2.0
+*/ -}}
+{{- /* A link in a page of doc/ to another page of doc/ goes to that page on
+   the site; any other relative link of doc/ goes to the file on GitHub. */ -}}
+{{- $dest := .Destination }}
+{{- $doc := .Page.Params.docfile }}
+{{- if and $doc (not (strings.Contains $dest ":")) (not (hasPrefix $dest "#")) (not (hasPrefix $dest "/")) }}
+  {{- $file := index (split $dest "#") 0 }}
+  {{- $frag := strings.TrimPrefix $file $dest }}
+  {{- $clean := path.Clean (printf "doc/%s" $file) }}
+  {{- $hit := "" }}
+  {{- range site.Data.docs }}{{ if eq (printf "doc/%s" .file) $clean }}{{ $hit = printf "/%s/%s" .section .slug }}{{ end }}{{ end }}
+  {{- with $hit }}{{ with site.GetPage . }}{{ $dest = printf "%s%s" .RelPermalink $frag }}{{ end }}
+  {{- else }}{{ $dest = printf "%s/blob/main/%s%s" site.Params.repo $clean $frag }}{{ end }}
+{{- end -}}
+<a href="{{ $dest | safeURL }}"{{ with .Title }} title="{{ . }}"{{ end }}>{{ .Text }}</a>
+{{- /**/ -}}

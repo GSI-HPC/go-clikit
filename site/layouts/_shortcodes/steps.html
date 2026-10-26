@@ -1,0 +1,16 @@
+{{- /*
+SPDX-FileCopyrightText: 2026 GSI Helmholtz Centre for Heavy Ion Research GmbH <http://www.gsi.de>
+SPDX-License-Identifier: Apache-2.0
+*/ -}}
+{{- /* {{< steps caps="One.|Two.|Three." >}}<svg>…</svg>{{< /steps >}}: a
+   diagram that moves in steps. In the SVG, data-step="n" shows from step
+   n, data-only="n" at step n alone, and data-at="x,y|x,y" moves an
+   element to a place for each step. At rest, and for a reader who asks
+   for less motion, it shows the last step. */ -}}
+{{- $caps := split (.Get "caps") "|" -}}
+<figure class="steps" data-steps>
+  <div class="art">{{ .Inner | safeHTML }}</div>
+  <ol class="captions" hidden>{{ range $caps }}<li>{{ . }}</li>{{ end }}</ol>
+  <div class="ctl"><button type="button" data-act="prev" aria-label="Step back">‹</button><button type="button" data-act="play">play</button><button type="button" data-act="next" aria-label="Step forward">›</button><span aria-live="polite">{{ index $caps (sub (len $caps) 1) }}</span></div>
+</figure>
+{{- /**/ -}}

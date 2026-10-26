@@ -1,0 +1,9 @@
+{{- /*
+SPDX-FileCopyrightText: 2026 GSI Helmholtz Centre for Heavy Ion Research GmbH <http://www.gsi.de>
+SPDX-License-Identifier: Apache-2.0
+*/ -}}
+{{- /* A heading of decisions.md, "## 21. …", also answers to #decision-21,
+   which the package pages and the decision shortcode link to. */ -}}
+{{- $n := "" }}{{ if eq .Level 2 }}{{ with findRESubmatch `^(\d+)\. ` .PlainText 1 }}{{ $n = index (index . 0) 1 }}{{ end }}{{ end -}}
+{{- with $n }}<span id="decision-{{ . }}" class="target"></span>{{ end -}}
+<h{{ .Level }} id="{{ .Anchor }}">{{ .Text }}<a class="anchor" href="#{{ .Anchor }}" aria-label="Link to this section">#</a></h{{ .Level }}>

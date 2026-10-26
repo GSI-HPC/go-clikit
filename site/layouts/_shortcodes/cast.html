@@ -1,0 +1,20 @@
+{{- /*
+SPDX-FileCopyrightText: 2026 GSI Helmholtz Centre for Heavy Ion Research GmbH <http://www.gsi.de>
+SPDX-License-Identifier: Apache-2.0
+*/ -}}
+{{- /* {{< cast "tree" "tide" >}}: a recording of a display, made by
+   internal/docsite on a fake clock. Named arguments: themes="all" or a
+   list for a picker, still="last" or a frame number for the frame shown
+   at rest, title, caption, class="short". */ -}}
+{{- $themes := slice }}
+{{- if eq (.Get "themes") "all" }}{{ $themes = slice "none" "classic" "aurora" "ember" "neon" "tide" }}{{ else if .Get "themes" }}{{ $themes = split (.Get "themes") "," }}{{ end }}
+{{- $cap := "" }}{{ with .Get "caption" }}{{ $cap = . | markdownify }}{{ end }}
+{{- partial "cast.html" (dict
+  "display" (.Get "display" | default (.Get 0))
+  "theme" (.Get "theme" | default (.Get 1) | default "tide")
+  "themes" $themes
+  "still" (.Get "still")
+  "title" (.Get "title")
+  "class" (.Get "class")
+  "caption" $cap
+) -}}

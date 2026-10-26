@@ -1,0 +1,20 @@
+{{- /*
+SPDX-FileCopyrightText: 2026 GSI Helmholtz Centre for Heavy Ion Research GmbH <http://www.gsi.de>
+SPDX-License-Identifier: Apache-2.0
+*/ -}}
+{{- /* {{< releases >}}: the releases, newest first, from data/releases.json,
+   which the Pages workflow writes from the tags at build time, since
+   nothing in the tree names a version (decision 4). Without it, a link. */ -}}
+{{- with site.Data.releases }}
+{{- range . }}
+<section class="release">
+<h2 id="{{ .tag }}">{{ .tag }}<a class="anchor" href="#{{ .tag }}" aria-label="Link to this release">#</a></h2>
+<p class="facts"><span>{{ .date }}</span><a href="{{ site.Params.repo }}/releases/tag/{{ .tag }}">on GitHub</a><a href="{{ site.Params.pkgsite }}@{{ .tag }}">on pkg.go.dev</a></p>
+{{- with .title }}<p><b>{{ . }}</b></p>{{ end }}
+{{ .notes | markdownify }}
+</section>
+{{- end }}
+{{- else }}
+<p>This build of the site has no list of the releases. See <a href="{{ site.Params.repo }}/releases">the releases on GitHub</a>.</p>
+{{- end }}
+{{- /**/ -}}

@@ -1,0 +1,216 @@
+[
+	{
+		"path": "cliout",
+		"imports": [
+			"termtext"
+		],
+		"edges": [
+			"termtext"
+		],
+		"requires": []
+	},
+	{
+		"path": "cobratree",
+		"imports": [],
+		"edges": [],
+		"requires": [
+			"github.com/spf13/cobra",
+			"github.com/spf13/pflag"
+		]
+	},
+	{
+		"path": "cobratree/cobratreetest",
+		"imports": [],
+		"edges": [],
+		"requires": [
+			"github.com/spf13/cobra",
+			"github.com/spf13/pflag"
+		]
+	},
+	{
+		"path": "doctor",
+		"imports": [
+			"termtext"
+		],
+		"edges": [
+			"termtext"
+		],
+		"requires": []
+	},
+	{
+		"path": "fanout",
+		"imports": [
+			"progress"
+		],
+		"edges": [
+			"progress"
+		],
+		"requires": [
+			"github.com/GSI-HPC/go-nodeset"
+		]
+	},
+	{
+		"path": "fanout/fanouttest",
+		"imports": [],
+		"edges": [],
+		"requires": []
+	},
+	{
+		"path": "fsutil",
+		"imports": [
+			"termtext"
+		],
+		"edges": [
+			"termtext"
+		],
+		"requires": [
+			"golang.org/x/sys/unix"
+		]
+	},
+	{
+		"path": "localweb",
+		"imports": [],
+		"edges": [],
+		"requires": []
+	},
+	{
+		"path": "localweb/assets",
+		"imports": [],
+		"edges": [],
+		"requires": []
+	},
+	{
+		"path": "localweb/htmx",
+		"imports": [],
+		"edges": [],
+		"requires": []
+	},
+	{
+		"path": "localweb/launch",
+		"imports": [
+			"localweb"
+		],
+		"edges": [
+			"localweb"
+		],
+		"requires": [
+			"golang.org/x/sys/unix"
+		]
+	},
+	{
+		"path": "localweb/localwebtest",
+		"imports": [
+			"localweb/session",
+			"localweb/sse"
+		],
+		"edges": [
+			"localweb/session",
+			"localweb/sse"
+		],
+		"requires": []
+	},
+	{
+		"path": "localweb/page",
+		"imports": [],
+		"edges": [],
+		"requires": []
+	},
+	{
+		"path": "localweb/session",
+		"imports": [
+			"localweb"
+		],
+		"edges": [
+			"localweb"
+		],
+		"requires": []
+	},
+	{
+		"path": "localweb/sse",
+		"imports": [
+			"localweb"
+		],
+		"edges": [
+			"localweb"
+		],
+		"requires": []
+	},
+	{
+		"path": "progress",
+		"imports": [
+			"termtext"
+		],
+		"edges": [
+			"termtext"
+		],
+		"requires": []
+	},
+	{
+		"path": "progress/cliprogress",
+		"imports": [
+			"progress",
+			"progress/display",
+			"termtext"
+		],
+		"edges": [
+			"progress/display"
+		],
+		"requires": [
+			"golang.org/x/sys/unix"
+		]
+	},
+	{
+		"path": "progress/display",
+		"imports": [
+			"progress",
+			"termtext"
+		],
+		"edges": [
+			"progress"
+		],
+		"requires": [
+			"github.com/GSI-HPC/go-nodeset"
+		]
+	},
+	{
+		"path": "progress/eventlog",
+		"imports": [
+			"progress"
+		],
+		"edges": [
+			"progress"
+		],
+		"requires": []
+	},
+	{
+		"path": "progress/mcpprogress",
+		"imports": [
+			"progress"
+		],
+		"edges": [
+			"progress"
+		],
+		"requires": []
+	},
+	{
+		"path": "progress/progresstest",
+		"imports": [
+			"progress",
+			"termtext"
+		],
+		"edges": [
+			"progress"
+		],
+		"requires": [
+			"github.com/GSI-HPC/go-nodeset"
+		]
+	},
+	{
+		"path": "termtext",
+		"imports": [],
+		"edges": [],
+		"requires": [
+			"golang.org/x/text/width"
+		]
+	}
+]

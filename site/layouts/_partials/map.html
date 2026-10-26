@@ -1,0 +1,64 @@
+{{- /*
+SPDX-FileCopyrightText: 2026 GSI Helmholtz Centre for Heavy Ion Research GmbH <http://www.gsi.de>
+SPDX-License-Identifier: Apache-2.0
+*/ -}}
+{{- /* The map of the packages: the islands, a node for each package, and an
+   arrow for each import the map draws (site/data/imports.json, which
+   internal/docsite holds to go list). With focus, the package and its
+   neighbours stand out. */ -}}
+{{- $focus := .focus | default "" }}
+{{- $groups := partial "groups.html" . }}
+{{- $color := dict }}
+{{- range $groups }}{{ $color = merge $color (dict .id .color) }}{{ end }}
+{{- $pos := dict }}
+{{- range site.Data.packages }}{{ $pos = merge $pos (dict .path .) }}{{ end }}
+{{- $near := dict $focus true }}
+{{- range site.Data.imports }}
+  {{- $from := .path }}
+  {{- range .imports }}
+    {{- if eq $from $focus }}{{ $near = merge $near (dict . true) }}{{ end }}
+    {{- if eq . $focus }}{{ $near = merge $near (dict $from true) }}{{ end }}
+  {{- end }}
+{{- end }}
+<figure class="map{{ if .mini }} mini{{ end }}">
+<svg viewBox="0 0 1000 540" role="img" aria-labelledby="map-t{{ $focus | anchorize }}">
+  <title id="map-t{{ $focus | anchorize }}">{{ if $focus }}The place of {{ $focus }} in go-clikit: the packages it imports, and the packages that import it.{{ else }}The packages of go-clikit in four groups. An arrow goes from a package to a package it imports.{{ end }}</title>
+  <defs><marker id="arr{{ $focus | anchorize }}" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,1 L9,5 L0,9 z" fill="var(--mute)"/></marker></defs>
+  {{- range $groups }}
+  <rect x="{{ .x }}" y="{{ .y }}" width="{{ .w }}" height="{{ .h }}" rx="28" fill="{{ .color }}" fill-opacity=".07" stroke="{{ .color }}" stroke-opacity=".45"/>
+  {{- if not $.mini }}
+  <text x="{{ add .x 20 }}" y="{{ add .y 24 }}" class="isl-label" fill="{{ .color }}">{{ .label }}</text>
+  {{- end }}
+  {{- end }}
+  {{- range site.Data.imports }}
+  {{- $a := index $pos .path }}
+  {{- $from := .path }}
+  {{- range .edges }}
+  {{- $b := index $pos . }}
+  {{- $dx := sub (float $b.x) $a.x }}{{ $dy := sub (float $b.y) $a.y }}
+  {{- $len := math.Sqrt (add (mul $dx $dx) (mul $dy $dy)) }}
+  {{- $ux := div $dx $len }}{{ $uy := div $dy $len }}
+  {{- $ca := math.Min (div (add (mul (len (path.Base $from)) 4.4) 13) (math.Max (math.Abs $ux) 0.0001)) (div 16.0 (math.Max (math.Abs $uy) 0.0001)) }}
+  {{- $cb := math.Min (div (add (mul (len (path.Base .)) 4.4) 16) (math.Max (math.Abs $ux) 0.0001)) (div 19.0 (math.Max (math.Abs $uy) 0.0001)) }}
+  {{- $dim := and $focus (not (or (eq $from $focus) (eq . $focus))) }}
+  <line x1="{{ add $a.x (mul $ux $ca) }}" y1="{{ add $a.y (mul $uy $ca) }}" x2="{{ sub $b.x (mul $ux $cb) }}" y2="{{ sub $b.y (mul $uy $cb) }}" stroke="var(--mute)" stroke-width="1.4" marker-end="url(#arr{{ $focus | anchorize }})" opacity="{{ if $dim }}.2{{ else }}.9{{ end }}"/>
+  {{- end }}
+  {{- end }}
+  {{- range site.Data.packages }}
+  {{- $name := path.Base .path }}
+  {{- $w := add (mul (len $name) 8.8) 24 }}
+  {{- $on := eq .path $focus }}
+  {{- $dim := and $focus (not (index $near .path)) }}
+  {{- $c := index $color .group }}
+  {{- with site.GetPage (printf "/packages/%s" $name) }}<a href="{{ .RelPermalink }}" aria-label="{{ .Params.import }}">{{ end }}
+  <g opacity="{{ if $dim }}.4{{ else }}1{{ end }}">
+    <rect x="{{ sub .x (div $w 2) }}" y="{{ sub .y 15 }}" width="{{ $w }}" height="30" rx="15" fill="{{ if $on }}{{ $c }}{{ else }}var(--ink){{ end }}" stroke="{{ $c }}" stroke-width="1.5"/>
+    <text x="{{ .x }}" y="{{ add .y 4.5 }}" text-anchor="middle" class="nm" fill="{{ if $on }}var(--ink){{ else }}var(--fg){{ end }}">{{ $name }}</text>
+  </g>
+  {{- with site.GetPage (printf "/packages/%s" $name) }}</a>{{ end }}
+  {{- end }}
+</svg>
+{{- if not .mini }}
+<figcaption class="legend">{{ range $groups }}<b style="--c: {{ .color }}">{{ .name }}</b>{{ end }}<span>→ imports</span></figcaption>
+{{- end }}
+</figure>

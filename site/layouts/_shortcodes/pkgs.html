@@ -1,0 +1,13 @@
+{{- /*
+SPDX-FileCopyrightText: 2026 GSI Helmholtz Centre for Heavy Ion Research GmbH <http://www.gsi.de>
+SPDX-License-Identifier: Apache-2.0
+*/ -}}
+{{- /* {{< pkgs "progress" "fanout" >}}: cards for some packages. */ -}}
+<nav class="cards">
+{{- range .Params }}
+{{- with site.GetPage (printf "/packages/%s" (path.Base .)) }}
+<a href="{{ .RelPermalink }}"><b>{{ .Params.import }}</b><span>{{ .Description }}</span></a>
+{{- end }}
+{{- end }}
+</nav>
+{{- /**/ -}}

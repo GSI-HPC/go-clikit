@@ -1,0 +1,159 @@
+{
+	"display": "plain",
+	"theme": "none",
+	"width": 100,
+	"frames": [
+		{
+			"t": 0.5,
+			"text": "[0:00] reinstall › fetching the base image: start\n"
+		},
+		{
+			"t": 1,
+			"text": "[0:00] reinstall › fetching the base image: start\n"
+		},
+		{
+			"t": 1.5,
+			"text": "[0:00] reinstall › fetching the base image: start\n"
+		},
+		{
+			"t": 2,
+			"text": "[0:00] reinstall › fetching the base image: start\n"
+		},
+		{
+			"t": 2.5,
+			"text": "[0:00] reinstall › fetching the base image: start\n"
+		},
+		{
+			"t": 3,
+			"text": "[0:00] reinstall › fetching the base image: start\n"
+		},
+		{
+			"t": 3.5,
+			"text": "[0:00] reinstall › fetching the base image: start\n"
+		},
+		{
+			"t": 4,
+			"text": "[0:00] reinstall › fetching the base image: start\n"
+		},
+		{
+			"t": 4.5,
+			"text": "[0:00] reinstall › fetching the base image: start\n"
+		},
+		{
+			"t": 5,
+			"text": "[0:00] reinstall › fetching the base image: start\n"
+		},
+		{
+			"t": 5.3,
+			"text": "[0:00] reinstall › fetching the base image: start\n[0:05] reinstall › fetching the base image: done in 5.0s: 2.0 GiB at 410 MiB/s\n"
+		},
+		{
+			"t": 5.5,
+			"text": "[0:00] reinstall › fetching the base image: start\n[0:05] reinstall › fetching the base image: done in 5.0s: 2.0 GiB at 410 MiB/s\n[0:05] reinstall › reinstalling the nodes: start, 12 targets, 4 at a time\n"
+		},
+		{
+			"t": 5.9,
+			"text": "[0:00] reinstall › fetching the base image: start\n[0:05] reinstall › fetching the base image: done in 5.0s: 2.0 GiB at 410 MiB/s\n[0:05] reinstall › reinstalling the nodes: start, 12 targets, 4 at a time\n"
+		},
+		{
+			"t": 6.3,
+			"text": "[0:00] reinstall › fetching the base image: start\n[0:05] reinstall › fetching the base image: done in 5.0s: 2.0 GiB at 410 MiB/s\n[0:05] reinstall › reinstalling the nodes: start, 12 targets, 4 at a time\n"
+		},
+		{
+			"t": 6.6,
+			"text": "[0:00] reinstall › fetching the base image: start\n[0:05] reinstall › fetching the base image: done in 5.0s: 2.0 GiB at 410 MiB/s\n[0:05] reinstall › reinstalling the nodes: start, 12 targets, 4 at a time\n"
+		},
+		{
+			"t": 7,
+			"text": "[0:00] reinstall › fetching the base image: start\n[0:05] reinstall › fetching the base image: done in 5.0s: 2.0 GiB at 410 MiB/s\n[0:05] reinstall › reinstalling the nodes: start, 12 targets, 4 at a time\n"
+		},
+		{
+			"t": 7.3,
+			"text": "[0:00] reinstall › fetching the base image: start\n[0:05] reinstall › fetching the base image: done in 5.0s: 2.0 GiB at 410 MiB/s\n[0:05] reinstall › reinstalling the nodes: start, 12 targets, 4 at a time\n"
+		},
+		{
+			"t": 7.7,
+			"text": "[0:00] reinstall › fetching the base image: start\n[0:05] reinstall › fetching the base image: done in 5.0s: 2.0 GiB at 410 MiB/s\n[0:05] reinstall › reinstalling the nodes: start, 12 targets, 4 at a time\n"
+		},
+		{
+			"t": 8,
+			"text": "[0:00] reinstall › fetching the base image: start\n[0:05] reinstall › fetching the base image: done in 5.0s: 2.0 GiB at 410 MiB/s\n[0:05] reinstall › reinstalling the nodes: start, 12 targets, 4 at a time\n"
+		},
+		{
+			"t": 8.4,
+			"text": "[0:00] reinstall › fetching the base image: start\n[0:05] reinstall › fetching the base image: done in 5.0s: 2.0 GiB at 410 MiB/s\n[0:05] reinstall › reinstalling the nodes: start, 12 targets, 4 at a time\n"
+		},
+		{
+			"t": 8.7,
+			"text": "[0:00] reinstall › fetching the base image: start\n[0:05] reinstall › fetching the base image: done in 5.0s: 2.0 GiB at 410 MiB/s\n[0:05] reinstall › reinstalling the nodes: start, 12 targets, 4 at a time\n"
+		},
+		{
+			"t": 9.1,
+			"text": "[0:00] reinstall › fetching the base image: start\n[0:05] reinstall › fetching the base image: done in 5.0s: 2.0 GiB at 410 MiB/s\n[0:05] reinstall › reinstalling the nodes: start, 12 targets, 4 at a time\n"
+		},
+		{
+			"t": 9.4,
+			"text": "[0:00] reinstall › fetching the base image: start\n[0:05] reinstall › fetching the base image: done in 5.0s: 2.0 GiB at 410 MiB/s\n[0:05] reinstall › reinstalling the nodes: start, 12 targets, 4 at a time\n"
+		},
+		{
+			"t": 9.8,
+			"text": "[0:00] reinstall › fetching the base image: start\n[0:05] reinstall › fetching the base image: done in 5.0s: 2.0 GiB at 410 MiB/s\n[0:05] reinstall › reinstalling the nodes: start, 12 targets, 4 at a time\n"
+		},
+		{
+			"t": 10.1,
+			"text": "[0:00] reinstall › fetching the base image: start\n[0:05] reinstall › fetching the base image: done in 5.0s: 2.0 GiB at 410 MiB/s\n[0:05] reinstall › reinstalling the nodes: start, 12 targets, 4 at a time\n"
+		},
+		{
+			"t": 10.5,
+			"text": "[0:00] reinstall › fetching the base image: start\n[0:05] reinstall › fetching the base image: done in 5.0s: 2.0 GiB at 410 MiB/s\n[0:05] reinstall › reinstalling the nodes: start, 12 targets, 4 at a time\n"
+		},
+		{
+			"t": 10.8,
+			"text": "[0:00] reinstall › fetching the base image: start\n[0:05] reinstall › fetching the base image: done in 5.0s: 2.0 GiB at 410 MiB/s\n[0:05] reinstall › reinstalling the nodes: start, 12 targets, 4 at a time\n[0:10] reinstall › reinstalling the nodes › exe07 failed (target): BMC answered 503\n"
+		},
+		{
+			"t": 11.2,
+			"text": "[0:00] reinstall › fetching the base image: start\n[0:05] reinstall › fetching the base image: done in 5.0s: 2.0 GiB at 410 MiB/s\n[0:05] reinstall › reinstalling the nodes: start, 12 targets, 4 at a time\n[0:10] reinstall › reinstalling the nodes › exe07 failed (target): BMC answered 503\n"
+		},
+		{
+			"t": 11.5,
+			"text": "[0:00] reinstall › fetching the base image: start\n[0:05] reinstall › fetching the base image: done in 5.0s: 2.0 GiB at 410 MiB/s\n[0:05] reinstall › reinstalling the nodes: start, 12 targets, 4 at a time\n[0:10] reinstall › reinstalling the nodes › exe07 failed (target): BMC answered 503\n"
+		},
+		{
+			"t": 11.9,
+			"text": "[0:00] reinstall › fetching the base image: start\n[0:05] reinstall › fetching the base image: done in 5.0s: 2.0 GiB at 410 MiB/s\n[0:05] reinstall › reinstalling the nodes: start, 12 targets, 4 at a time\n[0:10] reinstall › reinstalling the nodes › exe07 failed (target): BMC answered 503\n"
+		},
+		{
+			"t": 12.2,
+			"text": "[0:00] reinstall › fetching the base image: start\n[0:05] reinstall › fetching the base image: done in 5.0s: 2.0 GiB at 410 MiB/s\n[0:05] reinstall › reinstalling the nodes: start, 12 targets, 4 at a time\n[0:10] reinstall › reinstalling the nodes › exe07 failed (target): BMC answered 503\n"
+		},
+		{
+			"t": 12.6,
+			"text": "[0:00] reinstall › fetching the base image: start\n[0:05] reinstall › fetching the base image: done in 5.0s: 2.0 GiB at 410 MiB/s\n[0:05] reinstall › reinstalling the nodes: start, 12 targets, 4 at a time\n[0:10] reinstall › reinstalling the nodes › exe07 failed (target): BMC answered 503\n"
+		},
+		{
+			"t": 12.9,
+			"text": "[0:00] reinstall › fetching the base image: start\n[0:05] reinstall › fetching the base image: done in 5.0s: 2.0 GiB at 410 MiB/s\n[0:05] reinstall › reinstalling the nodes: start, 12 targets, 4 at a time\n[0:10] reinstall › reinstalling the nodes › exe07 failed (target): BMC answered 503\n"
+		},
+		{
+			"t": 13.3,
+			"text": "[0:00] reinstall › fetching the base image: start\n[0:05] reinstall › fetching the base image: done in 5.0s: 2.0 GiB at 410 MiB/s\n[0:05] reinstall › reinstalling the nodes: start, 12 targets, 4 at a time\n[0:10] reinstall › reinstalling the nodes › exe07 failed (target): BMC answered 503\n"
+		},
+		{
+			"t": 13.6,
+			"text": "[0:00] reinstall › fetching the base image: start\n[0:05] reinstall › fetching the base image: done in 5.0s: 2.0 GiB at 410 MiB/s\n[0:05] reinstall › reinstalling the nodes: start, 12 targets, 4 at a time\n[0:10] reinstall › reinstalling the nodes › exe07 failed (target): BMC answered 503\n"
+		},
+		{
+			"t": 14,
+			"text": "[0:00] reinstall › fetching the base image: start\n[0:05] reinstall › fetching the base image: done in 5.0s: 2.0 GiB at 410 MiB/s\n[0:05] reinstall › reinstalling the nodes: start, 12 targets, 4 at a time\n[0:10] reinstall › reinstalling the nodes › exe07 failed (target): BMC answered 503\n"
+		},
+		{
+			"t": 14.3,
+			"text": "[0:00] reinstall › fetching the base image: start\n[0:05] reinstall › fetching the base image: done in 5.0s: 2.0 GiB at 410 MiB/s\n[0:05] reinstall › reinstalling the nodes: start, 12 targets, 4 at a time\n[0:10] reinstall › reinstalling the nodes › exe07 failed (target): BMC answered 503\n"
+		},
+		{
+			"t": 14.5,
+			"text": "[0:00] reinstall › fetching the base image: start\n[0:05] reinstall › fetching the base image: done in 5.0s: 2.0 GiB at 410 MiB/s\n[0:05] reinstall › reinstalling the nodes: start, 12 targets, 4 at a time\n[0:10] reinstall › reinstalling the nodes › exe07 failed (target): BMC answered 503\n[0:14] reinstall › reinstalling the nodes: failed in 9.0s: 11 ok, 1 failed\nreinstall: failed in 14s: 11 ok, 1 failed, 2.0 GiB at 143 MiB/s\n"
+		}
+	]
+}

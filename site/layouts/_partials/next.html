@@ -1,0 +1,13 @@
+{{- /*
+SPDX-FileCopyrightText: 2026 GSI Helmholtz Centre for Heavy Ion Research GmbH <http://www.gsi.de>
+SPDX-License-Identifier: Apache-2.0
+*/ -}}
+{{- with .Params.next }}
+<nav class="next" aria-label="Next pages">
+  {{- range . }}
+  {{- with site.GetPage . }}
+  <a href="{{ .RelPermalink }}"><small>{{ .Section }}</small>{{ .LinkTitle }}</a>
+  {{- end }}
+  {{- end }}
+</nav>
+{{- end }}

@@ -1,0 +1,21 @@
+{{- /*
+SPDX-FileCopyrightText: 2026 GSI Helmholtz Centre for Heavy Ion Research GmbH <http://www.gsi.de>
+SPDX-License-Identifier: Apache-2.0
+*/ -}}
+{{ define "main" }}
+{{ partial "pagehead.html" . }}
+<div class="prose" style="max-width: none">
+  <div style="max-width: 760px">{{ .Content }}</div>
+  {{ partial "map.html" (dict) }}
+  {{- range $g := partial "groups.html" . }}
+  <h2>{{ $g.name }}</h2>
+  <nav class="cards" aria-label="{{ $g.name }}">
+    {{- range where site.Data.packages "group" $g.id }}
+    {{- with site.GetPage (printf "/packages/%s" (path.Base .path)) }}
+    <a href="{{ .RelPermalink }}"><b>{{ .Params.import }}</b><span>{{ .Description }}</span></a>
+    {{- end }}
+    {{- end }}
+  </nav>
+  {{- end }}
+</div>
+{{ end }}

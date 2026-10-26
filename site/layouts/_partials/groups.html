@@ -1,0 +1,11 @@
+{{- /*
+SPDX-FileCopyrightText: 2026 GSI Helmholtz Centre for Heavy Ion Research GmbH <http://www.gsi.de>
+SPDX-License-Identifier: Apache-2.0
+*/ -}}
+{{- /* The islands of the map: where each group of packages is drawn. */ -}}
+{{- return slice
+  (dict "id" "progress" "name" "progress & output" "label" "PROGRESS & OUTPUT" "x" 30 "y" 30 "w" 570 "h" 400 "color" "var(--isl-progress)")
+  (dict "id" "files" "name" "files" "label" "FILES" "x" 30 "y" 455 "w" 570 "h" 70 "color" "var(--isl-files)")
+  (dict "id" "command" "name" "command line" "label" "COMMAND LINE" "x" 630 "y" 30 "w" 340 "h" 130 "color" "var(--isl-command)")
+  (dict "id" "web" "name" "local web" "label" "LOCAL WEB" "x" 630 "y" 185 "w" 340 "h" 340 "color" "var(--isl-web)")
+-}}

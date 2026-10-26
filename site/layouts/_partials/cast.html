@@ -1,0 +1,20 @@
+{{- /*
+SPDX-FileCopyrightText: 2026 GSI Helmholtz Centre for Heavy Ion Research GmbH <http://www.gsi.de>
+SPDX-License-Identifier: Apache-2.0
+*/ -}}
+{{- /* A recording of a display (see the cast shortcode). */ -}}
+<figure class="term{{ with .class }} {{ . }}{{ end }}" data-cast="{{ .display }}" data-theme="{{ .theme }}" data-base="{{ "casts/" | relURL }}" data-still="{{ .still | default (index (dict "tree" "25" "counter" "20" "plain" "last") .display) }}">
+  <div class="bar"><i></i><i></i><i></i><em>{{ .title | default (printf "reinstall exe[01-12] --progress=%s" (cond (eq .display "tree") "tty" .display)) }}</em>
+    {{- with .themes }}
+    <select aria-label="Theme">{{ range . }}<option value="{{ . }}"{{ if eq . $.theme }} selected{{ end }}>{{ cond (eq . "none") "zero Theme" . }}</option>{{ end }}</select>
+    {{- end }}
+    <button type="button" data-act="play">play</button>
+  </div>
+  {{- /* The still frame, without its colours, for a reader without the script. */}}
+  {{- $rec := os.ReadFile (printf "static/casts/%s-%s.json" .display .theme) | transform.Unmarshal }}
+  {{- $still := .still | default (index (dict "tree" "25" "counter" "20" "plain" "last") .display) }}
+  {{- $n := len $rec.frames }}
+  {{- $i := sub $n 1 }}{{ if ne $still "last" }}{{ $i = math.Min (int $still) $i }}{{ end }}
+  <pre aria-label="Recording of the {{ .display }} display">{{ replaceRE `«[^»]*»` "" (index $rec.frames (int $i)).text }}</pre>
+  {{- with .caption }}<figcaption>{{ . | safeHTML }}</figcaption>{{ end }}
+</figure>

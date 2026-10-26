@@ -1,0 +1,22 @@
+{{- /*
+SPDX-FileCopyrightText: 2026 GSI Helmholtz Centre for Heavy Ion Research GmbH <http://www.gsi.de>
+SPDX-License-Identifier: Apache-2.0
+*/ -}}
+{{ define "main" }}
+<section class="hero">
+  <div>
+    <p class="eyebrow">Go module · Apache-2.0 · {{ with site.Params.release }}{{ . }} · {{ end }}API on pkg.go.dev</p>
+    <h1>{{ .Params.headline }}</h1>
+    <p class="lede">{{ .Description }}</p>
+    <div class="cta">
+      <a class="btn primary" href="{{ "tour/" | relURL }}">Take the tour</a>
+      <a class="btn" href="{{ "packages/" | relURL }}">See the packages</a>
+    </div>
+    <p class="install"><span>$</span><code>go get {{ site.Params.module }}/progress</code><button type="button" data-copy="go get {{ site.Params.module }}/progress">copy</button></p>
+  </div>
+  {{ partial "cast.html" (dict "display" "tree" "theme" "tide" "themes" (slice "none" "classic" "aurora" "ember" "neon" "tide") "caption" "Recorded from <code>progress/display</code> on a fake clock, by a test of the kit. Pick a theme." "still" "25") }}
+</section>
+<div class="prose" style="max-width: none">
+  {{ .Content }}
+</div>
+{{ end }}
