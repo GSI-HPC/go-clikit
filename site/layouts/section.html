@@ -5,8 +5,8 @@ SPDX-License-Identifier: Apache-2.0
 {{ define "main" }}
 {{ partial "pagehead.html" . }}
 <div class="doc wide">
-  <article class="prose" style="max-width: none">
-    <div style="max-width: 760px">{{ .Content }}</div>
+  <article class="prose">
+    {{ .Content }}
     <nav class="cards" aria-label="{{ .Title }}">
       {{- range .Pages.ByWeight }}
       <a href="{{ .RelPermalink }}"><b>{{ .LinkTitle }}</b><span>{{ .Description }}</span></a>

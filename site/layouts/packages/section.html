@@ -4,8 +4,8 @@ SPDX-License-Identifier: Apache-2.0
 */ -}}
 {{ define "main" }}
 {{ partial "pagehead.html" . }}
-<div class="prose" style="max-width: none">
-  <div style="max-width: 760px">{{ .Content }}</div>
+<div class="prose">
+  {{ .Content }}
   {{ partial "map.html" (dict) }}
   {{- range $g := partial "groups.html" . }}
   <h2>{{ $g.name }}</h2>

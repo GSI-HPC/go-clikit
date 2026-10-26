@@ -9,7 +9,7 @@ SPDX-License-Identifier: Apache-2.0
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>{{ if .IsHome }}{{ site.Title }}: {{ site.Params.description | truncate 70 }}{{ else }}{{ .Title }} · {{ site.Title }}{{ end }}</title>
 <meta name="description" content="{{ with .Description }}{{ . }}{{ else }}{{ site.Params.description }}{{ end }}">
-<script>try { var s = localStorage.getItem('scheme'); if (s) document.documentElement.dataset.theme = s; } catch (e) {}</script>
+<script>try { var d = document.documentElement.dataset, s = localStorage.getItem('scheme'), w = localStorage.getItem('width'); if (s) d.theme = s; if (w) d.width = w; } catch (e) {}</script>
 {{- with resources.Get "css/site.css" | minify | fingerprint }}
 <link rel="stylesheet" href="{{ .RelPermalink }}" integrity="{{ .Data.Integrity }}">
 {{- end }}
@@ -31,13 +31,14 @@ SPDX-License-Identifier: Apache-2.0
     {{- with site.Params.release }}
     <a class="chip" href="{{ site.Params.repo }}/releases/tag/{{ . }}" title="The newest release">{{ . }}</a>
     {{- end }}
+    <button id="width" type="button" aria-label="Change the width of the page" title="Page width: normal">↔</button>
     <button id="scheme" type="button" aria-label="Change between dark and light">◐</button>
     <a class="ext" href="{{ site.Params.pkgsite }}">pkg.go.dev ↗</a>
   </div>
 </header>
 <div class="shell">
   {{ partial "side.html" . }}
-  <main id="content">
+  <main id="content"><div class="page">
     {{ block "main" . }}{{ end }}
     <footer class="foot">
       <span>Apache-2.0 · GSI Helmholtz Centre for Heavy Ion Research GmbH</span>
@@ -50,7 +51,7 @@ SPDX-License-Identifier: Apache-2.0
       <a href="{{ site.Params.repo }}/blob/main/doc/{{ . }}">Change this page</a>
       {{- end }}
     </footer>
-  </main>
+  </div></main>
 </div>
 <dialog class="search" id="search" data-index="{{ "index.json" | relURL }}" aria-label="Search">
   <input id="search-input" type="search" placeholder="Search: a package, a name, a task" autocomplete="off" aria-label="Search the docs">
