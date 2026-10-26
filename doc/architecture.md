@@ -51,9 +51,9 @@ strict and to read the build info
 | `fanout/fanouttest` | `InFlight`, which counts the calls a test's fake is in the middle of, and holds them to prove a limit | none |
 | `cliout` | `Table`, a command's result in columns aligned by the columns a terminal gives them, and `WriteJSON`, every cell and string escaped | `termtext` |
 | `doctor` | `Check`, one check of a doctor command, with its `Status`, `ok`, `warning` or `failed`; `Worst` and `Count`; and `Write`, which writes the checks for a person in a text that is an interface | `termtext` |
-| `fsutil` | `WriteAtomic`, which replaces a file whole or not at all; `Lock`, a lock beside a file that several processes share, and `Update`, a change of the file under it; `EnsureDir` and `CheckTrusted`, which refuse a directory or a file that another user could have written | `golang.org/x/sys`, where the lock needs it |
+| `fsutil` | `WriteAtomic`, which replaces a file whole or not at all; `Lock`, a lock beside a file that several processes share, and `Update`, a change of the file under it; `EnsureDir` and `CheckTrusted`, which refuse a directory or a file that another user could have written | `termtext`, on Linux, to escape the name of a lock's holder; `golang.org/x/sys`, where the lock needs it |
 | `cobratree` | `Strict`, which makes a cobra command tree strict about its command line, the usage errors and the words of a flag's value refused, exit statuses carried by errors, help topics, and the build info | cobra, pflag |
-| `cobratree/cobratreetest` | `Run`, which runs a command tree in a test and keeps its standard output and standard error apart, and `CheckCommandLines`, which checks the command lines of a manual against the tree | `cobratree`, cobra, pflag |
+| `cobratree/cobratreetest` | `Run`, which runs a command tree in a test and keeps its standard output and standard error apart, and `CheckCommandLines`, which checks the command lines of a manual against the tree | cobra, pflag |
 | `localweb` | `Listen`, which binds a loopback address or a private Unix socket, `PeerListener`, which closes another user's connections, `ListenerOwner`, which names the user of a listening socket, the checks `Hosts`, `SameOrigin` and `Headers`, `Serve`, which serves with every timeout set, and `Stopping`, which tells a handler that waits that the server stops | none |
 | `localweb/session` | `Manager`, which exchanges the launch token for a session cookie and holds each session's CSRF token, and `NewToken` | `localweb` |
 | `localweb/sse` | `Notifier` and `Subscription`, which tell a stream the exact topics that changed, and `Serve`, which streams a page's fragments as Server-Sent Events, every one first and then those that changed, until `localweb.Serve` starts to stop | `localweb` |
@@ -67,9 +67,9 @@ Every arrow points down the table: nothing imports `cliprogress`,
 `progresstest`, `mcpprogress`, `eventlog` or `fanout`, only `cliprogress` imports `display`,
 `progress` imports only `termtext`, and `termtext` only
 `golang.org/x/text`. `cliout` and `doctor` import only `termtext`, and
-`fsutil` no package of the kit. `cobratree` stands
-apart: it imports no package of the kit, and none imports it but
-`cobratree/cobratreetest`. A library imports `progress`, and `fanout` when
+`fsutil` too, on Linux, where it names the holder of a lock. `cobratree`
+stands apart: it imports no package of the kit, and none imports it, not
+even `cobratree/cobratreetest`, which takes a cobra command. A library imports `progress`, and `fanout` when
 it works on many items; the command imports `cliprogress`, or `display`
 when it picks its displays by a rule of its own, an MCP server
 `mcpprogress`, a program that reads back the event log it or a child
