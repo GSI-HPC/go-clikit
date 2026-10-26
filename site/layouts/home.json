@@ -1,0 +1,14 @@
+{{- /*
+SPDX-FileCopyrightText: 2026 GSI Helmholtz Centre for Heavy Ion Research GmbH <http://www.gsi.de>
+SPDX-License-Identifier: Apache-2.0
+*/ -}}
+{{- /* The index the search reads. */ -}}
+{{- $out := slice }}
+{{- range site.Pages }}
+{{- if not .IsHome }}
+{{- $heads := slice }}
+{{- range .Fragments.HeadingsMap }}{{ $heads = $heads | append .Title }}{{ end }}
+{{- $out = $out | append (dict "title" (cond (isset .Params "import") .Params.import .Title) "url" .RelPermalink "section" (.Section | default "home") "summary" (.Description | default "") "text" (printf "%s %s" (delimit $heads " ") (.Plain | truncate 1500))) }}
+{{- end }}
+{{- end }}
+{{- $out | jsonify }}

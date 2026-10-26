@@ -72,6 +72,18 @@ reuse:
 lint-docs:
 	npx --yes markdownlint-cli2 "**/*.md" ".agents/**/*.md" "#node_modules" "#.claude"
 
+## site: check the documentation site against the code and build it into site/public (needs hugo)
+.PHONY: site
+site:
+	$(GO) test ./internal/docsite
+	python3 site/releases.py > site/data/releases.json
+	HUGO_PARAMS_RELEASE=$$(git describe --tags --abbrev=0 --match 'v*' 2>/dev/null) hugo --source site --minify
+
+## site-recordings: write the recordings and the map of the site anew from the code
+.PHONY: site-recordings
+site-recordings:
+	$(GO) test ./internal/docsite -update
+
 ## test-release: test the release tag verification against scratch tags
 .PHONY: test-release
 test-release:
@@ -81,6 +93,7 @@ test-release:
 .PHONY: clean
 clean:
 	rm -f $(COVER) coverage.html
+	rm -rf site/public site/resources site/data/releases.json
 
 ## help: list the available targets
 .PHONY: help

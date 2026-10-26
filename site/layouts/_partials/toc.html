@@ -1,0 +1,15 @@
+{{- /*
+SPDX-FileCopyrightText: 2026 GSI Helmholtz Centre for Heavy Ion Research GmbH <http://www.gsi.de>
+SPDX-License-Identifier: Apache-2.0
+*/ -}}
+<aside class="toc">
+  {{- if gt (len .Fragments.Headings) 0 }}
+  <p>On this page</p>
+  {{ .TableOfContents }}
+  {{- end }}
+  {{- with .Params.import }}
+  <a class="api" href="{{ site.Params.pkgsite }}/{{ . }}">Every name of {{ path.Base . }}, with its examples, is on pkg.go.dev ↗</a>
+  {{- else }}
+  <a class="api" href="{{ site.Params.pkgsite }}">Every name, with its examples, is on pkg.go.dev ↗</a>
+  {{- end }}
+</aside>

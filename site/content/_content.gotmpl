@@ -1,0 +1,19 @@
+{{- /*
+SPDX-FileCopyrightText: 2026 GSI Helmholtz Centre for Heavy Ion Research GmbH <http://www.gsi.de>
+SPDX-License-Identifier: Apache-2.0
+*/ -}}
+{{- /* The documents of doc/, shown as they are (site/data/docs.json). The
+   SPDX comment and the first heading are left out: the page draws its own
+   title. */ -}}
+{{- range site.Data.docs }}
+  {{- $src := resources.Get (printf "doc/%s" .file) }}
+  {{- if not $src }}{{ errorf "no doc/%s" .file }}{{ end }}
+  {{- $text := replaceRE `(?s)^(<!--.*?-->\s*)*# [^\n]*\n` "" $src.Content }}
+  {{- $.AddPage (dict
+    "path" (printf "%s/%s" .section .slug)
+    "title" .title
+    "weight" .weight
+    "params" (dict "docfile" .file "description" .summary)
+    "content" (dict "mediaType" "text/markdown" "value" $text)
+  ) }}
+{{- end }}

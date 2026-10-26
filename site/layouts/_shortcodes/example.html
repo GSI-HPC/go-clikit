@@ -1,0 +1,45 @@
+{{- /*
+SPDX-FileCopyrightText: 2026 GSI Helmholtz Centre for Heavy Ion Research GmbH <http://www.gsi.de>
+SPDX-License-Identifier: Apache-2.0
+*/ -}}
+{{- /* {{< example "progress/display" "ExampleNewTree" >}}: an Example function
+   of a package, read from its example_test.go, with its output, or a
+   helper of the examples, whole. The tests run the examples, so the code
+   on the page compiles and prints what it says. internal/docsite checks
+   that the function is there. */ -}}
+{{- $pkg := .Get 0 }}{{ $fn := .Get 1 }}
+{{- $src := resources.Get (printf "src/%s/example_test.go" $pkg) }}
+{{- if not $src }}{{ errorf "example: no example_test.go in %s (%s)" $pkg .Position }}{{ end }}
+{{- $found := findRE (printf `(?s)\n(?://[^\n]*\n)*func %s\([^\n]*\{\n.*?\n\}\n` $fn) $src.Content 1 }}
+{{- if not $found }}{{ errorf "example: no %s in %s (%s)" $fn $pkg .Position }}{{ end }}
+{{- $whole := strings.Trim (index $found 0) "\n" }}
+{{- if hasPrefix $fn "Example" }}
+  {{- $body := replaceRE `(?s)^(?://[^\n]*\n)*func [^\n]*\n(.*)\n\}$` "$1" $whole }}
+  {{- $parts := split $body "\t// Output:" }}
+  {{- $code := replaceRE `(?m)^\t` "" (index $parts 0) | strings.TrimRight "\n" }}
+  {{- $suffix := strings.TrimPrefix "Example" $fn }}
+  {{- $anchor := "package" }}
+  {{- with $suffix }}
+    {{- $bits := split . "_" }}
+    {{- $anchor = index $bits 0 }}
+    {{- range after 1 $bits }}{{ if eq (substr . 0 1) (upper (substr . 0 1)) }}{{ $anchor = printf "%s.%s" $anchor . }}{{ else }}{{ $anchor = printf "%s-%s" $anchor (title .) }}{{ end }}{{ end }}
+  {{- end }}
+<figure class="fig example">
+{{ highlight $code "go" "" }}
+  {{- if gt (len $parts) 1 }}
+  {{- $out := strings.Trim (replaceRE `(?m)^\t// ?` "" (index $parts 1)) "\n" }}
+<pre class="out" aria-label="Output"><code>{{ $out }}</code></pre>
+  {{- end }}
+{{- if hasPrefix $pkg "internal/" }}
+<figcaption><code>{{ $fn }}</code> in <a href="{{ site.Params.repo }}/blob/main/{{ $pkg }}/example_test.go"><code>{{ $pkg }}/example_test.go</code></a>. CI {{ if gt (len $parts) 1 }}runs it and checks its output{{ else }}compiles it{{ end }}.</figcaption>
+{{- else }}
+<figcaption><a href="{{ site.Params.pkgsite }}/{{ $pkg }}#example-{{ $anchor }}">{{ $fn }}</a> in <code>{{ $pkg }}/example_test.go</code>. CI {{ if gt (len $parts) 1 }}runs it and checks its output{{ else }}compiles it{{ end }}.</figcaption>
+{{- end }}
+</figure>
+{{- else }}
+<figure class="fig example">
+{{ highlight $whole "go" "" }}
+<figcaption><code>{{ $fn }}</code> in <a href="{{ site.Params.repo }}/blob/main/{{ $pkg }}/example_test.go"><code>{{ $pkg }}/example_test.go</code></a>, which the examples of the package call.</figcaption>
+</figure>
+{{- end }}
+{{- /**/ -}}

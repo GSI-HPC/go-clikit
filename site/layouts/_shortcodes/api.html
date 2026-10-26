@@ -1,0 +1,11 @@
+{{- /*
+SPDX-FileCopyrightText: 2026 GSI Helmholtz Centre for Heavy Ion Research GmbH <http://www.gsi.de>
+SPDX-License-Identifier: Apache-2.0
+*/ -}}
+{{- /* {{< api "progress" "Span.End" >}}: a link to a name on pkg.go.dev,
+   which internal/docsite checks the package has. A third argument is the
+   text of the link. */ -}}
+{{- $pkg := .Get 0 }}{{ $name := .Get 1 }}
+{{- $text := .Get 2 | default (cond (eq $name "") $pkg (printf "%s.%s" (path.Base $pkg) $name)) -}}
+<a href="{{ site.Params.pkgsite }}/{{ $pkg }}{{ with $name }}#{{ . }}{{ end }}"><code>{{ $text }}</code></a>
+{{- /**/ -}}

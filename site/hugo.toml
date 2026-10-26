@@ -1,0 +1,70 @@
+# SPDX-FileCopyrightText: 2026 GSI Helmholtz Centre for Heavy Ion Research GmbH <http://www.gsi.de>
+# SPDX-License-Identifier: Apache-2.0
+#
+# The documentation site (doc/decisions.md, decision 48). It complements
+# pkg.go.dev, which stays the API reference. Build it with "make site".
+
+baseURL = "https://gsi-hpc.github.io/go-clikit/"
+languageCode = "en-GB"
+title = "go-clikit"
+disableKinds = ["taxonomy", "term", "rss"]
+enableGitInfo = false
+
+[params]
+module = "github.com/GSI-HPC/go-clikit"
+repo = "https://github.com/GSI-HPC/go-clikit"
+pkgsite = "https://pkg.go.dev/github.com/GSI-HPC/go-clikit"
+description = "The runtime that GSI-HPC's command-line tools share: progress as spans, displays, bounded pools, strict command lines and a guarded local web server."
+
+[markup.goldmark.renderer]
+# The pages draw their figures in inline HTML and SVG.
+unsafe = true
+[markup.goldmark.parser]
+# The anchors GitHub gives the headings of doc/, which its links use.
+autoHeadingIDType = "github"
+[markup.highlight]
+noClasses = false
+[markup.tableOfContents]
+startLevel = 2
+endLevel = 2
+
+[outputs]
+home = ["html", "json"]
+
+[[menus.main]]
+name = "Tour"
+pageRef = "/tour"
+weight = 1
+[[menus.main]]
+name = "Concepts"
+pageRef = "/concepts"
+weight = 2
+[[menus.main]]
+name = "Guides"
+pageRef = "/guides"
+weight = 3
+[[menus.main]]
+name = "Packages"
+pageRef = "/packages"
+weight = 4
+[[menus.main]]
+name = "Reference"
+pageRef = "/reference"
+weight = 5
+
+# The pages of doc/ are shown as they are, so that each text has one
+# source; the examples are read from the packages' own tests.
+[[module.mounts]]
+source = "content"
+target = "content"
+[[module.mounts]]
+source = "assets"
+target = "assets"
+[[module.mounts]]
+source = "../doc"
+target = "assets/doc"
+includeFiles = ["*.md"]
+[[module.mounts]]
+source = ".."
+target = "assets/src"
+includeFiles = ["**/example_test.go"]

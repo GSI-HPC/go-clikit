@@ -25,3 +25,10 @@ coverage.html
 
 # Markdown linting
 node_modules/
+
+# The documentation site as Hugo builds it, and the list of releases that
+# make site writes from the tags
+/site/public/
+/site/resources/
+/site/.hugo_build.lock
+/site/data/releases.json

@@ -1,0 +1,16 @@
+[
+	{"file": "architecture.md", "section": "concepts", "slug": "architecture", "title": "Architecture", "weight": 90,
+	 "summary": "How the kit came to be, how the packages fit together, what runs on which goroutine, and the hooks a program fills in."},
+	{"file": "event-log.md", "section": "concepts", "slug": "event-log", "title": "The event log", "weight": 95,
+	 "summary": "The JSONL event log as an interface: its lines, keys and values, the rule for versions, and how the kit reads it back."},
+	{"file": "signal-recipe.md", "section": "guides", "slug": "signals", "title": "Handle signals in main", "weight": 90,
+	 "summary": "The signal context of main, which the kit leaves to each program."},
+	{"file": "decisions.md", "section": "reference", "slug": "decisions", "title": "Decisions", "weight": 30,
+	 "summary": "What was decided, why, and what it costs. A decision is never edited; a later one refines or supersedes it."},
+	{"file": "testing.md", "section": "reference", "slug": "testing", "title": "How the kit is tested", "weight": 40,
+	 "summary": "The contract of the events, fake clocks, the Screen, fuzzing, and the path that allocates nothing."},
+	{"file": "ui-convention.md", "section": "reference", "slug": "ui-convention", "title": "UI convention", "weight": 50,
+	 "summary": "What the programs with a local web page share: the key table, the theme, the storage keys, the headers and the accessibility floor."},
+	{"file": "release.md", "section": "reference", "slug": "release", "title": "Cutting a release", "weight": 60,
+	 "summary": "Cutting, withdrawing and verifying a release, for the maintainers."}
+]

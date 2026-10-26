@@ -1,0 +1,159 @@
+{
+	"display": "counter",
+	"theme": "none",
+	"width": 72,
+	"frames": [
+		{
+			"t": 0.5,
+			"text": ""
+		},
+		{
+			"t": 1,
+			"text": "fetching the base image · 0.4/2.0 GiB · 19% · 205 MiB/s · 0:01.0\n"
+		},
+		{
+			"t": 1.5,
+			"text": "fetching the base image · 0.6/2.0 GiB · 29% · 273 MiB/s · 0:01.5\n"
+		},
+		{
+			"t": 2,
+			"text": "fetching the base image · 0.8/2.0 GiB · 39% · 307 MiB/s · 0:02.0\n"
+		},
+		{
+			"t": 2.5,
+			"text": "fetching the base image · 1.0/2.0 GiB · 49% · 328 MiB/s · 0:02.5\n"
+		},
+		{
+			"t": 3,
+			"text": "fetching the base image · 1.2/2.0 GiB · 59% · 341 MiB/s · 0:03.0\n"
+		},
+		{
+			"t": 3.5,
+			"text": "fetching the base image · 1.4/2.0 GiB · 69% · 351 MiB/s · 0:03.5\n"
+		},
+		{
+			"t": 4,
+			"text": "fetching the base image · 1.6/2.0 GiB · 79% · 358 MiB/s · 0:04.0\n"
+		},
+		{
+			"t": 4.5,
+			"text": "fetching the base image · 1.8/2.0 GiB · 89% · 364 MiB/s · 0:04.5\n"
+		},
+		{
+			"t": 5,
+			"text": "fetching the base image · 2.0/2.0 GiB · 99% · 369 MiB/s · 0:05.0\n"
+		},
+		{
+			"t": 5.3,
+			"text": "reinstall · 0:05.3\n"
+		},
+		{
+			"t": 5.5,
+			"text": "reinstalling the nodes · 0/12 · 12 queued · 0:05.5\n"
+		},
+		{
+			"t": 5.9,
+			"text": "reinstalling the nodes · 0/12 · 4 running · 8 queued · 0:05.9\n"
+		},
+		{
+			"t": 6.3,
+			"text": "reinstalling the nodes · 0/12 · 4 running · 8 queued · 0:06.3\n"
+		},
+		{
+			"t": 6.6,
+			"text": "reinstalling the nodes · 1/12 · 4 running · 7 queued · 0:06.6\n"
+		},
+		{
+			"t": 7,
+			"text": "reinstalling the nodes · 1/12 · 4 running · 7 queued · 0:07.0\n"
+		},
+		{
+			"t": 7.3,
+			"text": "reinstalling the nodes · 2/12 · 4 running · 6 queued · 0:07.3\n"
+		},
+		{
+			"t": 7.7,
+			"text": "reinstalling the nodes · 2/12 · 4 running · 6 queued · 0:07.7\n"
+		},
+		{
+			"t": 8,
+			"text": "reinstalling the nodes · 3/12 · 4 running · 5 queued · 0:08.0\n"
+		},
+		{
+			"t": 8.4,
+			"text": "reinstalling the nodes · 3/12 · 4 running · 5 queued · 0:08.4\n"
+		},
+		{
+			"t": 8.7,
+			"text": "reinstalling the nodes · 4/12 · 4 running · 4 queued · 0:08.7\n"
+		},
+		{
+			"t": 9.1,
+			"text": "reinstalling the nodes · 4/12 · 4 running · 4 queued · 0:09.1\n"
+		},
+		{
+			"t": 9.4,
+			"text": "reinstalling the nodes · 5/12 · 4 running · 3 queued · 0:09.4\n"
+		},
+		{
+			"t": 9.8,
+			"text": "reinstalling the nodes · 5/12 · 4 running · 3 queued · 0:09.8\n"
+		},
+		{
+			"t": 10.1,
+			"text": "reinstalling the nodes · 6/12 · 4 running · 2 queued · 0:10.1\n"
+		},
+		{
+			"t": 10.5,
+			"text": "reinstalling the nodes · 6/12 · 4 running · 2 queued · 0:10.5\n"
+		},
+		{
+			"t": 10.8,
+			"text": "reinstalling the nodes · 7/12 · 1 failed · 4 running · 1 queued · 0:10.\n"
+		},
+		{
+			"t": 11.2,
+			"text": "reinstalling the nodes · 7/12 · 1 failed · 4 running · 1 queued · 0:11.\n"
+		},
+		{
+			"t": 11.5,
+			"text": "reinstalling the nodes · 8/12 · 1 failed · 4 running · 0:11.5\n"
+		},
+		{
+			"t": 11.9,
+			"text": "reinstalling the nodes · 8/12 · 1 failed · 4 running · 0:11.9\n"
+		},
+		{
+			"t": 12.2,
+			"text": "reinstalling the nodes · 9/12 · 1 failed · 3 running · 0:12.2\n"
+		},
+		{
+			"t": 12.6,
+			"text": "reinstalling the nodes · 9/12 · 1 failed · 3 running · 0:12.6\n"
+		},
+		{
+			"t": 12.9,
+			"text": "reinstalling the nodes · 10/12 · 1 failed · 2 running · 0:12.9\n"
+		},
+		{
+			"t": 13.3,
+			"text": "reinstalling the nodes · 10/12 · 1 failed · 2 running · 0:13.3\n"
+		},
+		{
+			"t": 13.6,
+			"text": "reinstalling the nodes · 11/12 · 1 failed · 1 running · 0:13.6\n"
+		},
+		{
+			"t": 14,
+			"text": "reinstalling the nodes · 11/12 · 1 failed · 1 running · 0:14.0\n"
+		},
+		{
+			"t": 14.3,
+			"text": "reinstalling the nodes · 12/12 · 1 failed · 0:14.3\n"
+		},
+		{
+			"t": 14.5,
+			"text": "reinstall: failed in 14s: 11 ok, 1 failed, 2.0 GiB at 143 MiB/s\n"
+		}
+	]
+}
