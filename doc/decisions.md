@@ -2719,3 +2719,44 @@ explains.
   a display draws needs the recordings written anew, or the tests fail.
 - The site is published only once a maintainer sets GitHub Actions as the
   source of the repository's Pages.
+
+## 49. An update carries the newest amount, and the log writes the last advance before a pause
+
+Status: accepted.
+
+### Context
+
+sind reports the bytes of an image pull. Its parser learns a new size of
+the download and a new amount from the same line of `docker pull`, and
+sends the size with `Update` and the amount with `SetAmount`. The update
+went out at once, with the amount the Bus had last sent in an advance, and
+the advance came up to 100 ms later: a reader of the events saw the share
+of the work go back, then forward, many times a pull (23 times in five
+seconds in one pull of 113 MB). The event log then wrote the first advance
+of a span in each second, or in each `AdvanceEvery`, and left the others out
+without a trace: the last amount before a pause, such as the minutes a pull
+spends unpacking after its last byte, reached the log only with the span's
+end. A live view of the log showed 98 % for the whole pause.
+
+### Decision
+
+- `Span.Update` of a running span takes the newest amount of its work, as
+  `End` does, and the update carries it. Work that learns an amount and a
+  size together sets the amount first, then the size, and the update has
+  both. An advance the Bus's timer still had to send then finds nothing new.
+- The Log holds the newest advance of a span that it leaves out, and
+  writes it once `AdvanceEvery` has passed since the last it wrote. Any
+  event of the span that comes first carries a newer amount, and the
+  advance held is left out after all and counted in `leftOut`. Close
+  writes the advances still held, of spans that never ended.
+- The line of an advance held may follow lines of other spans with a
+  greater `seq`. A reader that needs the order of the Bus sorts by `seq`;
+  the lines of one span stay in order.
+
+### Costs
+
+- A log has up to one more advance line per span and pause, and a timer
+  per span while it holds one.
+- A reader that took the order of the lines for the order of `seq` reads
+  one advance late; the eventlog reducer, which keeps each span's newest
+  fields, is not affected, since no event of the span comes between.
