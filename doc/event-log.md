@@ -52,7 +52,7 @@ runs that write to a pipe or to NFS at once each need a file of their own.
 | --- | --- |
 | `v` | The version of the format, `1` |
 | `run`, `trace` | As on the first line |
-| `seq` | The event's number, from 1, as the Bus numbered it: the one order every sink saw. It has no gaps but those of the advances the log left out, which `leftOut` on the span's `end` counts |
+| `seq` | The event's number, from 1, as the Bus numbered it: the one order every sink saw. It has no gaps but those of the advances the log left out, which `leftOut` on the span's `end` counts. |
 | `time` | When the event happened, in UTC, as RFC 3339 with nine digits after the second, so that the times of one run sort as they happened |
 | `type` | `start`; `run`, a queued span that starts to run; `update`, a span whose total, message, or unit and size of work changed; `line`, a line of output; `end`; `suspend` and `resume`, the displays taken off the terminal for a question and put back; `advance`, a span whose `amount` changed, which the Bus sends at most once each 100 ms a span, by its clock |
 | `span`, `parent` | The span the event is about and the one it was started under, 16 hexadecimal digits each; the root has no `parent`. A `suspend` or `resume` has only a `span`, the one it was asked for under, if any |
@@ -67,7 +67,7 @@ runs that write to a pipe or to NFS at once each need a file of their own.
 | `cache`, `source` | Where a lookup was answered from, such as `hit`, `miss`, `memory` or `disk`; and the kind of source a secret or a credential was read from, never the value |
 | `timeout` | The bound of a call, or the length of a wait, in seconds |
 | `exit` | The exit code of a command; `0` is written, and a command that gave none has no `exit` |
-| `amount`, `size` | How much of the span's own work is done, and how much there is, in its `unit`; never what is below it. A span has them on every event from the first that sets them, the `amount` the Bus last sent in an `advance`, and its `end` the final one; a `size` left out is one not known |
+| `amount`, `size` | How much of the span's own work is done, and how much there is, in its `unit`; never what is below it. A span has them on every event from the first that sets them, the `amount` the Bus last sent in an `advance` or an `update`, which takes the newest, and its `end` the final one; a `size` left out is one not known |
 | `unit` | What the span's work is counted in: `items`, `bytes` or `percent`, whose `size` is always 100 |
 | `status` | How the span ended: `ok`, `failed`, `canceled` or `skipped` |
 | `class` | Why a span that failed did: `target`, `transport`, `timeout`, `auth`, `pin`, `usage` or `canceled` |

@@ -460,7 +460,8 @@ type Fields struct {
 	// Amount is how much of the span's own work is done, and Size how much
 	// there is, in Unit; a Size of 0 is one not known. Neither counts the
 	// work of the spans below. Every event of a span carries the Amount
-	// the Bus last sent in a TypeAdvance, and its TypeEnd the final one.
+	// the Bus last sent, in a TypeAdvance or a TypeUpdate, which takes the
+	// newest, and its TypeEnd the final one.
 	Amount, Size int64
 	Unit         Unit
 }

@@ -35,9 +35,11 @@ span that does not run, and nothing to a nil span.
 A copy can write a hundred thousand times a second. So `Advance` adds to an
 atomic amount and takes no lock. The Bus sends the amount as an event at
 most every 100 ms for each span, by its own clock, and always with the
-span's end, so that the newest amount is never lost. The event log writes an
-advance at most once a second by default, and counts the advances it leaves
-out in `leftOut` on the next advance it writes.
+span's end, so that the newest amount is never lost. An update of the span
+carries the newest amount too, so that work which learns its amount and its
+size sets the amount first, and a new size never meets an old amount. The
+event log writes an advance at most once a second by default, and counts the
+advances it leaves out in `leftOut` on the next advance it writes.
 
 {{% call note %}}
 `Advance` and `SetAmount` read the clock of the Bus, `BusOptions.Now`, on

@@ -139,7 +139,14 @@ func (s *Span) endWork() {
 	if t := w.timer.Swap(nil); t != nil {
 		t.Stop()
 	}
-	if amount := max(w.amount.Load(), 0); amount != s.fields.Amount {
+	s.takeAmount()
+}
+
+// takeAmount takes the newest amount into the span's fields, for an event
+// that carries it other than an advance, an update or the end. An advance
+// the timer still has to send then finds nothing new to send. b.mu is held.
+func (s *Span) takeAmount() {
+	if amount := max(s.work.amount.Load(), 0); amount != s.fields.Amount {
 		if s.fields.Unit == 0 {
 			s.fields.Unit = UnitItems
 		}
