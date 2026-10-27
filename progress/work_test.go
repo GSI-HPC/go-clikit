@@ -104,8 +104,8 @@ func TestEndTakesWork(t *testing.T) {
 
 // The Bus sends a span's amount at most once each 100 ms by its clock: an
 // advance before then is sent once its place comes, and the newest amount
-// is never lost, since the End carries it. Every event of the span from the
-// first advance carries the amount sent last.
+// is never lost, since the End carries it. An update carries the newest
+// amount, as the End does.
 func TestAnAdvanceIsSentAtMostEvery100msByTheBusClock(t *testing.T) {
 	t.Parallel()
 	clock := newClock()
@@ -116,8 +116,8 @@ func TestAnAdvanceIsSentAtMostEvery100msByTheBusClock(t *testing.T) {
 	clock.Add(50 * time.Millisecond)
 	call.Advance(10)
 	call.Update(progress.Message("halfway"))
-	if got, want := workOf(last(t, capture, progress.TypeUpdate)), (work{10, 100, progress.UnitBytes}); got != want {
-		t.Errorf("the update carries %+v, want the amount sent last, %+v", got, want)
+	if got, want := workOf(last(t, capture, progress.TypeUpdate)), (work{30, 100, progress.UnitBytes}); got != want {
+		t.Errorf("the update carries %+v, want the newest amount, %+v", got, want)
 	}
 	clock.Add(50 * time.Millisecond)
 	call.Advance(10)

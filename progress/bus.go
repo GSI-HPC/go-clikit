@@ -383,7 +383,10 @@ func (s *Span) Run() {
 // as End does, such as an address learned once the work has started, and
 // sends them. A Total smaller than the one before is ignored, and so is a
 // unit other than the one Work gave before; Queued and Flagged, which only
-// Start can give, are ignored too.
+// Start can give, are ignored too. A running span's update carries the
+// newest amount of its work, as its End does, not the amount the Bus last
+// sent in an advance, so that a new size never meets an old amount: work
+// that learns both sets the amount first, then the size.
 func (s *Span) Update(opts ...Option) {
 	if s == nil {
 		return
@@ -395,6 +398,9 @@ func (s *Span) Update(opts ...Option) {
 		return
 	}
 	s.setFields(opts)
+	if s.state == StateRunning {
+		s.takeAmount()
+	}
 	b.emit(s.event(TypeUpdate))
 }
 
