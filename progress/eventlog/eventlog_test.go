@@ -260,17 +260,17 @@ func TestDecodeTheFirstLine(t *testing.T) {
 		traced bool
 	}{
 		{"no parent", `{"v":1,"type":"trace","run":"r","trace":"` + trace + `","program":"prog\u0007"}`,
-			eventlog.Line{RunID: "r", Run: "r", Begin: true, Program: `prog\x07`, Trace: progress.TraceContext{}}, true},
+			eventlog.Line{RunID: "r", Begin: true, Program: `prog\x07`, Trace: progress.TraceContext{}}, true},
 		{"a parent", `{"v":1,"type":"trace","run":"r","trace":"` + trace + `","parent":"00f067aa0ba902b7","traceFlags":"01","traceState":"a=b"}`,
-			eventlog.Line{RunID: "r", Run: "r", Begin: true, Trace: progress.TraceContext{Parent: 0x00f067aa0ba902b7, Flags: 1, State: "a=b"}}, true},
+			eventlog.Line{RunID: "r", Begin: true, Trace: progress.TraceContext{Parent: 0x00f067aa0ba902b7, Flags: 1, State: "a=b"}}, true},
 		{"a tracestate not kept", `{"v":1,"type":"trace","run":"r","trace":"` + trace + `","parent":"00f067aa0ba902b7","traceFlags":"01","traceState":"a=\u001b"}`,
-			eventlog.Line{RunID: "r", Run: "r", Begin: true, Trace: progress.TraceContext{Parent: 0x00f067aa0ba902b7, Flags: 1}}, true},
+			eventlog.Line{RunID: "r", Begin: true, Trace: progress.TraceContext{Parent: 0x00f067aa0ba902b7, Flags: 1}}, true},
 		{"a parent without flags", `{"v":1,"type":"trace","run":"r","trace":"` + trace + `","parent":"00f067aa0ba902b7"}`,
-			eventlog.Line{RunID: "r", Run: "r", Begin: true, Trace: progress.TraceContext{}}, true},
+			eventlog.Line{RunID: "r", Begin: true, Trace: progress.TraceContext{}}, true},
 		{"a short trace", `{"v":1,"type":"trace","run":"r","trace":"4bf9"}`,
-			eventlog.Line{RunID: "r", Run: "r", Begin: true}, false},
+			eventlog.Line{RunID: "r", Begin: true}, false},
 		{"a trace not hexadecimal", `{"v":1,"type":"trace","run":"r","trace":"` + strings.Repeat("z", 32) + `"}`,
-			eventlog.Line{RunID: "r", Run: "r", Begin: true}, false},
+			eventlog.Line{RunID: "r", Begin: true}, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			if tc.traced {

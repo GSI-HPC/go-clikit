@@ -54,11 +54,6 @@ type Options struct {
 	// on the files of a directory, such as os.DirFS(dir). A template that
 	// no longer parses fails the render.
 	Dev bool
-	// Reload is the former name of Dev, read while Dev is false.
-	//
-	// Deprecated: Use Dev, the name of the same switch in
-	// localweb/assets (decision 36).
-	Reload bool
 }
 
 // Set is the parsed templates of a program. Its methods are safe for
@@ -89,7 +84,7 @@ type run struct {
 // with DATA and returns its HTML, so that the name of a block can be a
 // value. include nests at most MaxIncludeDepth deep in one render.
 func Parse(fsys fs.FS, o Options, patterns ...string) (*Set, error) {
-	s := &Set{fsys: fsys, patterns: patterns, funcs: o.Funcs, dev: o.Dev || o.Reload}
+	s := &Set{fsys: fsys, patterns: patterns, funcs: o.Funcs, dev: o.Dev}
 	set, err := s.parse(&run{})
 	if err != nil {
 		return nil, err

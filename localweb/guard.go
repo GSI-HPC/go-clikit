@@ -126,12 +126,6 @@ type OriginPolicy struct {
 	Refuse Refuser
 }
 
-// Origin is the former name of OriginPolicy.
-//
-// Deprecated: Use OriginPolicy; the type is a policy, not an origin
-// (decision 36).
-type Origin = OriginPolicy
-
 // SameOrigin returns middleware that refuses, with 403 Forbidden, every
 // request that CrossSite says came from another site.
 func SameOrigin(o OriginPolicy) func(http.Handler) http.Handler {

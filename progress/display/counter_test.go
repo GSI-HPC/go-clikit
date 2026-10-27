@@ -239,7 +239,7 @@ func TestTheCounterOfAWideFanOut(t *testing.T) {
 	t.Parallel()
 	f := newFixture(t, "provision reinstall", func() (int, int, error) { return 120, 40, nil })
 	ctx, step := progress.Start(f.ctx, progress.KindStep, "reset the machines",
-		progress.WithFlags(progress.Fold), progress.Total(480), progress.Limit(8))
+		progress.Flagged(progress.FlagFold), progress.Total(480), progress.Limit(8))
 	targets := make([]*progress.Span, 480)
 	for i := range targets {
 		node := fmt.Sprintf("exe%d", i+1)
@@ -333,7 +333,7 @@ func TestTheCounterShowsTwoStepsSideBySide(t *testing.T) {
 	t.Parallel()
 	f := newFixture(t, "provision status", func() (int, int, error) { return 160, 40, nil })
 	start := func(name string, n int) (*progress.Span, []*progress.Span) {
-		ctx, step := progress.Start(f.ctx, progress.KindStep, name, progress.WithFlags(progress.Fold), progress.Total(n))
+		ctx, step := progress.Start(f.ctx, progress.KindStep, name, progress.Flagged(progress.FlagFold), progress.Total(n))
 		targets := make([]*progress.Span, n)
 		for i := range targets {
 			node := fmt.Sprintf("exe%d", i+1)
@@ -373,7 +373,7 @@ func TestTheCounterShowsTwoStepsSideBySide(t *testing.T) {
 func TestTheCounterNamesTheStepUnderWay(t *testing.T) {
 	t.Parallel()
 	f := newFixture(t, "provision reinstall", nil)
-	_, hidden := progress.Start(f.ctx, progress.KindStep, "check the boot paths", progress.WithFlags(progress.Hidden))
+	_, hidden := progress.Start(f.ctx, progress.KindStep, "check the boot paths", progress.Flagged(progress.FlagHidden))
 	f.draw(time.Second)
 	hidden.End(nil)
 	_, step := progress.Start(f.ctx, progress.KindStep, "configuring the network boot")

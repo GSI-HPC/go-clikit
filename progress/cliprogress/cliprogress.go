@@ -348,7 +348,7 @@ func UTF8Locale(getenv func(string) string) bool {
 // is on can show, as the variables getenv reads say, the way most programs
 // read them: the zero Theme, which draws no escape code, where onTerminal
 // is false or TERM is dumb, since plain lines go to a log then; t's art
-// alone, NoColours, where NO_COLOR is set to anything; 256 colours where
+// alone, ColorsNone, where NO_COLOR is set to anything; 256 colours where
 // COLORTERM is set to anything or TERM names 256 colours, as xterm-256color
 // does; and the terminal's own 16 otherwise. The program passes os.Getenv,
 // and picks t, from a flag such as --theme, say; the package reads no
@@ -359,9 +359,9 @@ func ThemeFor(t display.Theme, onTerminal bool, getenv func(string) string) disp
 	case !onTerminal || term == "dumb":
 		return display.Theme{}
 	case getenv("NO_COLOR") != "":
-		return t.In(display.NoColours)
+		return t.In(display.ColorsNone)
 	case getenv("COLORTERM") != "" || strings.Contains(term, "256"):
-		return t.In(display.Colours256)
+		return t.In(display.Colors256)
 	}
-	return t.In(display.Colours16)
+	return t.In(display.Colors16)
 }

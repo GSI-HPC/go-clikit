@@ -49,18 +49,6 @@ const (
 	MorphVersion = "0.7.4"
 )
 
-// The former names of the versions.
-const (
-	// Version is the former name of ScriptVersion.
-	//
-	// Deprecated: Use ScriptVersion, which pairs with Script (decision 36).
-	Version = ScriptVersion
-	// IdiomorphVersion is the former name of MorphVersion.
-	//
-	// Deprecated: Use MorphVersion, which pairs with Morph (decision 36).
-	IdiomorphVersion = MorphVersion
-)
-
 // Config is the configuration of htmx a page sets in its meta element
 // htmx-config. htmx evaluates no expression and runs no script it swaps
 // in, which the Content-Security-Policy refuses anyway; it adds no style

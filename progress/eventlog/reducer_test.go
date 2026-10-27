@@ -228,27 +228,6 @@ func TestReducerKeep(t *testing.T) {
 	}
 }
 
-// The old names of ReducerOptions, KeepRuns and Take stay for one minor
-// release (decision 36): Keep is read when KeepRuns is 0.
-func TestReducerOldNames(t *testing.T) {
-	for _, tc := range []struct {
-		name string
-		o    eventlog.Options
-		want []string
-	}{
-		{"Keep alone", eventlog.Options{Keep: 1}, []string{"b"}},
-		{"KeepRuns first", eventlog.Options{KeepRuns: 2, Keep: 1}, []string{"b", "a"}},
-	} {
-		r := eventlog.NewReducer(tc.o)
-		for _, l := range append(command("aaaa", "a", "ok"), command("bbbb", "b", "ok")...) {
-			r.Line([]byte(l))
-		}
-		if got := names(r); !slices.Equal(got, tc.want) {
-			t.Errorf("%s: the runs = %q, want %q", tc.name, got, tc.want)
-		}
-	}
-}
-
 // Run looks a run up by its ID, as Changed gives them: a run it holds, one
 // without a command so far too, which has a zero Root, and none for a run
 // it dropped or never had.

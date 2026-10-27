@@ -112,12 +112,6 @@ type ItemInfo struct {
 	Size int64
 }
 
-// Item is the old name of ItemInfo.
-//
-// Deprecated: Use ItemInfo, which says that it describes an item rather
-// than is one (decision 36).
-type Item = ItemInfo
-
 // Outcome is what the work for one item came to.
 type Outcome[R any] struct {
 	// Value is what the work returned, which a panic in the release
@@ -205,7 +199,7 @@ func Map[T, R any](ctx context.Context, items []T, o MapOptions[T], fn func(ctx 
 		o.Classify = bus.Classify
 	}
 	stepCtx, step := progress.Start(ctx, progress.KindStep, o.Step,
-		progress.WithFlags(progress.Fold|o.Flags), progress.Total(len(items)), progress.Limit(limit))
+		progress.Flagged(progress.FlagFold|o.Flags), progress.Total(len(items)), progress.Limit(limit))
 	names := make([]string, len(items))
 	ctxs := make([]context.Context, len(items))
 	spans := make([]*progress.Span, len(items))
@@ -464,12 +458,6 @@ type FailedItem struct {
 	Err error
 }
 
-// Failed is the old name of FailedItem.
-//
-// Deprecated: Use FailedItem, a noun, which Summary.Failed lists (decision
-// 36).
-type Failed = FailedItem
-
 // FailureError is the error that sums up the items of a fan-out that
 // failed, which Map ends its step with and returns when MapOptions.Summarize
 // is nil, and only when an item failed. errors.As finds it, and with it the
@@ -530,23 +518,6 @@ func (e *FailureError) ProgressClass() progress.Class {
 		return progress.ClassCanceled
 	}
 	return progress.ClassTarget
-}
-
-// Failure returns a *FailureError of s, with "<n> <noun>" as its noun, or
-// none when noun is empty, and nil when no item failed.
-//
-// Deprecated: Make a &FailureError{Summary: s} when an item failed, with a
-// Noun that is a function of the count, as MapOptions.Noun is, rather than
-// a plural (decision 36).
-func Failure(noun string, s Summary) error {
-	if len(s.Failed) == 0 {
-		return nil
-	}
-	e := &FailureError{Summary: s}
-	if noun != "" {
-		e.Noun = func(n int) string { return fmt.Sprintf("%d %s", n, noun) }
-	}
-	return e
 }
 
 // list names items as a node set when every name reads as one host name in

@@ -121,11 +121,3 @@ func TestResolve(t *testing.T) {
 		})
 	}
 }
-
-// The deprecated function resolves the build info of the running binary.
-func TestResolveTheRunningBinary(t *testing.T) {
-	want := ReadBuildInfo().Resolve("v1.2.3", "ebed487")
-	if got := Resolve("v1.2.3", "ebed487"); got != want || got.Version != "v1.2.3" || got.Commit != "ebed487" {
-		t.Errorf("Resolve = %+v, want %+v", got, want)
-	}
-}

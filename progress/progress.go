@@ -226,27 +226,6 @@ const (
 	FlagDryRun
 )
 
-// The old names of the flags.
-const (
-	// Hidden is the old name of FlagHidden.
-	//
-	// Deprecated: Use FlagHidden, which takes its type as a prefix, as
-	// every enum constant does (decision 36).
-	Hidden = FlagHidden
-	// Fold is the old name of FlagFold.
-	//
-	// Deprecated: Use FlagFold (decision 36).
-	Fold = FlagFold
-	// ShowLines is the old name of FlagShowLines.
-	//
-	// Deprecated: Use FlagShowLines (decision 36).
-	ShowLines = FlagShowLines
-	// DryRun is the old name of FlagDryRun.
-	//
-	// Deprecated: Use FlagDryRun (decision 36).
-	DryRun = FlagDryRun
-)
-
 // inherited are the flags a span passes to the spans started under it.
 const inherited = FlagHidden | FlagShowLines
 
@@ -326,20 +305,6 @@ const (
 	StreamStderr Stream = 2
 )
 
-// The old names of the streams.
-const (
-	// Stdout is the old name of StreamStdout.
-	//
-	// Deprecated: Use StreamStdout, which takes its type as a prefix, as
-	// every enum constant does, and does not read as os.Stdout (decision
-	// 36).
-	Stdout = StreamStdout
-	// Stderr is the old name of StreamStderr.
-	//
-	// Deprecated: Use StreamStderr (decision 36).
-	Stderr = StreamStderr
-)
-
 // String returns the name the event log writes for the stream, such as
 // "stdout", or "stream(n)" for a value this package does not define.
 func (s Stream) String() string {
@@ -365,23 +330,6 @@ const (
 	// nothing else, such as a remote task. Its size is always 100, and a
 	// display draws its share, never an amount or a rate.
 	UnitPercent
-)
-
-// The old names of the units.
-const (
-	// Items is the old name of UnitItems.
-	//
-	// Deprecated: Use UnitItems, which takes its type as a prefix, as every
-	// enum constant does (decision 36).
-	Items = UnitItems
-	// Bytes is the old name of UnitBytes.
-	//
-	// Deprecated: Use UnitBytes (decision 36).
-	Bytes = UnitBytes
-	// Percent is the old name of UnitPercent.
-	//
-	// Deprecated: Use UnitPercent (decision 36).
-	Percent = UnitPercent
 )
 
 // String returns the name the event log writes for the unit, such as
@@ -545,12 +493,6 @@ type RunInfo struct {
 	PanicLog io.Writer
 }
 
-// Run is the old name of RunInfo.
-//
-// Deprecated: Use RunInfo. Run also names a method of Span, a lifecycle
-// in cliprogress and a snapshot in eventlog (decision 36).
-type Run = RunInfo
-
 // RunSink is a Sink that records the run its events belong to, as an
 // event log does. The Bus tells it once, when it is made, before any
 // event.
@@ -558,12 +500,6 @@ type RunSink interface {
 	// Begin receives the run the Bus's events belong to.
 	Begin(RunInfo)
 }
-
-// TraceSink is the old name of RunSink.
-//
-// Deprecated: Use RunSink, which says what it is given: a run, not traces
-// (decision 36).
-type TraceSink = RunSink
 
 // Suspender is a Sink that draws on the terminal, and takes itself off it
 // while something else asks a question there. Suspend and Resume are called
@@ -636,12 +572,6 @@ func Queued() Option { return func(o *options) { o.queued = true } }
 // Flagged gives a span flags when it starts.
 func Flagged(f Flags) Option { return func(o *options) { o.flags |= f } }
 
-// WithFlags gives a span flags when it starts, as Flagged does.
-//
-// Deprecated: Use Flagged. An option is a bare noun, and With names only a
-// helper that returns a context, such as WithBus (decision 36).
-func WithFlags(f Flags) Option { return Flagged(f) }
-
 // Node sets Node.
 func Node(s string) Option { return func(o *options) { o.Node = s } }
 
@@ -670,11 +600,6 @@ func Message(s string) Option { return func(o *options) { o.Message = s } }
 func HTTPRequest(method, path string) Option {
 	return func(o *options) { o.Method, o.Path = method, path }
 }
-
-// HTTP sets the Method and Path of an HTTP request, as HTTPRequest does.
-//
-// Deprecated: Use HTTPRequest, which pairs with HTTPStatus (decision 36).
-func HTTP(method, path string) Option { return HTTPRequest(method, path) }
 
 // HTTPStatus sets HTTPStatus.
 func HTTPStatus(code int) Option { return func(o *options) { o.HTTPStatus = code } }

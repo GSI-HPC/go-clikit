@@ -46,7 +46,7 @@ var (
 // scaleOf returns how the amounts of u are drawn: bytes as bytes, anything
 // else as items.
 func scaleOf(u progress.Unit) scale {
-	if u == progress.Bytes {
+	if u == progress.UnitBytes {
 		return byteScale
 	}
 	return itemScale
@@ -160,7 +160,7 @@ type work struct {
 // cancellation.
 func workOf(g look, r progress.Reading, cells int) work {
 	var w work
-	bounded := r.Bound != progress.Unbounded
+	bounded := r.Bound != progress.BoundNone
 	if bounded {
 		w.share = g.paint(roleBar, shareText(r.Fraction))
 		if cells > 0 {
@@ -170,7 +170,7 @@ func workOf(g look, r progress.Reading, cells int) work {
 	if r.Left > 0 {
 		w.left = g.paint(roleMuted, leftText(r.Left))
 	}
-	if r.Unit == progress.Percent {
+	if r.Unit == progress.UnitPercent {
 		return w
 	}
 	if r.Size > 0 {
@@ -212,7 +212,7 @@ func (w work) text(sep string, giveUp int) string {
 // 80.0 MiB/s", both muted; the amount alone when the span took no time,
 // and "" for work in Percent, which has no amount to say.
 func endedText(g look, r progress.Reading) string {
-	if r.Unit == progress.Percent {
+	if r.Unit == progress.UnitPercent {
 		return ""
 	}
 	text := g.paint(roleMuted, amountText(r.Unit, float64(r.Amount)))

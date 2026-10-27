@@ -87,39 +87,6 @@ func TestFailureError(t *testing.T) {
 	}
 }
 
-// Failure, the deprecated constructor, makes a *FailureError with the noun
-// it is given after the count, and nil when none failed.
-func TestFailure(t *testing.T) {
-	t.Parallel()
-
-	refused := errors.New("exe2: connection refused")
-	for _, tc := range []struct {
-		name string
-		noun string
-		s    fanout.Summary
-		want string
-	}{
-		{"none failed", "hosts", summary(5, nil, nil, false), ""},
-		{"a noun", "hosts", summary(5, []string{"exe2"}, []error{refused}, false), "1 of 5 hosts failed: exe2"},
-		{"no noun", "", summary(5, []string{"exe2"}, []error{refused}, true), "1 of 5 failed: exe2"},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
-			err := fanout.Failure(tc.noun, tc.s)
-			if tc.want == "" {
-				if err != nil {
-					t.Errorf("Failure = %v, want nil", err)
-				}
-				return
-			}
-			var fe *fanout.FailureError
-			if !errors.As(err, &fe) || err.Error() != tc.want || !errors.Is(err, refused) {
-				t.Errorf("Failure = %#v (%v), want a *FailureError %q over %v", err, err, tc.want, refused)
-			}
-		})
-	}
-}
-
 // summary makes the Summary of total items of which those named names
 // failed, each with the error of the same place in errs, or none past its
 // end.

@@ -175,16 +175,6 @@ func TestValidateCommandLineUnderARunnableGroup(t *testing.T) {
 	}
 }
 
-// The deprecated name validates as ValidateCommandLine does.
-func TestCheckCommandLine(t *testing.T) {
-	for _, line := range []string{"get cluster", "get clusters"} {
-		args := strings.Fields(line)
-		if got, want := fmt.Sprint(CheckCommandLine(tree(), args)), fmt.Sprint(ValidateCommandLine(tree(), args)); got != want {
-			t.Errorf("prog %s: error %s, want %s", line, got, want)
-		}
-	}
-}
-
 func TestCheckCommandLines(t *testing.T) {
 	text := `# Show what there is.
 $ prog get cluster --realm dev

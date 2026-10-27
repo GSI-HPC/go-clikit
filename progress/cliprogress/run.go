@@ -36,12 +36,6 @@ type Session struct {
 	finished bool
 }
 
-// Run is the old name of Session.
-//
-// Deprecated: Use Session. progress.Run and Span.Run name other things
-// (decision 36).
-type Run = Session
-
 // shown is a display: the Tree, the Counter or Plain.
 type shown interface {
 	progress.Sink
@@ -119,7 +113,7 @@ func Start(ctx context.Context, o Options) (*Session, error) {
 		if !o.Manual {
 			r.shown.Start()
 		}
-		r.summary = &display.Summary{Theme: o.Theme, ASCII: o.ASCII}
+		r.summary = display.NewSummary(display.SummaryOptions{Theme: o.Theme, ASCII: o.ASCII})
 		sinks = append(sinks, r.shown, r.summary)
 		panicLog = r.term.Lines(panicLog)
 	}

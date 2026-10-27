@@ -53,24 +53,6 @@ func TestScriptHoldsItsVersion(t *testing.T) {
 	}
 }
 
-// The deprecated name Version is ScriptVersion.
-func TestVersionIsScriptVersion(t *testing.T) {
-	t.Parallel()
-
-	if htmx.Version != htmx.ScriptVersion {
-		t.Errorf("Version = %q, want ScriptVersion %q", htmx.Version, htmx.ScriptVersion)
-	}
-}
-
-// The deprecated name IdiomorphVersion is MorphVersion.
-func TestIdiomorphVersionIsMorphVersion(t *testing.T) {
-	t.Parallel()
-
-	if htmx.IdiomorphVersion != htmx.MorphVersion {
-		t.Errorf("IdiomorphVersion = %q, want MorphVersion %q", htmx.IdiomorphVersion, htmx.MorphVersion)
-	}
-}
-
 func TestFilesHoldThreeFilesOnly(t *testing.T) {
 	t.Parallel()
 

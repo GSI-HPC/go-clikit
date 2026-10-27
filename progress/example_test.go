@@ -320,10 +320,10 @@ func ExampleSpan_SetAmount() {
 	// end "firmware update" 100/100 percent
 }
 
-// ExampleCountWriter copies an image through CountWriter under a call that
+// ExampleAdvanceWriter copies an image through AdvanceWriter under a call that
 // gives its size. The Bus sends the amount when its place comes, and the
 // call's End carries the newest.
-func ExampleCountWriter() {
+func ExampleAdvanceWriter() {
 	now := time.Date(2026, 10, 10, 12, 0, 0, 0, time.UTC)
 	capture := &progresstest.Capture{}
 	bus := progress.NewBus(progress.BusOptions{

@@ -36,17 +36,7 @@ type ReducerOptions struct {
 	// that start after them are left out, and so are their events. 0 is
 	// DefaultMaxSpans.
 	MaxSpans int
-	// Keep is the old name of KeepRuns, read when KeepRuns is 0.
-	//
-	// Deprecated: Use KeepRuns, which says what it keeps (decision 36).
-	Keep int
 }
-
-// Options is the old name of ReducerOptions.
-//
-// Deprecated: Use ReducerOptions; only the Reducer takes these options
-// (decision 36).
-type Options = ReducerOptions
 
 // Run is one run of a log as a Reducer folds it: what its first line
 // says, and the tree of the spans of its command.
@@ -154,7 +144,7 @@ type run struct {
 // NewReducer returns a Reducer that holds no run.
 func NewReducer(o ReducerOptions) *Reducer {
 	return &Reducer{
-		keep:     cmp.Or(max(o.KeepRuns, 0), max(o.Keep, 0), DefaultKeepRuns),
+		keep:     cmp.Or(max(o.KeepRuns, 0), DefaultKeepRuns),
 		maxSpans: cmp.Or(max(o.MaxSpans, 0), DefaultMaxSpans),
 		runs:     map[string]*run{},
 		gone:     map[string]struct{}{},
@@ -200,12 +190,6 @@ func (r *Reducer) Take(b []byte) {
 		ru.event(e, r.maxSpans)
 	}
 }
-
-// Line folds one line of a log in, as Take does.
-//
-// Deprecated: Use Take, the method of Feed; Line names the decoded struct
-// too (decision 36).
-func (r *Reducer) Line(b []byte) { r.Take(b) }
 
 // Skipped counts the lines the Reducer could not read, those Decode
 // refused, since it was made: a view that shows no run can say why, as a

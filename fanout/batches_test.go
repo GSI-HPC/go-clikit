@@ -484,7 +484,7 @@ func TestBatchesReturnTheErrorThatEndedTheRun(t *testing.T) {
 }
 
 // ReportLimit is recorded on each batch and enforces nothing; below one
-// records none. The deprecated Limit is read while ReportLimit is zero.
+// records none.
 func TestBatchesRecordTheReportLimit(t *testing.T) {
 	t.Parallel()
 
@@ -495,10 +495,7 @@ func TestBatchesRecordTheReportLimit(t *testing.T) {
 	}{
 		{"none", fanout.BatchOptions{}, ""},
 		{"a report limit", fanout.BatchOptions{ReportLimit: 1}, " limit=1"},
-		{"below one", fanout.BatchOptions{ReportLimit: -1, Limit: 3}, ""},
-		{"the old field", fanout.BatchOptions{Limit: 3}, " limit=3"},
-		{"the old field below one", fanout.BatchOptions{Limit: -3}, ""},
-		{"both", fanout.BatchOptions{ReportLimit: 1, Limit: 3}, " limit=1"},
+		{"below one", fanout.BatchOptions{ReportLimit: -1}, ""},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()

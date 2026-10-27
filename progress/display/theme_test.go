@@ -127,21 +127,6 @@ func TestColorsString(t *testing.T) {
 	}
 }
 
-// The old names of Colors, its constants and Theme.Colors stay as aliases
-// for one minor release (decision 36), and name the same values.
-func TestTheOldNamesOfColorsAreAliases(t *testing.T) {
-	t.Parallel()
-	old := []display.Colours{display.Colours256, display.Colours16, display.NoColours}
-	if want := []display.Colors{display.Colors256, display.Colors16, display.ColorsNone}; !slices.Equal(old, want) {
-		t.Errorf("the old constants are %v, want %v", old, want)
-	}
-	for _, theme := range []display.Theme{{}, display.Aurora, display.Neon.In(display.Colors16)} {
-		if got, want := theme.Colours(), theme.Colors(); got != want {
-			t.Errorf("%v.Colours() is %v, want %v", theme, got, want)
-		}
-	}
-}
-
 // A Theme is the value of a flag through its text methods, which keep the
 // colours of the theme it is drawn in and leave it as it was for a name no
 // theme has. The zero Theme keeps no colours: a theme read over it is drawn

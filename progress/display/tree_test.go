@@ -167,7 +167,7 @@ func TestTheTreeOfAFanOutWithManyQueued(t *testing.T) {
 	t.Parallel()
 	f := newTreeFixture(t, "provision reinstall", treeSetup{})
 	ctx, step := progress.Start(f.ctx, progress.KindStep, "setting the machines to boot from the network once",
-		progress.WithFlags(progress.Fold), progress.Total(480), progress.Limit(8))
+		progress.Flagged(progress.FlagFold), progress.Total(480), progress.Limit(8))
 	ctxs, spans := targets(ctx, nodes(480)...)
 	end := func(i int) {
 		var err error
@@ -184,7 +184,7 @@ func TestTheTreeOfAFanOutWithManyQueued(t *testing.T) {
 		f.clock.Add(500 * time.Millisecond)
 		spans[i].Run()
 	}
-	progress.Start(ctxs[312], progress.KindCall, "redfish", progress.HTTP("PATCH", "/redfish/v1/Systems/1"), progress.Host("exe313.mgmt"))
+	progress.Start(ctxs[312], progress.KindCall, "redfish", progress.HTTPRequest("PATCH", "/redfish/v1/Systems/1"), progress.Host("exe313.mgmt"))
 	progress.Start(ctxs[314], progress.KindCall, "ssh", progress.Node("exe315"), progress.Timeout(10*time.Minute))
 	checkScreen(t, f.draw(4*time.Minute), `
 provision reinstall · 4:04.0
@@ -214,7 +214,7 @@ func TestTheTreeGroupsFailures(t *testing.T) {
 	t.Parallel()
 	f := newTreeFixture(t, "bmc power off", treeSetup{})
 	ctx, step := progress.Start(f.ctx, progress.KindStep, "power off",
-		progress.WithFlags(progress.Fold), progress.Total(7), progress.Limit(8))
+		progress.Flagged(progress.FlagFold), progress.Total(7), progress.Limit(8))
 	_, spans := targets(ctx, nodes(7)...)
 	for _, span := range spans {
 		span.Run()
@@ -254,7 +254,7 @@ func TestTheTreeGroupsFailuresThatNameTheirAddresses(t *testing.T) {
 	t.Parallel()
 	f := newTreeFixture(t, "bmc power off", treeSetup{})
 	ctx, step := progress.Start(f.ctx, progress.KindStep, "power off",
-		progress.WithFlags(progress.Fold), progress.Total(3), progress.Limit(8))
+		progress.Flagged(progress.FlagFold), progress.Total(3), progress.Limit(8))
 	_, spans := targets(ctx, nodes(3)...)
 	for _, span := range spans {
 		span.Run()
@@ -280,7 +280,7 @@ func TestTheTreeReadsOnlyWholeNamesAsTheTargets(t *testing.T) {
 	t.Parallel()
 	f := newTreeFixture(t, "bmc power off", treeSetup{})
 	ctx, step := progress.Start(f.ctx, progress.KindStep, "power off",
-		progress.WithFlags(progress.Fold), progress.Total(3), progress.Limit(8))
+		progress.Flagged(progress.FlagFold), progress.Total(3), progress.Limit(8))
 	var spans []*progress.Span
 	for _, node := range []string{"1", "2", "e"} {
 		_, span := progress.Start(ctx, progress.KindTarget, node, progress.Queued(), progress.Node(node))
@@ -309,7 +309,7 @@ func TestTheTreeReadsNamesBesideOtherCharactersAsTheTargets(t *testing.T) {
 	t.Parallel()
 	f := newTreeFixture(t, "bmc power off", treeSetup{})
 	ctx, step := progress.Start(f.ctx, progress.KindStep, "power off",
-		progress.WithFlags(progress.Fold), progress.Total(8), progress.Limit(8))
+		progress.Flagged(progress.FlagFold), progress.Total(8), progress.Limit(8))
 	failures := map[string]string{
 		"exe1":     "exe1-bmc: connection refused",
 		"exe2":     "exe2-bmc: connection refused",
@@ -351,7 +351,7 @@ func TestTheTreeReadsANameThatHoldsAnAddressAsTheTargets(t *testing.T) {
 	t.Parallel()
 	f := newTreeFixture(t, "bmc power off", treeSetup{})
 	ctx, step := progress.Start(f.ctx, progress.KindStep, "power off",
-		progress.WithFlags(progress.Fold), progress.Total(4), progress.Limit(4))
+		progress.Flagged(progress.FlagFold), progress.Total(4), progress.Limit(4))
 	failures := map[string]string{
 		"bmc-10.0.0.7":    "dial tcp bmc-10.0.0.7:623: connection refused",
 		"bmc-10.0.0.8":    "dial tcp bmc-10.0.0.8:623: connection refused",
@@ -385,11 +385,11 @@ bmc power off: failed in 2.0s: 0 ok, 4 failed
 func TestTheTreeRevealsASlowHiddenSpan(t *testing.T) {
 	t.Parallel()
 	f := newTreeFixture(t, "provision reinstall", treeSetup{})
-	_, quick := progress.Start(f.ctx, progress.KindStep, "resolve", progress.WithFlags(progress.Hidden))
+	_, quick := progress.Start(f.ctx, progress.KindStep, "resolve", progress.Flagged(progress.FlagHidden))
 	f.clock.Add(40 * time.Millisecond)
 	quick.End(nil)
 	f.clock.Add(460 * time.Millisecond)
-	ctx, slow := progress.Start(f.ctx, progress.KindStep, "check the boot paths", progress.WithFlags(progress.Hidden))
+	ctx, slow := progress.Start(f.ctx, progress.KindStep, "check the boot paths", progress.Flagged(progress.FlagHidden))
 	_, call := progress.Start(ctx, progress.KindCall, "ssh", progress.Node("install"), progress.Timeout(10*time.Minute))
 	checkScreen(t, f.draw(500*time.Millisecond), `
 provision reinstall · 0:01.0
@@ -400,7 +400,7 @@ provision reinstall · 0:02.0
 `)
 	call.End(nil)
 	slow.End(nil)
-	_, failed := progress.Start(f.ctx, progress.KindStep, "check Slurm jobs", progress.WithFlags(progress.Hidden))
+	_, failed := progress.Start(f.ctx, progress.KindStep, "check Slurm jobs", progress.Flagged(progress.FlagHidden))
 	f.clock.Add(10 * time.Millisecond)
 	failed.End(unreachable("login: connection refused"))
 	checkScreen(t, f.draw(time.Second), `
@@ -513,7 +513,7 @@ func TestTheTreeShowsTwoRootsSideBySide(t *testing.T) {
 	t.Parallel()
 	f := newTreeFixture(t, "provision status", treeSetup{})
 	start := func(name string, call func(ctx context.Context)) {
-		ctx, _ := progress.Start(f.ctx, progress.KindStep, name, progress.WithFlags(progress.Fold), progress.Total(5))
+		ctx, _ := progress.Start(f.ctx, progress.KindStep, name, progress.Flagged(progress.FlagFold), progress.Total(5))
 		ctxs, spans := targets(ctx, nodes(5)...)
 		for i, span := range spans {
 			f.clock.Add(100 * time.Millisecond)
@@ -522,7 +522,7 @@ func TestTheTreeShowsTwoRootsSideBySide(t *testing.T) {
 		}
 	}
 	start("read the power state", func(ctx context.Context) {
-		progress.Start(ctx, progress.KindCall, "redfish", progress.HTTP("GET", "/redfish/v1/Systems/1"))
+		progress.Start(ctx, progress.KindCall, "redfish", progress.HTTPRequest("GET", "/redfish/v1/Systems/1"))
 	})
 	start("read the uptime", func(ctx context.Context) {
 		progress.Start(ctx, progress.KindCall, "ssh", progress.Timeout(20*time.Second))
@@ -546,7 +546,7 @@ provision status · 0:02.0
 func TestTheTreeListsTheRunningByTenths(t *testing.T) {
 	t.Parallel()
 	f := newTreeFixture(t, "exec", treeSetup{})
-	ctx, _ := progress.Start(f.ctx, progress.KindStep, "run", progress.WithFlags(progress.Fold), progress.Total(4))
+	ctx, _ := progress.Start(f.ctx, progress.KindStep, "run", progress.Flagged(progress.FlagFold), progress.Total(4))
 	_, spans := targets(ctx, nodes(4)...)
 	for _, start := range []struct {
 		target int
@@ -577,7 +577,7 @@ exec · 0:02.0
 func TestTheRunningKeepTheirPlacesFromFrameToFrame(t *testing.T) {
 	t.Parallel()
 	f := newTreeFixture(t, "exec", treeSetup{})
-	ctx, _ := progress.Start(f.ctx, progress.KindStep, "run", progress.WithFlags(progress.Fold), progress.Total(2))
+	ctx, _ := progress.Start(f.ctx, progress.KindStep, "run", progress.Flagged(progress.FlagFold), progress.Total(2))
 	_, spans := targets(ctx, nodes(2)...)
 	f.clock.Add(410 * time.Millisecond)
 	spans[1].Run() // exe2 at 0.41s
@@ -598,7 +598,7 @@ func TestTheRunningKeepTheirPlacesFromFrameToFrame(t *testing.T) {
 func TestTheTreeFallsBackToTheCounter(t *testing.T) {
 	t.Parallel()
 	f := newTreeFixture(t, "exec", treeSetup{width: 100, height: 7})
-	ctx, _ := progress.Start(f.ctx, progress.KindStep, "run", progress.WithFlags(progress.Fold), progress.Total(3))
+	ctx, _ := progress.Start(f.ctx, progress.KindStep, "run", progress.Flagged(progress.FlagFold), progress.Total(3))
 	_, spans := targets(ctx, nodes(3)...)
 	spans[0].Run()
 	checkScreen(t, f.draw(time.Second), `
@@ -617,7 +617,7 @@ run · 0/3 · 1 running · 2 queued · 0:0
 	// In a theme the counter's line is drawn in it, as a Counter in that
 	// theme draws it, and cut to the width with its colours set back.
 	themed := newTreeFixture(t, "exec", treeSetup{width: 100, height: 7, theme: display.Neon, styles: true})
-	ctx, _ = progress.Start(themed.ctx, progress.KindStep, "run", progress.WithFlags(progress.Fold), progress.Total(3))
+	ctx, _ = progress.Start(themed.ctx, progress.KindStep, "run", progress.Flagged(progress.FlagFold), progress.Total(3))
 	_, spans = targets(ctx, nodes(3)...)
 	spans[0].Run()
 	themed.draw(time.Second)
@@ -636,7 +636,7 @@ run · 0/3 · 1 running · 2 queued · 0:0
 func TestTheTreeInASCII(t *testing.T) {
 	t.Parallel()
 	f := newTreeFixture(t, "exec", treeSetup{ascii: true})
-	ctx, step := progress.Start(f.ctx, progress.KindStep, "run", progress.WithFlags(progress.Fold), progress.Total(5), progress.Limit(1))
+	ctx, step := progress.Start(f.ctx, progress.KindStep, "run", progress.Flagged(progress.FlagFold), progress.Total(5), progress.Limit(1))
 	_, spans := targets(ctx, nodes(5)...)
 	for i, span := range spans[:4] {
 		span.Run()
@@ -741,7 +741,7 @@ func TestAWriteLandsAboveTheRegion(t *testing.T) {
 	t.Parallel()
 	f := newTreeFixture(t, "bmc power cycle", treeSetup{})
 	errOut := f.term.Writer(f.screen)
-	ctx, _ := progress.Start(f.ctx, progress.KindStep, "power cycle", progress.WithFlags(progress.Fold), progress.Total(2))
+	ctx, _ := progress.Start(f.ctx, progress.KindStep, "power cycle", progress.Flagged(progress.FlagFold), progress.Total(2))
 	_, spans := targets(ctx, "exe1", "exe2")
 	spans[0].Run()
 	f.draw(time.Second)
@@ -769,7 +769,7 @@ func TestTheTreeSaysItIsInterrupting(t *testing.T) {
 	t.Parallel()
 	interrupt := make(chan struct{})
 	f := newTreeFixture(t, "exec", treeSetup{interrupted: interrupt})
-	ctx, _ := progress.Start(f.ctx, progress.KindStep, "run", progress.WithFlags(progress.Fold), progress.Total(5), progress.Limit(2))
+	ctx, _ := progress.Start(f.ctx, progress.KindStep, "run", progress.Flagged(progress.FlagFold), progress.Total(5), progress.Limit(2))
 	_, spans := targets(ctx, nodes(5)...)
 	spans[0].Run()
 	spans[1].Run()
@@ -797,13 +797,13 @@ func TestTheTreeShowsTheLastLineOfOutput(t *testing.T) {
 	t.Parallel()
 	f := newTreeFixture(t, "cinc run", treeSetup{})
 	ctx, _ := progress.Start(f.ctx, progress.KindStep, "run",
-		progress.WithFlags(progress.Fold|progress.ShowLines), progress.Total(2))
+		progress.Flagged(progress.FlagFold|progress.FlagShowLines), progress.Total(2))
 	ctxs, spans := targets(ctx, "exe1", "exe2")
 	for i, span := range spans {
 		span.Run()
 		callCtx, _ := progress.Start(ctxs[i], progress.KindCall, "ssh", progress.Timeout(30*time.Minute))
 		if i == 0 {
-			out := progress.Tee(callCtx, io.Discard, progress.Stdout, nil)
+			out := progress.Tee(callCtx, io.Discard, progress.StreamStdout, nil)
 			_, _ = io.WriteString(out, "Starting Cinc Client\nConverging 12 resources\n")
 		}
 	}
@@ -821,7 +821,7 @@ func TestTheRowsFitTheTerminal(t *testing.T) {
 	t.Parallel()
 	f := newTreeFixture(t, "exec", treeSetup{width: 40})
 	ctx, _ := progress.Start(f.ctx, progress.KindStep, "run the command on every node of the cluster",
-		progress.WithFlags(progress.Fold), progress.Total(1))
+		progress.Flagged(progress.FlagFold), progress.Total(1))
 	_, spans := targets(ctx, "exe1")
 	spans[0].Run()
 	spans[0].End(errors.New("exe1: " + strings.Repeat("ü", 60)))
@@ -838,7 +838,7 @@ exec · 0:02.0
 func TestARowOfWideCharactersFitsTheTerminal(t *testing.T) {
 	t.Parallel()
 	f := newTreeFixture(t, "exec", treeSetup{width: 40})
-	ctx, _ := progress.Start(f.ctx, progress.KindStep, "run", progress.WithFlags(progress.Fold), progress.Total(1))
+	ctx, _ := progress.Start(f.ctx, progress.KindStep, "run", progress.Flagged(progress.FlagFold), progress.Total(1))
 	_, spans := targets(ctx, "exe1")
 	spans[0].Run()
 	spans[0].End(errors.New("exe1: " + strings.Repeat("失败", 40)))
@@ -887,7 +887,7 @@ func TestAStepWithNoNamePassesItsChildrenUp(t *testing.T) {
 	f := newTreeFixture(t, "node hw", treeSetup{})
 	ctx, unnamed := progress.Start(f.ctx, progress.KindStep, "")
 	_, step := progress.Start(ctx, progress.KindStep, "read the inventory")
-	askCtx, ask := progress.Start(ctx, progress.KindStep, "ask the nodes", progress.WithFlags(progress.Fold), progress.Total(1))
+	askCtx, ask := progress.Start(ctx, progress.KindStep, "ask the nodes", progress.Flagged(progress.FlagFold), progress.Total(1))
 	_, spans := targets(askCtx, "exe1")
 	spans[0].Run()
 	checkScreen(t, f.draw(time.Second), `
@@ -968,7 +968,7 @@ func TestTheTreeDoesNotDrawTheSameFrameTwice(t *testing.T) {
 	capture := &progresstest.Capture{}
 	bus := progress.NewBus(progress.BusOptions{Sinks: []progress.Sink{capture, tree}, Now: c.Now})
 	ctx, command := progress.Start(progress.WithBus(context.Background(), bus), progress.KindCommand, "exec")
-	ctx, step := progress.Start(ctx, progress.KindStep, "run", progress.WithFlags(progress.Fold), progress.Total(1))
+	ctx, step := progress.Start(ctx, progress.KindStep, "run", progress.Flagged(progress.FlagFold), progress.Total(1))
 	_, spans := targets(ctx, "exe1")
 	spans[0].Run()
 	c.Add(time.Second)
@@ -1014,7 +1014,7 @@ func TestTheTreeDrawsAShortListWhole(t *testing.T) {
 	t.Parallel()
 	f := newTreeFixture(t, "provision status", treeSetup{})
 	start := func(name string, n int) {
-		ctx, _ := progress.Start(f.ctx, progress.KindStep, name, progress.WithFlags(progress.Fold), progress.Total(n))
+		ctx, _ := progress.Start(f.ctx, progress.KindStep, name, progress.Flagged(progress.FlagFold), progress.Total(n))
 		_, spans := targets(ctx, nodes(n)...)
 		for _, span := range spans {
 			span.Run()
@@ -1040,7 +1040,7 @@ provision status · 0:01.0
 func TestTheTreeCutsTheFailures(t *testing.T) {
 	t.Parallel()
 	f := newTreeFixture(t, "exec", treeSetup{})
-	ctx, _ := progress.Start(f.ctx, progress.KindStep, "run", progress.WithFlags(progress.Fold), progress.Total(14))
+	ctx, _ := progress.Start(f.ctx, progress.KindStep, "run", progress.Flagged(progress.FlagFold), progress.Total(14))
 	_, spans := targets(ctx, nodes(14)...)
 	for _, span := range spans {
 		span.Run()
@@ -1109,7 +1109,7 @@ provision reinstall · 0:03.0
 func TestTheTreeDrawsTheCallOfACountedStep(t *testing.T) {
 	t.Parallel()
 	f := newTreeFixture(t, "provision reinstall", treeSetup{})
-	ctx, _ := progress.Start(f.ctx, progress.KindStep, "boot", progress.WithFlags(progress.Fold), progress.Total(1))
+	ctx, _ := progress.Start(f.ctx, progress.KindStep, "boot", progress.Flagged(progress.FlagFold), progress.Total(1))
 	targets(ctx, "exe1")
 	progress.Start(ctx, progress.KindCall, "ssh", progress.Node("install"), progress.Timeout(30*time.Second))
 	checkScreen(t, f.draw(3*time.Second), `
@@ -1124,7 +1124,7 @@ provision reinstall · 0:03.0
 func TestTheTreeReadsTheBoundOfARequest(t *testing.T) {
 	t.Parallel()
 	f := newTreeFixture(t, "cinc run", treeSetup{})
-	ctx, _ := progress.Start(f.ctx, progress.KindStep, "run", progress.WithFlags(progress.Fold), progress.Total(2))
+	ctx, _ := progress.Start(f.ctx, progress.KindStep, "run", progress.Flagged(progress.FlagFold), progress.Total(2))
 	ctxs, spans := targets(ctx, "exe1", "exe2")
 	for _, span := range spans {
 		span.Run()
@@ -1196,7 +1196,7 @@ deploy · 0:01.1
 func TestTheTreeFoldsWhatBatchesLeftOut(t *testing.T) {
 	t.Parallel()
 	f := newTreeFixture(t, "bmc power on", treeSetup{})
-	ctx, step := progress.Start(f.ctx, progress.KindStep, "power on", progress.WithFlags(progress.Fold), progress.Total(6))
+	ctx, step := progress.Start(f.ctx, progress.KindStep, "power on", progress.Flagged(progress.FlagFold), progress.Total(6))
 	batch := func(i int, set string) (context.Context, *progress.Span) {
 		return progress.Start(ctx, progress.KindBatch, fmt.Sprintf("%d/3", i), progress.Queued(),
 			progress.Batch(i, 3), progress.Node(set), progress.Total(2))
@@ -1236,7 +1236,7 @@ bmc power on · 0:01.0
 func TestTheTreeFoldsTargetsThatAreNoNodeSet(t *testing.T) {
 	t.Parallel()
 	f := newTreeFixture(t, "switch status", treeSetup{})
-	ctx, _ := progress.Start(f.ctx, progress.KindStep, "read the ports", progress.WithFlags(progress.Fold), progress.Total(5))
+	ctx, _ := progress.Start(f.ctx, progress.KindStep, "read the ports", progress.Flagged(progress.FlagFold), progress.Total(5))
 	_, spans := targets(ctx, "exe1", "exe2", "port 10", "exe3", "exe4")
 	for _, span := range spans {
 		span.Run()
@@ -1280,7 +1280,7 @@ func TestTheTreeTakesEventsNoBusSends(t *testing.T) {
 	t.Cleanup(tree.Close)
 	for _, e := range []progress.Event{
 		{Type: progress.TypeStart, Span: 1, Kind: progress.KindCommand, Name: "exec", State: progress.StateRunning},
-		{Type: progress.TypeStart, Span: 2, Parent: 1, Kind: progress.KindStep, Name: "run", Flags: progress.Fold,
+		{Type: progress.TypeStart, Span: 2, Parent: 1, Kind: progress.KindStep, Name: "run", Flags: progress.FlagFold,
 			State: progress.StateRunning, Fields: progress.Fields{Total: 1}},
 		{Type: progress.TypeStart, Span: 2, Parent: 1, Kind: progress.KindStep, Name: "run again", State: progress.StateRunning},
 		{Type: progress.TypeStart, Span: 3, Parent: 2, Kind: progress.KindTarget, Name: "exe1", State: progress.StateQueued},
@@ -1322,7 +1322,7 @@ func TestTheTreeStartsOnce(t *testing.T) {
 func TestTheTreeFoldsALargeSetOnceASecond(t *testing.T) {
 	t.Parallel()
 	f := newTreeFixture(t, "exec", treeSetup{})
-	ctx, step := progress.Start(f.ctx, progress.KindStep, "run", progress.WithFlags(progress.Fold),
+	ctx, step := progress.Start(f.ctx, progress.KindStep, "run", progress.Flagged(progress.FlagFold),
 		progress.Total(400), progress.Limit(400))
 	_, spans := targets(ctx, nodes(400)...)
 	fail := func(from, to int) {
@@ -1365,9 +1365,9 @@ exec · 0:02.1
 func TestTheTreeDrawsWorkOfNoKnownSize(t *testing.T) {
 	t.Parallel()
 	f := newTreeFixture(t, "index", treeSetup{})
-	_, walk := progress.Start(f.ctx, progress.KindStep, "indexing the archive", progress.Work(progress.Items, 0))
+	_, walk := progress.Start(f.ctx, progress.KindStep, "indexing the archive", progress.Work(progress.UnitItems, 0))
 	ctx, dump := progress.Start(f.ctx, progress.KindStep, "receiving the dump")
-	_, call := progress.Start(ctx, progress.KindCall, "dump", progress.HTTP("GET", "/export"), progress.Work(progress.Bytes, -1))
+	_, call := progress.Start(ctx, progress.KindCall, "dump", progress.HTTPRequest("GET", "/export"), progress.Work(progress.UnitBytes, -1))
 	for range 73 {
 		f.clock.Add(100 * time.Millisecond)
 		walk.Advance(660)
@@ -1397,12 +1397,12 @@ func TestTheTreeDrawsWorkInPercent(t *testing.T) {
 	t.Parallel()
 	f := newTreeFixture(t, "bmc firmware", treeSetup{})
 	ctx, step := progress.Start(f.ctx, progress.KindStep, "updating the BMC firmware",
-		progress.WithFlags(progress.Fold), progress.Total(6), progress.Limit(3))
+		progress.Flagged(progress.FlagFold), progress.Total(6), progress.Limit(3))
 	ctxs, spans := targets(ctx, "exe0311", "exe0312", "exe0313", "exe0314", "exe0315", "exe0316")
 	update := func(i int) *progress.Span {
 		spans[i].Run()
 		_, call := progress.Start(ctxs[i], progress.KindCall, "firmware update",
-			progress.HTTP("GET", fmt.Sprintf("/redfish/v1/TaskService/Tasks/%d", i+5)), progress.Work(progress.Percent, 100))
+			progress.HTTPRequest("GET", fmt.Sprintf("/redfish/v1/TaskService/Tasks/%d", i+5)), progress.Work(progress.UnitPercent, 100))
 		return call
 	}
 	for i := range 2 {
@@ -1449,12 +1449,12 @@ bmc firmware · 1:12.0
 func TestTheTreeDrawsTheWorkOfACallAndTheLinesOfSteps(t *testing.T) {
 	t.Parallel()
 	f := newTreeFixture(t, "deploy", treeSetup{})
-	_, call := progress.Start(f.ctx, progress.KindCall, "upload", progress.HTTP("PUT", "/images/rocky.qcow2"),
-		progress.Work(progress.Bytes, 512<<20))
+	_, call := progress.Start(f.ctx, progress.KindCall, "upload", progress.HTTPRequest("PUT", "/images/rocky.qcow2"),
+		progress.Work(progress.UnitBytes, 512<<20))
 	ctx, step := progress.Start(f.ctx, progress.KindStep, "copying the image",
-		progress.WithFlags(progress.Fold), progress.Total(2), progress.Limit(2))
-	_, spans := progress.Start(ctx, progress.KindTarget, "exe1", progress.Queued(), progress.Work(progress.Items, 40))
-	_, other := progress.Start(ctx, progress.KindTarget, "exe2", progress.Queued(), progress.Work(progress.Items, 0))
+		progress.Flagged(progress.FlagFold), progress.Total(2), progress.Limit(2))
+	_, spans := progress.Start(ctx, progress.KindTarget, "exe1", progress.Queued(), progress.Work(progress.UnitItems, 40))
+	_, other := progress.Start(ctx, progress.KindTarget, "exe2", progress.Queued(), progress.Work(progress.UnitItems, 0))
 	spans.Run()
 	for range 20 {
 		f.clock.Add(100 * time.Millisecond)
@@ -1472,7 +1472,7 @@ deploy · 0:02.0
 	other.Advance(3)
 	other.End(nil)
 	step.End(nil)
-	_, failed := progress.Start(f.ctx, progress.KindStep, "checking the image", progress.Work(progress.Bytes, 0))
+	_, failed := progress.Start(f.ctx, progress.KindStep, "checking the image", progress.Work(progress.UnitBytes, 0))
 	failed.Advance(1536)
 	failed.End(errors.New("checksum mismatch"))
 	call.End(nil)

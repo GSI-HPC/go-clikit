@@ -12,8 +12,7 @@ import (
 )
 
 // topicsAnnotation marks a root whose help command shows topics, so that
-// Strict and HelpTopics tell when they are called in an order that would
-// lose them.
+// Strict tells when it is called again, which would lose them.
 const topicsAnnotation = "cobratree.topics"
 
 // Topics lets the help command of a strict tree show topics that are no
@@ -39,30 +38,6 @@ func Topics(lookup func(name string) (text string, ok bool), names func() []stri
 		panic("cobratree: Topics needs a lookup")
 	}
 	return func(o *options) { o.lookup, o.names = lookup, names }
-}
-
-// HelpTopics lets the help command of the tree under root show topics that
-// are no command, as Topics does, but offers none of them to completion.
-// The program calls it after Strict, whose help command it extends; on a
-// tree that is not strict, a word that is neither a command nor a topic
-// shows the root's help, as cobra's help does. It returns the help
-// command, for the program to word.
-//
-// It panics when the tree shows topics already, from Topics or an earlier
-// HelpTopics, and on a tree without subcommands, which has no help
-// command; Strict panics when it is called after HelpTopics, whose topics
-// it would drop.
-//
-// Deprecated: Pass Topics to Strict, which shows the topics after its
-// checks, whatever order the program writes, and offers their names to
-// completion (decision 36).
-func HelpTopics(root *cobra.Command, topic func(name string) (text string, ok bool)) *cobra.Command {
-	if hasTopics(root) {
-		panic(fmt.Sprintf("cobratree: HelpTopics called on %q, whose help shows topics already: pass Topics to Strict alone", root.Name()))
-	}
-	help := helpCommand(root)
-	showTopics(root, help, topic, nil)
-	return help
 }
 
 // hasTopics reports whether the help command of root shows topics.

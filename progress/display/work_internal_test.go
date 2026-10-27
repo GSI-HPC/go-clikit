@@ -21,27 +21,27 @@ func TestAmountText(t *testing.T) {
 		v    float64
 		want string
 	}{
-		{progress.Bytes, 0, "0 B"},
-		{progress.Bytes, 512, "512 B"},
-		{progress.Bytes, 999, "999 B"},
-		{progress.Bytes, 1000, "1.0 KiB"},
-		{progress.Bytes, 85.3 * (1 << 20), "85.3 MiB"},
-		{progress.Bytes, 99.94 * (1 << 20), "99.9 MiB"},
-		{progress.Bytes, 99.96 * (1 << 20), "100 MiB"},
-		{progress.Bytes, 312 << 20, "312 MiB"},
-		{progress.Bytes, 999.4 * (1 << 20), "999 MiB"},
-		{progress.Bytes, 999.6 * (1 << 20), "1.0 GiB"},
-		{progress.Bytes, 1.2 * (1 << 30), "1.2 GiB"},
-		{progress.Bytes, 3 << 40, "3.0 TiB"},
-		{progress.Bytes, 2048 << 40, "2048 TiB"},
-		{progress.Items, 9312, "9312"},
-		{progress.Items, 9999, "9999"},
-		{progress.Items, 10000, "10.0k"},
-		{progress.Items, 48200, "48.2k"},
-		{progress.Items, 312000, "312k"},
-		{progress.Items, 999600, "1.0M"},
-		{progress.Items, 1.2e6, "1.2M"},
-		{progress.Items, 5e15, "5000T"},
+		{progress.UnitBytes, 0, "0 B"},
+		{progress.UnitBytes, 512, "512 B"},
+		{progress.UnitBytes, 999, "999 B"},
+		{progress.UnitBytes, 1000, "1.0 KiB"},
+		{progress.UnitBytes, 85.3 * (1 << 20), "85.3 MiB"},
+		{progress.UnitBytes, 99.94 * (1 << 20), "99.9 MiB"},
+		{progress.UnitBytes, 99.96 * (1 << 20), "100 MiB"},
+		{progress.UnitBytes, 312 << 20, "312 MiB"},
+		{progress.UnitBytes, 999.4 * (1 << 20), "999 MiB"},
+		{progress.UnitBytes, 999.6 * (1 << 20), "1.0 GiB"},
+		{progress.UnitBytes, 1.2 * (1 << 30), "1.2 GiB"},
+		{progress.UnitBytes, 3 << 40, "3.0 TiB"},
+		{progress.UnitBytes, 2048 << 40, "2048 TiB"},
+		{progress.UnitItems, 9312, "9312"},
+		{progress.UnitItems, 9999, "9999"},
+		{progress.UnitItems, 10000, "10.0k"},
+		{progress.UnitItems, 48200, "48.2k"},
+		{progress.UnitItems, 312000, "312k"},
+		{progress.UnitItems, 999600, "1.0M"},
+		{progress.UnitItems, 1.2e6, "1.2M"},
+		{progress.UnitItems, 5e15, "5000T"},
 		{progress.Unit(9), 12, "12"},
 	} {
 		if got := amountText(tc.u, tc.v); got != tc.want {
@@ -58,13 +58,13 @@ func TestOutOfText(t *testing.T) {
 		amount, size int64
 		want         string
 	}{
-		{progress.Bytes, 512 << 20, 2 << 30, "0.5/2.0 GiB"},
-		{progress.Bytes, 2254857830, 2 << 30, "2.1/2.0 GiB"},
-		{progress.Bytes, 85 << 20, 312 << 20, "85.0/312 MiB"},
-		{progress.Bytes, 100, 512, "100/512 B"},
-		{progress.Items, 48200, 50000, "48.2/50.0k"},
-		{progress.Items, 312, 480, "312/480"},
-		{progress.Items, 0, 0, "0/0"},
+		{progress.UnitBytes, 512 << 20, 2 << 30, "0.5/2.0 GiB"},
+		{progress.UnitBytes, 2254857830, 2 << 30, "2.1/2.0 GiB"},
+		{progress.UnitBytes, 85 << 20, 312 << 20, "85.0/312 MiB"},
+		{progress.UnitBytes, 100, 512, "100/512 B"},
+		{progress.UnitItems, 48200, 50000, "48.2/50.0k"},
+		{progress.UnitItems, 312, 480, "312/480"},
+		{progress.UnitItems, 0, 0, "0/0"},
 	} {
 		if got := outOfText(tc.u, tc.amount, tc.size); got != tc.want {
 			t.Errorf("outOfText(%v, %d, %d) = %q, want %q", tc.u, tc.amount, tc.size, got, tc.want)
@@ -81,19 +81,19 @@ func TestRateText(t *testing.T) {
 		v    float64
 		want string
 	}{
-		{progress.Items, 0, "0.0/s"},
-		{progress.Items, 0.4, "0.4/s"},
-		{progress.Items, 9.94, "9.9/s"},
-		{progress.Items, 9.96, "10/s"},
-		{progress.Items, 312, "312/s"},
-		{progress.Items, 999.4, "999/s"},
-		{progress.Items, 999.5, "1.0k/s"},
-		{progress.Items, 6600, "6.6k/s"},
-		{progress.Bytes, 0.4, "0.4 B/s"},
-		{progress.Bytes, 512, "512 B/s"},
-		{progress.Bytes, 999.5, "1.0 KiB/s"},
-		{progress.Bytes, 85.3 * (1 << 20), "85.3 MiB/s"},
-		{progress.Bytes, 797 << 20, "797 MiB/s"},
+		{progress.UnitItems, 0, "0.0/s"},
+		{progress.UnitItems, 0.4, "0.4/s"},
+		{progress.UnitItems, 9.94, "9.9/s"},
+		{progress.UnitItems, 9.96, "10/s"},
+		{progress.UnitItems, 312, "312/s"},
+		{progress.UnitItems, 999.4, "999/s"},
+		{progress.UnitItems, 999.5, "1.0k/s"},
+		{progress.UnitItems, 6600, "6.6k/s"},
+		{progress.UnitBytes, 0.4, "0.4 B/s"},
+		{progress.UnitBytes, 512, "512 B/s"},
+		{progress.UnitBytes, 999.5, "1.0 KiB/s"},
+		{progress.UnitBytes, 85.3 * (1 << 20), "85.3 MiB/s"},
+		{progress.UnitBytes, 797 << 20, "797 MiB/s"},
 	} {
 		if got := rateText(tc.u, tc.v); got != tc.want {
 			t.Errorf("rateText(%v, %v) = %q, want %q", tc.u, tc.v, got, tc.want)
@@ -147,7 +147,7 @@ func TestShareLeftAndStalled(t *testing.T) {
 // its rate.
 func TestWorkText(t *testing.T) {
 	t.Parallel()
-	bounded := progress.Reading{Unit: progress.Bytes, Amount: 1152 << 20, Size: 2 << 30, Bound: progress.ByBelow,
+	bounded := progress.Reading{Unit: progress.UnitBytes, Amount: 1152 << 20, Size: 2 << 30, Bound: progress.BoundChildren,
 		Fraction: 0.5625, Rate: 80 << 20, Left: 11200 * time.Millisecond}
 	ascii := lookOf(Tide.In(ColorsNone), true)
 	for _, tc := range []struct {
@@ -164,11 +164,11 @@ func TestWorkText(t *testing.T) {
 		{"a bar", ascii, bounded, 0, "[###...] 1.1/2.0 GiB - 56% - 80.0 MiB/s - ~12s left"},
 		{"the bar last", ascii, bounded, 3, "[###...] 56%"},
 		{"no bar", ascii, bounded, 4, "56%"},
-		{"percent", ascii, progress.Reading{Unit: progress.Percent, Amount: 40, Size: 100, Bound: progress.BySize,
+		{"percent", ascii, progress.Reading{Unit: progress.UnitPercent, Amount: 40, Size: 100, Bound: progress.BoundSize,
 			Fraction: 0.4, Rate: 2, Left: 32 * time.Second, Stalled: 6 * time.Second}, 0, "[##....] 40% - ~32s left"},
-		{"unbounded", ascii, progress.Reading{Unit: progress.Items, Amount: 48200, Rate: 6600}, 0, "48.2k - 6.6k/s"},
-		{"unbounded, given up", ascii, progress.Reading{Unit: progress.Items, Amount: 48200, Rate: 6600}, 3, ""},
-		{"stalled", unicodeLook, progress.Reading{Unit: progress.Bytes, Amount: 312 << 20, Stalled: 6100 * time.Millisecond},
+		{"unbounded", ascii, progress.Reading{Unit: progress.UnitItems, Amount: 48200, Rate: 6600}, 0, "48.2k - 6.6k/s"},
+		{"unbounded, given up", ascii, progress.Reading{Unit: progress.UnitItems, Amount: 48200, Rate: 6600}, 3, ""},
+		{"stalled", unicodeLook, progress.Reading{Unit: progress.UnitBytes, Amount: 312 << 20, Stalled: 6100 * time.Millisecond},
 			0, "312 MiB · stalled 6.1s"},
 	} {
 		if got := workOf(tc.g, tc.r, workBar).text(tc.g.sep, tc.giveUp); got != tc.want {
@@ -179,7 +179,7 @@ func TestWorkText(t *testing.T) {
 	// cancellation.
 	const muted, canceled = "\x1b[38;5;66m", "\x1b[38;5;103m"
 	tide := lookOf(Tide, false)
-	stalled := progress.Reading{Unit: progress.Bytes, Amount: 312 << 20, Stalled: 6100 * time.Millisecond}
+	stalled := progress.Reading{Unit: progress.UnitBytes, Amount: 312 << 20, Stalled: 6100 * time.Millisecond}
 	if got, want := workOf(tide, stalled, workBar).text(" ", 0), muted+"312 MiB"+reset+" "+canceled+"stalled 6.1s"+reset; got != want {
 		t.Errorf("stalled in Tide: %q, want %q", got, want)
 	}
@@ -193,16 +193,16 @@ func TestEndedText(t *testing.T) {
 		r    progress.Reading
 		want string
 	}{
-		{progress.Reading{Unit: progress.Bytes, Amount: 2 << 30, Rate: 80 << 20}, "2.0 GiB at 80.0 MiB/s"},
-		{progress.Reading{Unit: progress.Bytes, Amount: 1536}, "1.5 KiB"},
-		{progress.Reading{Unit: progress.Percent, Amount: 100, Rate: 4}, ""},
+		{progress.Reading{Unit: progress.UnitBytes, Amount: 2 << 30, Rate: 80 << 20}, "2.0 GiB at 80.0 MiB/s"},
+		{progress.Reading{Unit: progress.UnitBytes, Amount: 1536}, "1.5 KiB"},
+		{progress.Reading{Unit: progress.UnitPercent, Amount: 100, Rate: 4}, ""},
 	} {
 		if got := endedText(unicodeLook, tc.r); got != tc.want {
 			t.Errorf("endedText(%+v) = %q, want %q", tc.r, got, tc.want)
 		}
 	}
 	const muted = "\x1b[38;5;66m"
-	if got, want := endedText(lookOf(Tide, false), progress.Reading{Unit: progress.Items, Amount: 43, Rate: 21.5}),
+	if got, want := endedText(lookOf(Tide, false), progress.Reading{Unit: progress.UnitItems, Amount: 43, Rate: 21.5}),
 		muted+"43"+reset+" at "+muted+"22/s"+reset; got != want {
 		t.Errorf("in Tide: %q, want %q", got, want)
 	}

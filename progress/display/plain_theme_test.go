@@ -31,7 +31,7 @@ func plainThemeWork(t *testing.T, o display.PlainOptions) string {
 	t.Helper()
 	f := newPlainFixtureWith(t, "bmc power on", o)
 	stepCtx, step := progress.Start(f.ctx, progress.KindStep, "power on",
-		progress.WithFlags(progress.Fold), progress.Total(6), progress.Limit(2))
+		progress.Flagged(progress.FlagFold), progress.Total(6), progress.Limit(2))
 	firstCtx, first := progress.Start(stepCtx, progress.KindBatch, "1/2", progress.Queued(), progress.Batch(1, 2), progress.Total(5))
 	_, second := progress.Start(stepCtx, progress.KindBatch, "2/2", progress.Queued(), progress.Batch(2, 2), progress.Total(1),
 		progress.Node("exe6"))
@@ -57,7 +57,7 @@ func plainThemeWork(t *testing.T, o display.PlainOptions) string {
 	second.Skip("not tried: an earlier batch failed")
 	step.End(errors.New("1 of 6 hosts failed: exe1"))
 
-	offCtx, off := progress.Start(f.ctx, progress.KindStep, "power off", progress.WithFlags(progress.Fold), progress.Total(2))
+	offCtx, off := progress.Start(f.ctx, progress.KindStep, "power off", progress.Flagged(progress.FlagFold), progress.Total(2))
 	_, left := progress.Start(offCtx, progress.KindBatch, "1/1", progress.Queued(), progress.Batch(1, 1), progress.Total(2),
 		progress.Node("exe[7-8]"))
 	left.End(context.Canceled)

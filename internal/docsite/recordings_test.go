@@ -90,7 +90,7 @@ func record(t *testing.T, name string, theme display.Theme, newDisplay func(*dis
 	ctx, command := progress.Start(progress.WithBus(context.Background(), bus), progress.KindCommand, "reinstall")
 
 	fctx, fetch := progress.Start(ctx, progress.KindStep, "fetching the base image", progress.Work(progress.UnitBytes, 2<<30))
-	_, get := progress.Start(fctx, progress.KindCall, "http", progress.HTTP("GET", "/images/rocky-9.4.qcow2"))
+	_, get := progress.Start(fctx, progress.KindCall, "http", progress.HTTPRequest("GET", "/images/rocky-9.4.qcow2"))
 	for range 10 {
 		fetch.Advance(int64(2<<30) / 10)
 		tick(500 * time.Millisecond)
@@ -117,7 +117,7 @@ func record(t *testing.T, name string, theme display.Theme, newDisplay func(*dis
 		next++
 		targets[i].Run()
 		_, calls[i] = progress.Start(ctxs[i], progress.KindCall, "redfish",
-			progress.HTTP("POST", "/redfish/v1/Systems/1"), progress.Timeout(30*time.Second))
+			progress.HTTPRequest("POST", "/redfish/v1/Systems/1"), progress.Timeout(30*time.Second))
 		running = append(running, i)
 	}
 	for range 4 {

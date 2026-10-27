@@ -293,59 +293,6 @@ func TestTheOptionsChangeTheLimitTheFieldAndTheRefusal(t *testing.T) {
 	}
 }
 
-// The former names of the fields are read while the new ones are empty,
-// and the new ones win.
-func TestTheFormerNamesOfTheOptionsStillWork(t *testing.T) {
-	t.Parallel()
-
-	h := newSessions(t, func(o *session.Options) {
-		*o = session.Options{Token: token, Cookie: "prog_ui_", Header: header, Field: "f"}
-	})
-	c, csrf := login(t, h)
-	if c.Name != cookie {
-		t.Errorf("the cookie of Cookie is %q, want %q", c.Name, cookie)
-	}
-	for _, set := range []func(*http.Request){
-		func(r *http.Request) { r.Header.Set(header, csrf) },
-		nil,
-	} {
-		body := "f=" + url.QueryEscape(csrf)
-		w := serve(h, http.MethodPost, "/", body, func(r *http.Request) {
-			r.AddCookie(c)
-			if set != nil {
-				set(r)
-			}
-		})
-		if w.Code != http.StatusOK {
-			t.Errorf("the token in Header or Field: got %d, want 200", w.Code)
-		}
-	}
-
-	h = newSessions(t, func(o *session.Options) {
-		o.Cookie, o.Header, o.Field = "old_", "X-Old", "old"
-		o.CSRFField = "new"
-	})
-	c, csrf = login(t, h)
-	w := serve(h, http.MethodPost, "/", "new="+url.QueryEscape(csrf), func(r *http.Request) { r.AddCookie(c) })
-	if c.Name != cookie || w.Code != http.StatusOK {
-		t.Errorf("the new names: cookie %q and %d, want %q and 200", c.Name, w.Code, cookie)
-	}
-	if session.DefaultField != session.DefaultCSRFField {
-		t.Errorf("DefaultField is %q, want %q", session.DefaultField, session.DefaultCSRFField)
-	}
-}
-
-// Sessions is still the manager, under its former name.
-func TestSessionsIsManager(t *testing.T) {
-	t.Parallel()
-
-	var s *session.Sessions
-	s, err := session.New(session.Options{Token: token, CookiePrefix: "prog_ui_", CSRFHeader: header})
-	if err != nil || s == nil {
-		t.Errorf("New = %v, %v", s, err)
-	}
-}
-
 // Outside the middleware a request has no CSRF token, and every token is
 // new.
 func TestCSRFIsEmptyOutsideASessionAndTokensDiffer(t *testing.T) {

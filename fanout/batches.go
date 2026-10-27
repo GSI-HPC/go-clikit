@@ -28,11 +28,6 @@ type BatchOptions struct {
 	// it. run enforces it, as a Map given it as MapOptions.Limit does.
 	// Below one records none.
 	ReportLimit int
-	// Limit is the old name of ReportLimit, read when ReportLimit is zero.
-	//
-	// Deprecated: Use ReportLimit. Batches enforces no limit, which the old
-	// name, the same as MapOptions.Limit, hid (decision 36).
-	Limit int
 	// Pause is how long to wait between two batches. The wait ends early,
 	// and its timer is stopped, when the context ends.
 	Pause time.Duration
@@ -118,7 +113,7 @@ func Batches(ctx context.Context, nodes *nodeset.NodeSet, o BatchOptions, run fu
 	chunks := nodes.Split(parts)
 
 	stepCtx, step := progress.Start(ctx, progress.KindStep, o.Step,
-		progress.WithFlags(progress.Fold), progress.Total(nodes.Len()))
+		progress.Flagged(progress.FlagFold), progress.Total(nodes.Len()))
 	out := make([]Batch, len(chunks))
 	ctxs := make([]context.Context, len(chunks))
 	spans := make([]*progress.Span, len(chunks))
@@ -126,7 +121,7 @@ func Batches(ctx context.Context, nodes *nodeset.NodeSet, o BatchOptions, run fu
 		out[i].Nodes = chunk
 		ctxs[i], spans[i] = progress.Start(stepCtx, progress.KindBatch, fmt.Sprintf("%d/%d", i+1, len(chunks)),
 			progress.Queued(), progress.Batch(i+1, len(chunks)), progress.Node(chunk.String()),
-			progress.Total(chunk.Len()), progress.Limit(o.reportLimit()))
+			progress.Total(chunk.Len()), progress.Limit(max(0, o.ReportLimit)))
 	}
 
 	// err is what ended the run: the error of the batch that failed, or
@@ -168,16 +163,6 @@ func Batches(ctx context.Context, nodes *nodeset.NodeSet, o BatchOptions, run fu
 	}
 	step.End(err)
 	return out, err
-}
-
-// reportLimit is the limit Batches records on each batch's span: ReportLimit,
-// or the deprecated Limit when ReportLimit is zero, and none below one.
-func (o BatchOptions) reportLimit() int {
-	limit := o.ReportLimit
-	if limit == 0 {
-		limit = o.Limit
-	}
-	return max(0, limit)
 }
 
 // leftOut is what a batch or a target the context left out, or cut short,

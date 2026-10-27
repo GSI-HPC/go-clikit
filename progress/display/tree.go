@@ -84,7 +84,7 @@ const (
 // reads as the amount, out of the size when there is one, the share done,
 // the rate and the time left, "1.1/2.0 GiB · 56% · 80.0 MiB/s · ~12s left",
 // with how long the work has stalled in place of the rate once it has not
-// grown for five seconds; work in progress.Percent draws its share and its
+// grown for five seconds; work in progress.UnitPercent draws its share and its
 // time left alone, and work of no known size its amount and its rate. A row
 // too wide for the terminal gives up its request first, as it is cut off,
 // then the time left, the rate, the amount and the bar, in that order. The
@@ -352,7 +352,7 @@ func (t *Tree) begin(e progress.Event) {
 		p.calls = append(p.calls, s)
 	}
 	s.underTarget = p.kind == progress.KindTarget || p.underTarget
-	if e.Kind != progress.KindCall && e.Flags&progress.Hidden == 0 {
+	if e.Kind != progress.KindCall && e.Flags&progress.FlagHidden == 0 {
 		p.drawsBelow = true
 	}
 	s.path = p.path
@@ -415,7 +415,7 @@ func (t *Tree) finished(e progress.Event, s *treeSpan, count progress.Count, cou
 	ran := !s.ran.IsZero()
 	d := e.Time.Sub(s.ran)
 	if e.Status == progress.StatusOK {
-		if s.flags&progress.Hidden != 0 && (!ran || d < revealAfter) || d < quick && !s.drawsBelow {
+		if s.flags&progress.FlagHidden != 0 && (!ran || d < revealAfter) || d < quick && !s.drawsBelow {
 			return
 		}
 	}
@@ -839,7 +839,7 @@ func (f *frame) drawn(s *treeSpan) bool {
 		return false
 	}
 	age := f.now.Sub(s.ran)
-	if s.flags&progress.Hidden != 0 && age < revealAfter {
+	if s.flags&progress.FlagHidden != 0 && age < revealAfter {
 		return false
 	}
 	return s.drawsBelow || age >= quick
@@ -921,7 +921,7 @@ func (f *frame) counted(depth int, head string, c progress.Count, r progress.Rea
 	var w work
 	if worked {
 		w = workOf(g, r, 0)
-		if r.Bound != progress.Unbounded {
+		if r.Bound != progress.BoundNone {
 			bar = g.fractionBar(r.Fraction, c, treeBar)
 		}
 	}
@@ -1112,7 +1112,7 @@ func (f *frame) target(s *treeSpan, depth int) string {
 	r, worked := f.t.meter.Read(s.id, f.now)
 	text := f.fitted(depth, g.spinner(f.now.Sub(f.t.start))+" "+s.name, r, worked, "  "+g.paint(roleMuted, f.took(s, inner)))
 	switch {
-	case s.flags&progress.ShowLines != 0 && s.line != "":
+	case s.flags&progress.FlagShowLines != 0 && s.line != "":
 		text += "  " + s.line
 	case inner != nil:
 		text += "  " + describe(inner, s)
@@ -1127,7 +1127,7 @@ func (f *frame) innermost(s *treeSpan) *treeSpan {
 	for cur := s; ; {
 		var next *treeSpan
 		for _, c := range slices.Backward(cur.children) {
-			if !c.over && c.state == progress.StateRunning && (c.flags&progress.Hidden == 0 || f.now.Sub(c.ran) >= revealAfter) {
+			if !c.over && c.state == progress.StateRunning && (c.flags&progress.FlagHidden == 0 || f.now.Sub(c.ran) >= revealAfter) {
 				next = c
 				break
 			}
@@ -1144,7 +1144,7 @@ func (f *frame) innermost(s *treeSpan) *treeSpan {
 func (f *frame) call(s *treeSpan) *treeSpan {
 	for _, c := range slices.Backward(s.calls) {
 		if c.state == progress.StateRunning &&
-			(c.flags&progress.Hidden == 0 || f.now.Sub(c.ran) >= revealAfter) {
+			(c.flags&progress.FlagHidden == 0 || f.now.Sub(c.ran) >= revealAfter) {
 			return c
 		}
 	}

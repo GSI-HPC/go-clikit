@@ -25,7 +25,7 @@ func (r *eofReader) Read(p []byte) (int, error) {
 	return n, io.EOF
 }
 
-// CountWriter advances the span it is given by what each write took, a
+// AdvanceWriter advances the span it is given by what each write took, a
 // short write included, and gives back what the writer gave, unchanged.
 func TestCountWriterAdvancesTheSpanByWhatEachWriteTook(t *testing.T) {
 	t.Parallel()
@@ -73,7 +73,7 @@ func TestCountWriterAdvancesTheSpanByWhatEachWriteTook(t *testing.T) {
 	}
 }
 
-// CountReader advances the span it is given by what each read gave, a read
+// AdvanceReader advances the span it is given by what each read gave, a read
 // that also returns io.EOF included.
 func TestCountReaderAdvancesTheSpanByWhatEachReadGave(t *testing.T) {
 	t.Parallel()
@@ -187,7 +187,7 @@ func TestCountCountsOnlyWhileTheSpanRuns(t *testing.T) {
 	}
 }
 
-// Without a span in ctx, CountWriter and CountReader return the writer and
+// Without a span in ctx, AdvanceWriter and AdvanceReader return the writer and
 // the reader they were given: with no Bus at all, with a Bus but no span, and
 // with a span that belongs to another Bus than the one ctx carries.
 func TestCountReturnsTheWriterAndReaderItselfWithoutASpan(t *testing.T) {
@@ -207,17 +207,17 @@ func TestCountReturnsTheWriterAndReaderItselfWithoutASpan(t *testing.T) {
 			t.Parallel()
 			w := &bytes.Buffer{}
 			if got := progress.AdvanceWriter(tc.ctx, w); got != io.Writer(w) {
-				t.Errorf("CountWriter returned %T, want the writer itself", got)
+				t.Errorf("AdvanceWriter returned %T, want the writer itself", got)
 			}
 			r := strings.NewReader("abc")
 			if got := progress.AdvanceReader(tc.ctx, r); got != io.Reader(r) {
-				t.Errorf("CountReader returned %T, want the reader itself", got)
+				t.Errorf("AdvanceReader returned %T, want the reader itself", got)
 			}
 		})
 	}
 }
 
-// Without a span, CountWriter and CountReader allocate nothing.
+// Without a span, AdvanceWriter and AdvanceReader allocate nothing.
 func TestCountWithoutASpanAllocatesNothing(t *testing.T) {
 	ctx := context.Background()
 	w := &bytes.Buffer{}
@@ -227,11 +227,11 @@ func TestCountWithoutASpanAllocatesNothing(t *testing.T) {
 		_ = progress.AdvanceReader(ctx, r)
 	})
 	if allocs != 0 {
-		t.Errorf("CountWriter and CountReader without a span allocate %v times, want 0", allocs)
+		t.Errorf("AdvanceWriter and AdvanceReader without a span allocate %v times, want 0", allocs)
 	}
 }
 
-// A copy through CountWriter ends with the bytes it moved: the End carries
+// A copy through AdvanceWriter ends with the bytes it moved: the End carries
 // the newest amount, whatever the copy's own buffers did.
 func TestACopyThroughCountEndsWithItsBytes(t *testing.T) {
 	t.Parallel()

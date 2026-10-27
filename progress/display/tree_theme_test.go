@@ -43,7 +43,7 @@ func treeThemeScene(ctx context.Context, c *clock, interrupt chan<- struct{}, dr
 	c.Add(200 * time.Millisecond)
 	_, call := progress.Start(ctx, progress.KindCall, "ssh", progress.Node("install"), progress.Message("reading the inventory"))
 	_, wait := progress.Start(ctx, progress.KindWait, "settle", progress.Timeout(15*time.Second), progress.Message("for the BMCs"))
-	stepCtx, step := progress.Start(ctx, progress.KindStep, "power on", progress.WithFlags(progress.Fold), progress.Total(12))
+	stepCtx, step := progress.Start(ctx, progress.KindStep, "power on", progress.Flagged(progress.FlagFold), progress.Total(12))
 	ctxs, spans := targets(stepCtx, nodes(12)...)
 	for _, span := range spans[:7] {
 		span.Run()
@@ -59,7 +59,7 @@ func treeThemeScene(ctx context.Context, c *clock, interrupt chan<- struct{}, dr
 	for _, span := range spans[7:10] {
 		span.Run()
 	}
-	progress.Start(ctxs[7], progress.KindCall, "redfish", progress.HTTP("PATCH", "/redfish/v1/Systems/1"), progress.Host("exe8.mgmt"))
+	progress.Start(ctxs[7], progress.KindCall, "redfish", progress.HTTPRequest("PATCH", "/redfish/v1/Systems/1"), progress.Host("exe8.mgmt"))
 	progress.Start(ctxs[8], progress.KindCall, "ssh", progress.Node("exe9"), progress.Timeout(10*time.Minute))
 	draw(time.Second, 30)
 	call.End(nil)
@@ -363,7 +363,7 @@ func TestTheBarOfATreeGivesWay(t *testing.T) {
 `},
 	} {
 		f := newTreeFixture(t, "bmc power on", treeSetup{width: tc.width, theme: display.Neon, styles: true})
-		ctx, _ := progress.Start(f.ctx, progress.KindStep, "power on", progress.WithFlags(progress.Fold), progress.Total(8))
+		ctx, _ := progress.Start(f.ctx, progress.KindStep, "power on", progress.Flagged(progress.FlagFold), progress.Total(8))
 		_, spans := targets(ctx, nodes(8)...)
 		for i, span := range spans[:6] {
 			span.Run()
@@ -389,7 +389,7 @@ func TestTheBarOfATreeGivesWay(t *testing.T) {
 func TestATreeInAThemeCutsOffWhatNeverFits(t *testing.T) {
 	t.Parallel()
 	f := newTreeFixture(t, "bmc power on", treeSetup{height: 18, theme: display.Classic, styles: true})
-	ctx, _ := progress.Start(f.ctx, progress.KindStep, "power on", progress.WithFlags(progress.Fold), progress.Total(4))
+	ctx, _ := progress.Start(f.ctx, progress.KindStep, "power on", progress.Flagged(progress.FlagFold), progress.Total(4))
 	batchCtx, batch := progress.Start(ctx, progress.KindBatch, "1/2", progress.Queued(),
 		progress.Batch(1, 2), progress.Node("exe[1-2]"), progress.Total(2))
 	progress.Start(ctx, progress.KindBatch, "2/2", progress.Queued(), progress.Batch(2, 2), progress.Node("exe[3-4]"), progress.Total(2))
@@ -418,7 +418,7 @@ func TestATreeInAThemeCutsOffWhatNeverFits(t *testing.T) {
 func TestTheSpinnerOfATreeTurnsWithItsClock(t *testing.T) {
 	t.Parallel()
 	f := newTreeFixture(t, "exec", treeSetup{theme: display.Aurora.In(display.ColorsNone), styles: true})
-	ctx, _ := progress.Start(f.ctx, progress.KindStep, "run", progress.WithFlags(progress.Fold), progress.Total(1))
+	ctx, _ := progress.Start(f.ctx, progress.KindStep, "run", progress.Flagged(progress.FlagFold), progress.Total(1))
 	_, spans := targets(ctx, "exe1")
 	spans[0].Run()
 	var marks []string
@@ -444,13 +444,13 @@ func TestATreeInAThemeLeavesTheOutputInTheTerminalsColor(t *testing.T) {
 	t.Parallel()
 	f := newTreeFixture(t, "cinc run", treeSetup{theme: display.Tide, styles: true})
 	ctx, _ := progress.Start(f.ctx, progress.KindStep, "run",
-		progress.WithFlags(progress.Fold|progress.ShowLines), progress.Total(2))
+		progress.Flagged(progress.FlagFold|progress.FlagShowLines), progress.Total(2))
 	ctxs, spans := targets(ctx, "exe1", "exe2")
 	for i, span := range spans {
 		span.Run()
 		callCtx, _ := progress.Start(ctxs[i], progress.KindCall, "ssh", progress.Timeout(30*time.Minute))
 		if i == 0 {
-			out := progress.Tee(callCtx, io.Discard, progress.Stdout, nil)
+			out := progress.Tee(callCtx, io.Discard, progress.StreamStdout, nil)
 			_, _ = io.WriteString(out, "Starting Cinc Client\nConverging 12 resources\n")
 		}
 	}
