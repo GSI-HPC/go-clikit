@@ -71,7 +71,7 @@ func (f *counterThemeFixture) text() string { return strings.TrimSuffix(f.screen
 // queued, and returns its targets. The Bus ends what is left open when the
 // test ends.
 func counterThemeStep(ctx context.Context, name string, n int) []*progress.Span {
-	ctx, _ = progress.Start(ctx, progress.KindStep, name, progress.WithFlags(progress.Fold), progress.Total(n))
+	ctx, _ = progress.Start(ctx, progress.KindStep, name, progress.Flagged(progress.FlagFold), progress.Total(n))
 	targets := make([]*progress.Span, n)
 	for i := range targets {
 		node := fmt.Sprintf("exe%d", i+1)
@@ -99,7 +99,7 @@ func counterThemeResetTheMachines(ctx context.Context) []*progress.Span {
 // failed, one canceled and one skipped, one running and one queued, with
 // a wait open below it.
 func counterThemeEveryCount(ctx context.Context) {
-	stepCtx, _ := progress.Start(ctx, progress.KindStep, "check the nodes", progress.WithFlags(progress.Fold), progress.Total(6))
+	stepCtx, _ := progress.Start(ctx, progress.KindStep, "check the nodes", progress.Flagged(progress.FlagFold), progress.Total(6))
 	spans := make([]*progress.Span, 6)
 	for i := range spans {
 		node := fmt.Sprintf("exe%d", i+1)

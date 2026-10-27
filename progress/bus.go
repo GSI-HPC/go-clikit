@@ -143,12 +143,6 @@ func (b *Bus) TraceID() TraceID {
 	return b.trace.ID
 }
 
-// Trace returns the trace the Bus's spans belong to, as TraceID does.
-//
-// Deprecated: Use TraceID. BusOptions.Trace is a TraceContext, and a
-// method of the same name that returns a TraceID misled (decision 36).
-func (b *Bus) Trace() TraceID { return b.TraceID() }
-
 // TraceContext returns the trace the Bus's spans belong to, and where it
 // came from, or the zero TraceContext for a nil Bus. Its Parent is the
 // span of the program that handed the trace on, not a span of this Bus: a

@@ -415,7 +415,7 @@ func TestWorkAddsToTheFramesOfTheCounter(t *testing.T) {
 			func(ctx context.Context, _ string) (struct{}, error) {
 				_, call := progress.Start(ctx, progress.KindCall, "copy")
 				if advance {
-					call.Update(progress.Work(progress.Bytes, 2<<30))
+					call.Update(progress.Work(progress.UnitBytes, 2<<30))
 					call.Advance(1 << 30)
 				}
 				s.draw()
@@ -491,11 +491,11 @@ func (p pool) finish(c *clock) {
 // ended, one failed, four run, each at its own rate, and one is queued.
 func copyImageOn(ctx context.Context, c *clock) pool {
 	ctx, step := progress.Start(ctx, progress.KindStep, "copying the image",
-		progress.WithFlags(progress.Fold), progress.Total(12), progress.Limit(4))
+		progress.Flagged(progress.FlagFold), progress.Total(12), progress.Limit(4))
 	ctxs, spans := targets(ctx, nodes(12)...)
 	copying := func(i int) *progress.Span {
 		spans[i].Run()
-		_, call := progress.Start(ctxs[i], progress.KindCall, "copy", progress.Work(progress.Bytes, 2<<30))
+		_, call := progress.Start(ctxs[i], progress.KindCall, "copy", progress.Work(progress.UnitBytes, 2<<30))
 		return call
 	}
 	for i := range 7 {

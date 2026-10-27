@@ -85,7 +85,7 @@ func ExampleMapOptions_describe() {
 
 // An ItemInfo with a Unit and a Size starts its target bounded, so that a queued
 // target shows its size before it runs. Each worker counts the bytes it
-// copies through progress.CountWriter, and the targets' amounts reach the
+// copies through progress.AdvanceWriter, and the targets' amounts reach the
 // Capture's tree as they copy.
 func ExampleMapOptions_work() {
 	type image struct {
@@ -101,10 +101,10 @@ func ExampleMapOptions_work() {
 		Step:  "copy",
 		Limit: 2,
 		Describe: func(im image) fanout.ItemInfo {
-			return fanout.ItemInfo{Node: im.node, Unit: progress.Bytes, Size: im.size}
+			return fanout.ItemInfo{Node: im.node, Unit: progress.UnitBytes, Size: im.size}
 		},
 	}, func(ctx context.Context, im image) (int64, error) {
-		return io.Copy(progress.CountWriter(ctx, io.Discard), bytes.NewReader(make([]byte, im.size)))
+		return io.Copy(progress.AdvanceWriter(ctx, io.Discard), bytes.NewReader(make([]byte, im.size)))
 	})
 	for i, o := range outcomes {
 		fmt.Println(images[i].node, o.Value, o.Err)

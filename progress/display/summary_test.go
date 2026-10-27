@@ -106,7 +106,7 @@ func TestTheSummary(t *testing.T) {
 			return err
 		}, "exec: failed in 2.0s: 3 ok"},
 		{"a hidden step counts for nothing", func(ctx context.Context, c *clock) error {
-			hidden, s := progress.Start(ctx, progress.KindStep, "resolve", progress.WithFlags(progress.Hidden))
+			hidden, s := progress.Start(ctx, progress.KindStep, "resolve", progress.Flagged(progress.FlagHidden))
 			step(hidden, "read the groups", three, map[string]error{"exe1": down})
 			s.End(nil)
 			c.Add(time.Hour + 2*time.Minute + 3*time.Second)
@@ -143,7 +143,7 @@ func TestTheSummary(t *testing.T) {
 		}, "exec: failed in 5.0s: 1 ok, 1 failed, 2 skipped"},
 		{"a batch left out that names no nodes counts as its Total", func(ctx context.Context, c *clock) error {
 			stepCtx, s := progress.Start(ctx, progress.KindStep, "power on",
-				progress.WithFlags(progress.Fold), progress.Total(5))
+				progress.Flagged(progress.FlagFold), progress.Total(5))
 			firstCtx, first := progress.Start(stepCtx, progress.KindBatch, "1/2", progress.Queued(), progress.Batch(1, 2), progress.Total(1))
 			_, second := progress.Start(stepCtx, progress.KindBatch, "2/2", progress.Queued(), progress.Batch(2, 2), progress.Total(4))
 			first.Run()

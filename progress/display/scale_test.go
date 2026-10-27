@@ -70,7 +70,7 @@ func fanOutCost(t *testing.T, n, frameEvery int, end func(i int) error) time.Dur
 		runtime.GC()
 		start := time.Now()
 		ctx, command := progress.Start(progress.WithBus(context.Background(), bus), progress.KindCommand, "exec")
-		ctx, step := progress.Start(ctx, progress.KindStep, "run", progress.WithFlags(progress.Fold),
+		ctx, step := progress.Start(ctx, progress.KindStep, "run", progress.Flagged(progress.FlagFold),
 			progress.Total(n), progress.Limit(n))
 		spans := make([]*progress.Span, n)
 		for i, name := range names {
@@ -125,7 +125,7 @@ func testFramesDoNotFoldALargeSetEachTime(t *testing.T) {
 			tree := display.NewTree(term, display.TreeOptions{Now: c.Now})
 			bus := progress.NewBus(progress.BusOptions{Sinks: []progress.Sink{tree}, Now: c.Now})
 			ctx, command := progress.Start(progress.WithBus(context.Background(), bus), progress.KindCommand, "exec")
-			ctx, step := progress.Start(ctx, progress.KindStep, "run", progress.WithFlags(progress.Fold),
+			ctx, step := progress.Start(ctx, progress.KindStep, "run", progress.Flagged(progress.FlagFold),
 				progress.Total(n+9), progress.Limit(n+9))
 			spans := make([]*progress.Span, n+9)
 			for i := range spans {
@@ -185,7 +185,7 @@ func testBatchesThatEndCostWhatTheirTargetsNumber(t *testing.T) {
 			runtime.GC()
 			start := time.Now()
 			ctx, command := progress.Start(progress.WithBus(context.Background(), bus), progress.KindCommand, "bmc power on")
-			ctx, step := progress.Start(ctx, progress.KindStep, "power on", progress.WithFlags(progress.Fold), progress.Total(n))
+			ctx, step := progress.Start(ctx, progress.KindStep, "power on", progress.Flagged(progress.FlagFold), progress.Total(n))
 			for b := 0; b < n/size; b++ {
 				batchCtx, batch := progress.Start(ctx, progress.KindBatch, fmt.Sprintf("%d/%d", b+1, n/size),
 					progress.Total(size))
@@ -228,7 +228,7 @@ func testAFrameDrawsTheRunningTargetsThatFit(t *testing.T) {
 		defer tree.Close()
 		defer bus.Close()
 		ctx, _ := progress.Start(progress.WithBus(context.Background(), bus), progress.KindCommand, "bmc power status")
-		ctx, _ = progress.Start(ctx, progress.KindStep, "ipmipower", progress.WithFlags(progress.Fold),
+		ctx, _ = progress.Start(ctx, progress.KindStep, "ipmipower", progress.Flagged(progress.FlagFold),
 			progress.Total(n), progress.Limit(n))
 		for i := range n {
 			name := fmt.Sprintf("exe%05d", i+1)
@@ -274,13 +274,13 @@ func testTargetsThatAdvanceCostWhatTheyNumber(t *testing.T) {
 			tree := display.NewTree(term, display.TreeOptions{Now: c.Now})
 			bus := progress.NewBus(progress.BusOptions{Sinks: []progress.Sink{tree}, Now: c.Now})
 			ctx, command := progress.Start(progress.WithBus(context.Background(), bus), progress.KindCommand, "deploy")
-			ctx, step := progress.Start(ctx, progress.KindStep, "copying the image", progress.WithFlags(progress.Fold),
+			ctx, step := progress.Start(ctx, progress.KindStep, "copying the image", progress.Flagged(progress.FlagFold),
 				progress.Total(n), progress.Limit(n))
 			spans := make([]*progress.Span, n)
 			for i := range spans {
 				name := fmt.Sprintf("exe%05d", i+1)
 				_, spans[i] = progress.Start(ctx, progress.KindTarget, name, progress.Queued(), progress.Node(name),
-					progress.Work(progress.Bytes, 1<<30))
+					progress.Work(progress.UnitBytes, 1<<30))
 				spans[i].Run()
 			}
 			runtime.GC()

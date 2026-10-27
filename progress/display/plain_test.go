@@ -49,7 +49,7 @@ func newPlainFixtureWith(t *testing.T, command string, o display.PlainOptions) *
 	f.term = display.NewTerminal(f.screen, display.TerminalOptions{})
 	o.Now = f.clock.Now
 	f.plain = display.NewPlain(f.term, o)
-	f.summary = &display.Summary{Theme: o.Theme, ASCII: o.ASCII}
+	f.summary = display.NewSummary(display.SummaryOptions{Theme: o.Theme, ASCII: o.ASCII})
 	f.capture = &progresstest.Capture{}
 	f.bus = progress.NewBus(progress.BusOptions{Sinks: []progress.Sink{f.capture, f.plain, f.summary}, Now: f.clock.Now})
 	t.Cleanup(func() {
@@ -261,7 +261,7 @@ func TestPlainLinesOfAStepWithNothingToNameIt(t *testing.T) {
 func TestPlainLinesOfAFailure(t *testing.T) {
 	t.Parallel()
 	f := newPlainFixture(t, "provision reinstall")
-	_, hidden := progress.Start(f.ctx, progress.KindStep, "resolve", progress.WithFlags(progress.Hidden))
+	_, hidden := progress.Start(f.ctx, progress.KindStep, "resolve", progress.Flagged(progress.FlagHidden))
 	f.draw(time.Second)
 	hidden.End(nil)
 	boot, links := progress.Start(f.ctx, progress.KindStep, "configuring the network boot")
@@ -302,7 +302,7 @@ func TestPlainHeartbeatsEveryTenSeconds(t *testing.T) {
 	t.Parallel()
 	f := newPlainFixture(t, "provision status")
 	start := func(name string) (*progress.Span, *progress.Span) {
-		ctx, step := progress.Start(f.ctx, progress.KindStep, name, progress.WithFlags(progress.Fold), progress.Total(1))
+		ctx, step := progress.Start(f.ctx, progress.KindStep, name, progress.Flagged(progress.FlagFold), progress.Total(1))
 		_, target := progress.Start(ctx, progress.KindTarget, "exe1", progress.Queued(), progress.Node("exe1"))
 		target.Run()
 		return step, target
@@ -414,7 +414,7 @@ func TestPlainReadsTheRealClock(t *testing.T) {
 		bus := progress.NewBus(progress.BusOptions{Sinks: []progress.Sink{capture, plain}})
 		ctx, command := progress.Start(progress.WithBus(context.Background(), bus), progress.KindCommand, "exec")
 		plain.Start()
-		ctx, step := progress.Start(ctx, progress.KindStep, "run", progress.WithFlags(progress.Fold), progress.Total(1))
+		ctx, step := progress.Start(ctx, progress.KindStep, "run", progress.Flagged(progress.FlagFold), progress.Total(1))
 		_, target := progress.Start(ctx, progress.KindTarget, "exe1", progress.Queued(), progress.Node("exe1"))
 		target.Run()
 		synctest.Wait()
@@ -481,7 +481,7 @@ func TestPlainWritesTheLinesThatComeWhileItDraws(t *testing.T) {
 func TestPlainLinesOfAWaitThatFails(t *testing.T) {
 	t.Parallel()
 	f := newPlainFixture(t, "bmc power on")
-	ctx, step := progress.Start(f.ctx, progress.KindStep, "power on", progress.WithFlags(progress.Fold), progress.Total(1))
+	ctx, step := progress.Start(f.ctx, progress.KindStep, "power on", progress.Flagged(progress.FlagFold), progress.Total(1))
 	_, target := progress.Start(ctx, progress.KindTarget, "exe1", progress.Queued(), progress.Node("exe1"))
 	_, wait := progress.Start(ctx, progress.KindWait, "stagger", progress.Timeout(30*time.Second))
 	f.draw(10 * time.Second)
@@ -520,11 +520,11 @@ func TestPlainTakesEventsNoBusSends(t *testing.T) {
 	t.Cleanup(plain.Close)
 	for _, e := range []progress.Event{
 		{Type: progress.TypeStart, Span: 1, Kind: progress.KindCommand, Name: "exec", State: progress.StateRunning},
-		{Type: progress.TypeStart, Span: 2, Parent: 1, Kind: progress.KindStep, Name: "run", Flags: progress.Fold,
+		{Type: progress.TypeStart, Span: 2, Parent: 1, Kind: progress.KindStep, Name: "run", Flags: progress.FlagFold,
 			State: progress.StateRunning},
-		{Type: progress.TypeStart, Span: 2, Parent: 1, Kind: progress.KindStep, Name: "run", Flags: progress.Fold,
+		{Type: progress.TypeStart, Span: 2, Parent: 1, Kind: progress.KindStep, Name: "run", Flags: progress.FlagFold,
 			State: progress.StateRunning},
-		{Type: progress.TypeEnd, Span: 2, Parent: 1, Kind: progress.KindStep, Name: "run", Flags: progress.Fold,
+		{Type: progress.TypeEnd, Span: 2, Parent: 1, Kind: progress.KindStep, Name: "run", Flags: progress.FlagFold,
 			State: progress.StateEnded, Status: progress.StatusOK},
 		{Type: progress.TypeStart, Span: 3, Parent: 1, Kind: progress.KindStep, Name: "check", State: progress.StateRunning},
 		{Type: progress.TypeEnd, Span: 3, Parent: 1, Kind: progress.KindStep, Name: "check", State: progress.StateEnded},
@@ -569,7 +569,7 @@ func TestPlainLinesSayTheNounTheyAreGiven(t *testing.T) {
 	}
 	f := newPlainFixtureWith(t, "create cluster", display.PlainOptions{Noun: nodes})
 	for _, n := range []int{1, 4} {
-		ctx, step := progress.Start(f.ctx, progress.KindStep, "start", progress.WithFlags(progress.Fold), progress.Total(n))
+		ctx, step := progress.Start(f.ctx, progress.KindStep, "start", progress.Flagged(progress.FlagFold), progress.Total(n))
 		targets := make([]*progress.Span, n)
 		for i := range targets {
 			_, targets[i] = progress.Start(ctx, progress.KindTarget, fmt.Sprintf("worker-%d", i), progress.Queued())

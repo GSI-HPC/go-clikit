@@ -1048,33 +1048,6 @@ func TestTheEventLogTakesTheVersionFromTheRun(t *testing.T) {
 	}
 }
 
-// The old name of RunID stays for one minor release (decision 36), and
-// is read when RunID is empty.
-func TestTheOldNameOfRunID(t *testing.T) {
-	t.Parallel()
-	for _, tc := range []struct {
-		name string
-		o    progress.LogOptions
-		want string
-	}{
-		{"Run alone", progress.LogOptions{Run: "0123456789abcdef"}, "0123456789abcdef"},
-		{"RunID first", progress.LogOptions{RunID: "fedcba9876543210", Run: "0123456789abcdef"}, "fedcba9876543210"},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
-			var out bytes.Buffer
-			log := progress.NewLog(&out, tc.o)
-			log.Begin(progress.RunInfo{})
-			if err := log.Close(); err != nil {
-				t.Fatalf("closing the log: %v", err)
-			}
-			if want := `"run":"` + tc.want + `"`; !strings.Contains(out.String(), want) {
-				t.Errorf("the log is %s, want %s", out.String(), want)
-			}
-		})
-	}
-}
-
 // advancesLogged feeds a log with options o one advance of a span every
 // 100 ms from the start of the second one, n of them, and the span's end,
 // and returns the lines it wrote as seq and leftOut pairs, "end" for the

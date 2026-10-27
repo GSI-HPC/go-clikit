@@ -247,15 +247,6 @@ func TestDev(t *testing.T) {
 	}
 }
 
-// The deprecated field Reload reads the files anew, as Dev does.
-func TestReloadIsDev(t *testing.T) {
-	t.Parallel()
-
-	if got := renderAfterEdit(t, page.Options{Reload: true}); got != "new" {
-		t.Errorf("Render = %q, want new", got)
-	}
-}
-
 // renderAfterEdit parses a block a of "old" with o, changes it to "new",
 // and returns what Render renders of it.
 func renderAfterEdit(t *testing.T, o page.Options) string {

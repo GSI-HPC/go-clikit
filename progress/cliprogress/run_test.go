@@ -386,7 +386,7 @@ func TestTheTreeDrawsOnItsOwnAndSeesTheInterrupt(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		screen := &progresstest.Screen{Width: 80}
 		o := terminal(screen, newClock())
-		o.Now, o.Manual, o.Theme = nil, false, display.Classic.In(display.NoColours)
+		o.Now, o.Manual, o.Theme = nil, false, display.Classic.In(display.ColorsNone)
 		ctx, cancel := context.WithCancel(context.Background())
 		r, err := cliprogress.Start(ctx, o)
 		if err != nil {

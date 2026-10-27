@@ -1227,9 +1227,6 @@ func TestANilBusIsSafe(t *testing.T) {
 	if got := bus.TraceID(); got != (progress.TraceID{}) {
 		t.Errorf("TraceID() = %s, want zeros", got)
 	}
-	if got := bus.Trace(); got != (progress.TraceID{}) {
-		t.Errorf("Trace() = %s, want zeros", got)
-	}
 	if got := bus.TraceContext(); got != (progress.TraceContext{}) {
 		t.Errorf("TraceContext() = %+v, want the zero one", got)
 	}

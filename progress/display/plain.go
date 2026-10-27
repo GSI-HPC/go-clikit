@@ -246,8 +246,8 @@ func (p *Plain) Handle(e progress.Event) {
 func (p *Plain) begin(e progress.Event) {
 	s := &plainSpan{
 		kind:   e.Kind,
-		hidden: e.Flags&progress.Hidden != 0,
-		counts: e.Kind == progress.KindBatch || e.Kind == progress.KindStep && e.Flags&progress.Fold != 0,
+		hidden: e.Flags&progress.FlagHidden != 0,
+		counts: e.Kind == progress.KindBatch || e.Kind == progress.KindStep && e.Flags&progress.FlagFold != 0,
 	}
 	parent := p.spans[e.Parent]
 	if parent != nil {

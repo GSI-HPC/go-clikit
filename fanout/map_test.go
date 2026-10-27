@@ -207,7 +207,7 @@ func TestMapReportsItsWork(t *testing.T) {
 	ctx, w := progresstest.Watch(context.Background(), t)
 	fanout.Map(ctx, nodes(5), fanout.MapOptions[string]{Step: "reset the machines", Limit: 2, Describe: onBMC},
 		func(ctx context.Context, node string) (struct{}, error) {
-			_, call := progress.Start(ctx, progress.KindCall, "redfish", progress.HTTP("POST", "/redfish/v1/Systems/1"))
+			_, call := progress.Start(ctx, progress.KindCall, "redfish", progress.HTTPRequest("POST", "/redfish/v1/Systems/1"))
 			var err error
 			if node == "exe3" {
 				err = unreachable{errors.New(node + ".mgmt.example.org: connection refused")}
@@ -252,10 +252,10 @@ func TestMapStartsATargetWithTheWorkOfItsItem(t *testing.T) {
 		size int64
 	}{
 		{"unsized", fanout.ItemInfo{Node: "exe1"}, 0, 0},
-		{"sized", fanout.ItemInfo{Node: "exe1", Unit: progress.Bytes, Size: 2 << 30}, progress.Bytes, 2 << 30},
-		{"size not known", fanout.ItemInfo{Node: "exe1", Unit: progress.Bytes, Size: -1}, progress.Bytes, 0},
-		{"unit without a size", fanout.ItemInfo{Node: "exe1", Unit: progress.Items}, progress.Items, 0},
-		{"percent", fanout.ItemInfo{Node: "exe1", Unit: progress.Percent}, progress.Percent, 100},
+		{"sized", fanout.ItemInfo{Node: "exe1", Unit: progress.UnitBytes, Size: 2 << 30}, progress.UnitBytes, 2 << 30},
+		{"size not known", fanout.ItemInfo{Node: "exe1", Unit: progress.UnitBytes, Size: -1}, progress.UnitBytes, 0},
+		{"unit without a size", fanout.ItemInfo{Node: "exe1", Unit: progress.UnitItems}, progress.UnitItems, 0},
+		{"percent", fanout.ItemInfo{Node: "exe1", Unit: progress.UnitPercent}, progress.UnitPercent, 100},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
@@ -281,7 +281,7 @@ const mapAllocsPerItem = 3
 // that spans nobody watches cost nothing: the allocations an item adds,
 // sized or not, are those of Map's own bookkeeping.
 func TestMapWithoutABusAllocatesOnlyItsBookkeeping(t *testing.T) {
-	for _, unit := range []progress.Unit{0, progress.Bytes} {
+	for _, unit := range []progress.Unit{0, progress.UnitBytes} {
 		allocs := func(n int) float64 {
 			items := make([]fanout.ItemInfo, n)
 			for i := range items {
@@ -309,7 +309,7 @@ func TestMapBoundsATargetBeforeItRuns(t *testing.T) {
 	ctx, w := progresstest.Watch(context.Background(), t)
 	items := []fanout.ItemInfo{
 		{Node: "exe1"},
-		{Node: "exe2", Unit: progress.Bytes, Size: 4096},
+		{Node: "exe2", Unit: progress.UnitBytes, Size: 4096},
 	}
 	fanout.Map(ctx, items, fanout.MapOptions[fanout.ItemInfo]{Step: "copy", Limit: 1,
 		Describe: func(i fanout.ItemInfo) fanout.ItemInfo { return i }},
@@ -318,7 +318,7 @@ func TestMapBoundsATargetBeforeItRuns(t *testing.T) {
 	if start.State != progress.StateQueued {
 		t.Errorf("target exe2 starts %v, want queued", start.State)
 	}
-	if start.Unit != progress.Bytes || start.Size != 4096 {
+	if start.Unit != progress.UnitBytes || start.Size != 4096 {
 		t.Errorf("queued target exe2 starts with unit %v and size %d, want bytes and 4096", start.Unit, start.Size)
 	}
 }
@@ -994,25 +994,4 @@ func TestMapKeepsWhatBrokeAnItemBesidesAGoexit(t *testing.T) {
 	if got := w.Finish(); got != want {
 		t.Errorf("tree:\n%s\nwant:\n%s", got, want)
 	}
-}
-
-// The old names of ItemInfo and FailedItem stay as aliases for one minor
-// release (decision 36): a Describe that returns an Item, and a Summarize
-// that reads a Failed, still serve.
-func TestMapTakesTheOldNames(t *testing.T) {
-	t.Parallel()
-
-	ctx, w := progresstest.Watch(context.Background(), t)
-	var failed []fanout.Failed
-	_, err := fanout.Map(ctx, []int{1}, fanout.MapOptions[int]{Step: "scan",
-		Describe: func(int) fanout.Item { return fanout.Item{Node: "exe1"} },
-		Summarize: func(s fanout.Summary) error {
-			failed = s.Failed
-			return fanout.Failure("hosts", s)
-		}},
-		func(context.Context, int) (struct{}, error) { return struct{}{}, errors.New("exe1: down") })
-	if len(failed) != 1 || failed[0].Name != "exe1" || fmt.Sprint(err) != "1 of 1 hosts failed: exe1" {
-		t.Errorf("Map = %v, with %+v failed, want exe1 failed", err, failed)
-	}
-	w.Finish()
 }

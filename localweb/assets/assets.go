@@ -66,12 +66,6 @@ type Set struct {
 	dev     bool
 }
 
-// Assets is the former name of Set.
-//
-// Deprecated: Use Set, which does not repeat the name of the package
-// (decision 36).
-type Assets = Set
-
 // New returns the files of fsys, served under prefix, a path that starts
 // and ends with a slash, such as "/static/". Unless o.Dev is set, it reads
 // every file once to make the version, and an error of fsys is its error.

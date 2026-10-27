@@ -359,17 +359,3 @@ func TestContentType(t *testing.T) {
 		})
 	}
 }
-
-// The deprecated name Assets is Set.
-func TestAssetsIsSet(t *testing.T) {
-	t.Parallel()
-
-	var a *assets.Assets
-	a, err := assets.New(fstest.MapFS{"a.css": {Data: []byte("x")}}, prefix, assets.Options{})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if w := get(a, http.MethodGet, a.URL("a.css")); w.Code != http.StatusOK {
-		t.Errorf("status = %d, want %d", w.Code, http.StatusOK)
-	}
-}

@@ -57,11 +57,6 @@ const (
 	// DefaultCSRFField is the form field of the CSRF token when
 	// Options.CSRFField is empty.
 	DefaultCSRFField = "csrf"
-	// DefaultField is the former name of DefaultCSRFField.
-	//
-	// Deprecated: Use DefaultCSRFField, which says which token the field
-	// carries (decision 36).
-	DefaultField = DefaultCSRFField
 	// DefaultMaxBody is the most bytes the body of a request that may
 	// change something holds when Options.MaxBody is zero.
 	DefaultMaxBody = 64 << 10
@@ -103,24 +98,6 @@ type Options struct {
 	// that serves pages adds the line that tells the user where to find
 	// the address to open.
 	Refuse localweb.Refuser
-
-	// Cookie is the former name of CookiePrefix, read while CookiePrefix
-	// is empty.
-	//
-	// Deprecated: Use CookiePrefix; the port follows it (decision 36).
-	Cookie string
-	// Header is the former name of CSRFHeader, read while CSRFHeader is
-	// empty.
-	//
-	// Deprecated: Use CSRFHeader, which says which token it carries
-	// (decision 36).
-	Header string
-	// Field is the former name of CSRFField, read while CSRFField is
-	// empty.
-	//
-	// Deprecated: Use CSRFField, which says which token it carries
-	// (decision 36).
-	Field string
 }
 
 // Manager holds the sessions of one launch.
@@ -141,9 +118,7 @@ type Manager struct {
 //     net/http would send neither;
 //   - with a negative MaxBody.
 func New(o Options) (*Manager, error) {
-	o.CookiePrefix = cmp.Or(o.CookiePrefix, o.Cookie)
-	o.CSRFHeader = cmp.Or(o.CSRFHeader, o.Header)
-	o.CSRFField = cmp.Or(o.CSRFField, o.Field, DefaultCSRFField)
+	o.CSRFField = cmp.Or(o.CSRFField, DefaultCSRFField)
 	if o.Token == "" || o.CookiePrefix == "" || o.CSRFHeader == "" {
 		return nil, errors.New("session: Options needs a Token, a CookiePrefix and a CSRFHeader")
 	}
@@ -164,12 +139,6 @@ func New(o Options) (*Manager, error) {
 	}
 	return &Manager{o: o, csrf: map[string]string{}}, nil
 }
-
-// Sessions is the former name of Manager.
-//
-// Deprecated: Use Manager, which does not nearly repeat the name of the
-// package (decision 36).
-type Sessions = Manager
 
 // csrfKey is the context key of a request's CSRF token.
 type csrfKey struct{}

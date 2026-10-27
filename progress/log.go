@@ -140,10 +140,6 @@ type LogOptions struct {
 	// RunID names the run on every line, as eventlog.Run.ID reads it
 	// back; empty draws 16 hexadecimal digits at random.
 	RunID string
-	// Run is the old name of RunID, read when RunID is empty.
-	//
-	// Deprecated: Use RunID, the one name of a run's ID (decision 36).
-	Run string
 	// AdvanceEvery is the least time between two advances of a span that
 	// the log writes, by the events' times; the advances in between are
 	// left out, and counted in "leftOut", but for the newest, which is
@@ -195,7 +191,7 @@ type sampling struct {
 // NewLog returns a Log that writes to w, and starts the goroutine that
 // writes; Close stops it.
 func NewLog(w io.Writer, o LogOptions) *Log {
-	l := &Log{w: w, run: cmp.Or(o.RunID, o.Run), o: o, after: time.AfterFunc,
+	l := &Log{w: w, run: o.RunID, o: o, after: time.AfterFunc,
 		wake: make(chan struct{}, 1), kept: make(chan struct{}, 1),
 		stop: make(chan struct{}), stopped: make(chan struct{})}
 	if l.run == "" {

@@ -49,11 +49,6 @@ type Line struct {
 	// RunID names the run the line belongs to, the same on every line of
 	// the run: the lines of several runs may be in one log.
 	RunID string
-	// Run is the old name of RunID, which Decode sets to the same.
-	//
-	// Deprecated: Use RunID, as Run.ID and progress.LogOptions.RunID name
-	// it (decision 36).
-	Run string
 	// Trace is the trace the run's spans belong to. On the first line of
 	// a run it says too where the trace came from, when another program
 	// handed it on; on an event, only its Trace is set.
@@ -174,7 +169,6 @@ func Decode(b []byte) (Line, error) {
 		return Line{}, errors.New("a line of the event log without a run")
 	}
 	out := Line{RunID: progress.Sanitize(l.Run, progress.MaxField)}
-	out.Run = out.RunID
 	out.Trace.ID, _ = traceID(l.Trace)
 	if l.Type == "trace" {
 		out.Begin = true

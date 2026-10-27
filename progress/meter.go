@@ -113,28 +113,6 @@ const (
 	BoundChildren
 )
 
-// The old names of the bounds.
-const (
-	// Unbounded is the old name of BoundNone.
-	//
-	// Deprecated: Use BoundNone, which takes its type as a prefix, as every
-	// enum constant does (decision 36).
-	Unbounded = BoundNone
-	// BySize is the old name of BoundSize.
-	//
-	// Deprecated: Use BoundSize (decision 36).
-	BySize = BoundSize
-	// ByTargets is the old name of BoundTargets.
-	//
-	// Deprecated: Use BoundTargets (decision 36).
-	ByTargets = BoundTargets
-	// ByBelow is the old name of BoundChildren.
-	//
-	// Deprecated: Use BoundChildren, which says what it counts: the work
-	// of the spans below (decision 36).
-	ByBelow = BoundChildren
-)
-
 // String returns "unbounded", "size", "targets" or "below", or "bound(n)"
 // for a value this package does not define.
 func (b Bound) String() string {

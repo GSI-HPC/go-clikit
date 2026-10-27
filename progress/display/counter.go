@@ -63,7 +63,7 @@ const (
 //	fetching the base image · 1.1/2.0 GiB · 56% · 80.0 MiB/s · ~12s left · 0:14.4
 //
 // The bar of a counted step whose work has a share fills with it, the cells
-// of the targets that failed at its end. Work in progress.Percent draws its
+// of the targets that failed at its end. Work in progress.UnitPercent draws its
 // share alone, and work of no known size its amount and rate. The work of
 // the command is not drawn. A line too long for the terminal gives up the
 // time left, then the rate, then the amount, and then the bars, until it
@@ -186,7 +186,7 @@ func (c *counting) add(e progress.Event) (progress.Count, bool) {
 			label = e.Name
 		}
 		c.labels[e.Span] = label
-		if titled && e.Flags&progress.Hidden == 0 {
+		if titled && e.Flags&progress.FlagHidden == 0 {
 			c.named = append(c.named, named{e.Span, e.Name, e.Kind == progress.KindStep})
 		}
 	case progress.TypeEnd:
@@ -230,7 +230,7 @@ func (c *counting) line(now, start time.Time, g look, width int, m *progress.Met
 	roots := c.tally.Roots()
 	shown := roots[:0]
 	for _, root := range roots {
-		if root.Flags&progress.Hidden == 0 {
+		if root.Flags&progress.FlagHidden == 0 {
 			// A step with no name is called by the span above it.
 			root.Name = cmp.Or(root.Name, c.labels[root.Span])
 			shown = append(shown, root)
@@ -301,7 +301,7 @@ func segment(n progress.Count, w reading, g look, giveUp int) string {
 	done := fmt.Sprintf("%d/%d", n.Done, n.Total)
 	if giveUp < giveUps {
 		bar := g.bar(n, counterBar)
-		if w.ok && w.Bound != progress.Unbounded {
+		if w.ok && w.Bound != progress.BoundNone {
 			bar = g.fractionBar(w.Fraction, n, counterBar)
 		}
 		if bar != "" {

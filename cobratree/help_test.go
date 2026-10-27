@@ -104,33 +104,6 @@ func TestTopicsRefusesTheRest(t *testing.T) {
 	}
 }
 
-// On a tree that is not strict, help shows the root's help for a word that
-// is neither, as cobra's does.
-func TestHelpTopicsOnALenientTree(t *testing.T) {
-	root := &cobra.Command{Use: "prog", SilenceErrors: true, SilenceUsage: true}
-	root.AddCommand(&cobra.Command{Use: "version", RunE: run})
-	help := cobratree.HelpTopics(root, topics)
-	if help.Name() != "help" {
-		t.Fatalf("HelpTopics returned %q, want the help command", help.Name())
-	}
-	for _, tc := range []struct {
-		arg, want string
-	}{
-		{"realm", "A realm keeps clusters apart.\n"},
-		{"xyzzy", "Available Commands:"},
-	} {
-		var out bytes.Buffer
-		root.SetOut(&out)
-		root.SetArgs([]string{"help", tc.arg})
-		if err := root.Execute(); err != nil {
-			t.Fatal(err)
-		}
-		if !strings.Contains(out.String(), tc.want) {
-			t.Errorf("help %s wrote %q, want %q in it", tc.arg, out.String(), tc.want)
-		}
-	}
-}
-
 // A help command of the program's own, with a RunE, still runs it, and a
 // topic that cannot be written fails the command.
 func TestTopicsWithAHelpCommandOfItsOwn(t *testing.T) {
@@ -260,41 +233,10 @@ func TestTopicsRefuses(t *testing.T) {
 	}
 }
 
-// HelpTopics after Strict, in the order it asks for, still shows the
-// topics and refuses the rest.
-func TestHelpTopicsAfterStrict(t *testing.T) {
-	root := tree(cobratree.Moved(moved))
-	help := cobratree.HelpTopics(root, topics)
-	if help.Name() != "help" {
-		t.Fatalf("HelpTopics returned %q, want the help command", help.Name())
-	}
-	var out bytes.Buffer
-	root.SetOut(&out)
-	root.SetArgs([]string{"help", "realm"})
-	if err := root.Execute(); err != nil || out.String() != "A realm keeps clusters apart.\n" {
-		t.Errorf("help realm: %q, %v; want the topic", out.String(), err)
-	}
-	root.SetArgs([]string{"help", "crate"})
-	want := `unknown help topic "crate": unknown command "crate" for "prog" (did you mean "create"?)`
-	if err := root.Execute(); err == nil || err.Error() != want || !cobratree.IsUsage(err) {
-		t.Errorf("help crate: error %v, want the usage error %q", err, want)
-	}
-}
-
-// Strict after HelpTopics, or after a Strict with Topics, would drop the
-// topics, and HelpTopics on a tree whose help shows topics already would
-// show them twice: each panics.
+// Strict after a Strict with Topics would drop the topics, and panics.
 func TestTopicsInTheWrongOrder(t *testing.T) {
-	root := &cobra.Command{Use: "prog", SilenceErrors: true, SilenceUsage: true}
-	root.AddCommand(&cobra.Command{Use: "version", RunE: run})
-	cobratree.HelpTopics(root, topics)
 	again := `cobratree: Strict called on "prog", whose help shows topics already, which it would drop: pass Topics to one call of Strict instead`
-	wantPanic(t, again, func() { cobratree.Strict(root) })
 	wantPanic(t, again, func() { cobratree.Strict(tree(cobratree.Topics(topics, nil))) })
-
-	twice := `cobratree: HelpTopics called on "prog", whose help shows topics already: pass Topics to Strict alone`
-	wantPanic(t, twice, func() { cobratree.HelpTopics(root, topics) })
-	wantPanic(t, twice, func() { cobratree.HelpTopics(tree(cobratree.Topics(topics, nil)), topics) })
 }
 
 // wantPanic runs f and fails t unless f panics with want.
@@ -315,15 +257,3 @@ var errWrite = errors.New("write failed")
 type failingWriter struct{}
 
 func (failingWriter) Write([]byte) (int, error) { return 0, errWrite }
-
-// A program of one command has no help command, and HelpTopics refuses to
-// take its root over.
-func TestHelpTopicsOnALoneCommand(t *testing.T) {
-	root := &cobra.Command{Use: "prog NAME", Args: cobra.ExactArgs(1), RunE: run}
-	wantPanic(t, `cobratree: help topics need a help command, and "prog" has no subcommands`, func() {
-		cobratree.HelpTopics(root, topics)
-	})
-	if root.HasSubCommands() || root.Annotations != nil {
-		t.Error("HelpTopics changed the root")
-	}
-}

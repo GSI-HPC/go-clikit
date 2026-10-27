@@ -91,9 +91,9 @@ import (
 //
 // Strict expects the program to print the error Execute returns itself,
 // with SilenceErrors and SilenceUsage set on root. It panics when help
-// topics were added to the tree before it, with HelpTopics or an earlier
-// Strict, since its check of help would drop them, and, given Topics, on
-// a tree without subcommands, which has no help command.
+// topics were added to the tree before it, by an earlier Strict, since its
+// check of help would drop them, and, given Topics, on a tree without
+// subcommands, which has no help command.
 func Strict(root *cobra.Command, opts ...Option) {
 	if hasTopics(root) {
 		panic(fmt.Sprintf("cobratree: Strict called on %q, whose help shows topics already, which it would drop: pass Topics to one call of Strict instead", root.Name()))

@@ -71,7 +71,7 @@ func ExampleNewPlain() {
 	ctx, command := progress.Start(progress.WithBus(context.Background(), bus), progress.KindCommand, "create cluster")
 
 	ctx, step := progress.Start(ctx, progress.KindStep, "starting the nodes",
-		progress.WithFlags(progress.Fold), progress.Total(3), progress.Limit(3))
+		progress.Flagged(progress.FlagFold), progress.Total(3), progress.Limit(3))
 	targets := startTargets(ctx, "worker0", "worker1", "worker2")
 	for _, target := range targets {
 		target.Run()
@@ -108,7 +108,7 @@ func ExampleNewTree() {
 	ctx, command := progress.Start(progress.WithBus(context.Background(), bus), progress.KindCommand, "power on")
 
 	ctx, step := progress.Start(ctx, progress.KindStep, "powering on",
-		progress.WithFlags(progress.Fold), progress.Total(4), progress.Limit(2))
+		progress.Flagged(progress.FlagFold), progress.Total(4), progress.Limit(2))
 	nodes := []string{"exe01", "exe02", "exe03", "exe04"}
 	ctxs := make([]context.Context, len(nodes))
 	targets := make([]*progress.Span, len(nodes))
@@ -121,7 +121,7 @@ func ExampleNewTree() {
 	}
 	targets[2].Run()
 	_, call := progress.Start(ctxs[2], progress.KindCall, "redfish",
-		progress.HTTP("POST", "/redfish/v1/Systems/1"), progress.Timeout(30*time.Second))
+		progress.HTTPRequest("POST", "/redfish/v1/Systems/1"), progress.Timeout(30*time.Second))
 	clock.Add(2 * time.Second)
 	tree.Draw()
 	fmt.Print(screen.String())
@@ -160,7 +160,7 @@ func ExampleNewTree_work() {
 
 	ctx, step := progress.Start(ctx, progress.KindStep, "fetching the base image")
 	_, call := progress.Start(ctx, progress.KindCall, "download",
-		progress.HTTP("GET", "/images/rocky-9.4.qcow2"), progress.Work(progress.Bytes, 2<<30))
+		progress.HTTPRequest("GET", "/images/rocky-9.4.qcow2"), progress.Work(progress.UnitBytes, 2<<30))
 	for range 144 {
 		clock.Add(100 * time.Millisecond)
 		call.Advance(8 << 20)
@@ -197,7 +197,7 @@ func ExampleNewCounter() {
 	ctx, command := progress.Start(progress.WithBus(context.Background(), bus), progress.KindCommand, "uptime")
 
 	ctx, step := progress.Start(ctx, progress.KindStep, "uptime",
-		progress.WithFlags(progress.Fold), progress.Total(3), progress.Limit(8))
+		progress.Flagged(progress.FlagFold), progress.Total(3), progress.Limit(8))
 	targets := startTargets(ctx, "exe001", "exe002", "exe003")
 	targets[0].Run()
 	targets[0].End(nil)
@@ -228,7 +228,7 @@ func ExampleNewCounter_work() {
 	ctx, command := progress.Start(progress.WithBus(context.Background(), bus), progress.KindCommand, "fetch")
 
 	ctx, step := progress.Start(ctx, progress.KindStep, "fetching the base image")
-	_, call := progress.Start(ctx, progress.KindCall, "download", progress.Work(progress.Bytes, 2<<30))
+	_, call := progress.Start(ctx, progress.KindCall, "download", progress.Work(progress.UnitBytes, 2<<30))
 	for range 144 {
 		clock.Add(100 * time.Millisecond)
 		call.Advance(8 << 20)
@@ -256,7 +256,7 @@ func ExampleNewPlain_work() {
 	ctx, command := progress.Start(progress.WithBus(context.Background(), bus), progress.KindCommand, "fetch")
 
 	ctx, step := progress.Start(ctx, progress.KindStep, "fetching the base image")
-	_, call := progress.Start(ctx, progress.KindCall, "download", progress.Work(progress.Bytes, 2<<30))
+	_, call := progress.Start(ctx, progress.KindCall, "download", progress.Work(progress.UnitBytes, 2<<30))
 	for range 100 {
 		clock.Add(100 * time.Millisecond)
 		call.Advance(8 << 20)
@@ -324,7 +324,7 @@ func ExampleNewTree_theme() {
 	ctx, command := progress.Start(progress.WithBus(context.Background(), bus), progress.KindCommand, "power on")
 
 	ctx, step := progress.Start(ctx, progress.KindStep, "powering on",
-		progress.WithFlags(progress.Fold), progress.Total(4), progress.Limit(2))
+		progress.Flagged(progress.FlagFold), progress.Total(4), progress.Limit(2))
 	targets := startTargets(ctx, "exe01", "exe02", "exe03", "exe04")
 	for _, target := range targets[:2] {
 		target.Run()
@@ -368,7 +368,7 @@ func ExampleNewPlain_theme() {
 	ctx, command := progress.Start(progress.WithBus(context.Background(), bus), progress.KindCommand, "create cluster")
 
 	ctx, step := progress.Start(ctx, progress.KindStep, "starting the nodes",
-		progress.WithFlags(progress.Fold), progress.Total(2))
+		progress.Flagged(progress.FlagFold), progress.Total(2))
 	targets := startTargets(ctx, "worker0", "worker1")
 	for _, target := range targets {
 		target.Run()
@@ -402,7 +402,7 @@ func ExampleNewCounter_theme() {
 	bus := progress.NewBus(progress.BusOptions{Sinks: []progress.Sink{counter}, Now: clock.Now})
 	ctx, command := progress.Start(progress.WithBus(context.Background(), bus), progress.KindCommand, "uptime")
 
-	ctx, step := progress.Start(ctx, progress.KindStep, "uptime", progress.WithFlags(progress.Fold), progress.Total(4))
+	ctx, step := progress.Start(ctx, progress.KindStep, "uptime", progress.Flagged(progress.FlagFold), progress.Total(4))
 	targets := startTargets(ctx, "exe001", "exe002", "exe003", "exe004")
 	for _, target := range targets[:3] {
 		target.Run()
@@ -434,7 +434,7 @@ func ExampleNewSummary() {
 	bus := progress.NewBus(progress.BusOptions{Sinks: []progress.Sink{summary}, Now: clock.Now})
 	ctx, command := progress.Start(progress.WithBus(context.Background(), bus), progress.KindCommand, "drain")
 
-	ctx, step := progress.Start(ctx, progress.KindStep, "draining", progress.WithFlags(progress.Fold), progress.Total(2))
+	ctx, step := progress.Start(ctx, progress.KindStep, "draining", progress.Flagged(progress.FlagFold), progress.Total(2))
 	targets := startTargets(ctx, "exe001", "exe002")
 	targets[0].Run()
 	targets[0].End(nil)

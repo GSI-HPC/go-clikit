@@ -19,7 +19,7 @@ import (
 func fetchBaseImage(ctx context.Context, c *clock, n int) (step, call *progress.Span) {
 	ctx, step = progress.Start(ctx, progress.KindStep, "fetching the base image")
 	_, call = progress.Start(ctx, progress.KindCall, "download",
-		progress.HTTP("GET", "/images/rocky-9.4.qcow2"), progress.Work(progress.Bytes, 2<<30))
+		progress.HTTPRequest("GET", "/images/rocky-9.4.qcow2"), progress.Work(progress.UnitBytes, 2<<30))
 	for range n {
 		c.Add(100 * time.Millisecond)
 		call.Advance(8 << 20)
@@ -31,7 +31,7 @@ func fetchBaseImage(ctx context.Context, c *clock, n int) (step, call *progress.
 // work is of no known size, and advances it by 500 items every 100 ms for
 // n tenths of a second on c.
 func indexTheArchive(ctx context.Context, c *clock, n int) *progress.Span {
-	_, step := progress.Start(ctx, progress.KindStep, "indexing the archive", progress.Work(progress.Items, 0))
+	_, step := progress.Start(ctx, progress.KindStep, "indexing the archive", progress.Work(progress.UnitItems, 0))
 	for range n {
 		c.Add(100 * time.Millisecond)
 		step.Advance(500)
@@ -42,7 +42,7 @@ func indexTheArchive(ctx context.Context, c *clock, n int) *progress.Span {
 // updateTheFirmware starts the step "updating the firmware" under ctx,
 // whose work is in Percent and reaches 40% in n tenths of a second on c.
 func updateTheFirmware(ctx context.Context, c *clock, n int) *progress.Span {
-	_, step := progress.Start(ctx, progress.KindStep, "updating the firmware", progress.Work(progress.Percent, 100))
+	_, step := progress.Start(ctx, progress.KindStep, "updating the firmware", progress.Work(progress.UnitPercent, 100))
 	for i := range n {
 		c.Add(100 * time.Millisecond)
 		step.SetAmount(int64(40 * (i + 1) / n))
@@ -88,7 +88,7 @@ func TestTheCounterDrawsWorkOfNoKnownSizeAndInPercent(t *testing.T) {
 		{"percent", func(ctx context.Context, c *clock) { updateTheFirmware(ctx, c, 30) },
 			"updating the firmware · 40% · ~5s left · 0:03.0"},
 		{"a call of the command", func(ctx context.Context, c *clock) {
-			_, call := progress.Start(ctx, progress.KindCall, "download", progress.Work(progress.Bytes, 1<<30))
+			_, call := progress.Start(ctx, progress.KindCall, "download", progress.Work(progress.UnitBytes, 1<<30))
 			c.Add(3 * time.Second)
 			call.Advance(1 << 29)
 		}, "fetch · 0:03.0"},
@@ -127,12 +127,12 @@ func TestTheCounterDrawsTheWorkOfAPool(t *testing.T) {
 		{61, "indexing the archives · 0/3 · 2 running · 1 queued · 0:05.0"},
 	} {
 		f = counterThemeNew(t, "index", tc.width, display.CounterOptions{})
-		ctx, _ := progress.Start(f.ctx, progress.KindStep, "indexing the archives", progress.WithFlags(progress.Fold), progress.Total(3))
+		ctx, _ := progress.Start(f.ctx, progress.KindStep, "indexing the archives", progress.Flagged(progress.FlagFold), progress.Total(3))
 		ctxs, spans := targets(ctx, nodes(3)...)
 		var walks []*progress.Span
 		for i := range 2 {
 			spans[i].Run()
-			_, walk := progress.Start(ctxs[i], progress.KindCall, "walk", progress.Work(progress.Items, 0))
+			_, walk := progress.Start(ctxs[i], progress.KindCall, "walk", progress.Work(progress.UnitItems, 0))
 			walks = append(walks, walk)
 		}
 		f.clock.Add(5 * time.Second)

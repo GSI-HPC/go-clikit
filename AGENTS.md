@@ -211,8 +211,7 @@ go-test-coverage: `go install github.com/vladopajic/go-test-coverage/v2@latest`.
   as a prefix, options are bare nouns, `NewX` returns `*X`, `Check*`
   takes a `testing.TB`, a blocking call takes a context, and identifiers
   use American spelling. A rename keeps a deprecated alias for one minor
-  release, whose `Deprecated:` paragraph ends with `(decision 36)`; the
-  SA1019 exclusion in `.golangci.yml` matches only those.
+  release, whose `Deprecated:` paragraph ends with `(decision 36)`.
 - Every exported identifier has a doc comment. Usage is shown in `Example`
   functions, which pkg.go.dev renders.
 - Wrap errors with `fmt.Errorf("context: %w", err)`. An exported error value

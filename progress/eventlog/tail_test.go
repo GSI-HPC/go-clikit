@@ -399,7 +399,6 @@ func TestAForwarderGivesOneRun(t *testing.T) {
 			"aaaa", []uint64{1, 2, 3}, 6},
 		{"a zero trace", func(s progress.Sink) eventlog.Feed { return eventlog.NewForwarder(s, progress.TraceID{}) },
 			"bbbb", []uint64{1, 2}, 8},
-		{"Forward", eventlog.Forward, "bbbb", []uint64{1, 2}, 8},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			var s sink

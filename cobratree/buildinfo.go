@@ -88,17 +88,6 @@ func (b BuildInfo) Resolve(version, commit string) BuildInfo {
 	return b
 }
 
-// Resolve returns the build info of the running binary with the version
-// and the commit a build set with -ldflags, as BuildInfo.Resolve puts
-// them in place of what ReadBuildInfo reads.
-//
-// Deprecated: Use ReadBuildInfo().Resolve(version, commit), whose name
-// says that it returns build info, and whose rules a test can apply to a
-// BuildInfo it builds (decision 36).
-func Resolve(version, commit string) BuildInfo {
-	return ReadBuildInfo().Resolve(version, commit)
-}
-
 // Short returns the commit cut to its first n characters, as a version line
 // prints it, with "-dirty" after it for a checkout that held changes not
 // committed: "ebed487-dirty" for 7. It is "" without a commit, and n of 0

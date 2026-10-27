@@ -50,14 +50,6 @@ func NewForwarder(s progress.Sink, trace progress.TraceID) *Forwarder {
 	return &Forwarder{sink: s, trace: trace}
 }
 
-// Forward returns a Feed that gives s the events of the first run that
-// begins in the lines it takes, as NewForwarder with a zero trace does.
-//
-// Deprecated: Use NewForwarder, which returns a *Forwarder, as the other
-// constructors return their type, and forwards the run of the trace the
-// server handed the child, not of whichever began first (decision 36).
-func Forward(s progress.Sink) Feed { return NewForwarder(s, progress.TraceID{}) }
-
 // Take gives the sink what the line holds, when it is of the run the
 // Forwarder gives, and was not given before.
 func (f *Forwarder) Take(b []byte) {

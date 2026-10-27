@@ -47,19 +47,6 @@ func AdvanceReader(ctx context.Context, r io.Reader) io.Reader {
 	return &advanceReader{r: r, span: s}
 }
 
-// CountWriter returns a writer that writes to w and advances the innermost
-// span in ctx, as AdvanceWriter does.
-//
-// Deprecated: Use AdvanceWriter, whose name says what it does to the span;
-// CountWriter suggested the unrelated type Count (decision 36).
-func CountWriter(ctx context.Context, w io.Writer) io.Writer { return AdvanceWriter(ctx, w) }
-
-// CountReader returns a reader that reads from r and advances the
-// innermost span in ctx, as AdvanceReader does.
-//
-// Deprecated: Use AdvanceReader (decision 36).
-func CountReader(ctx context.Context, r io.Reader) io.Reader { return AdvanceReader(ctx, r) }
-
 // advanceWriter is the writer AdvanceWriter returns.
 type advanceWriter struct {
 	w    io.Writer

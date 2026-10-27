@@ -39,7 +39,7 @@ import (
 //	deploy: failed in 20m33s: 479 ok, 1 failed, 958 GiB at 796 MiB/s
 //
 // Work in two units says nothing, as amounts in different units are never
-// added, and work in progress.Percent has no amount to say.
+// added, and work in progress.UnitPercent has no amount to say.
 //
 // In a Theme, the line takes the theme's colours and, in front, the mark of
 // how the command ended, and keeps its words and punctuation. In Classic:
@@ -51,23 +51,6 @@ import (
 //
 // A Summary is a progress.Sink; its methods are safe for concurrent use.
 type Summary struct {
-	// Theme is the old way to set SummaryOptions.Theme, read when NewSummary
-	// was given the zero Theme or did not make the Summary. Line reads it:
-	// set it before the Summary is put on a Bus.
-	//
-	// Deprecated: Pass SummaryOptions.Theme to NewSummary, which fixes it
-	// when the Summary is made, as the options of the other displays are
-	// (decision 36).
-	Theme Theme
-	// ASCII is the old way to set SummaryOptions.ASCII, read with it: either
-	// draws in ASCII. Line reads it: set it before the Summary is put on a
-	// Bus.
-	//
-	// Deprecated: Pass SummaryOptions.ASCII to NewSummary, which fixes it
-	// when the Summary is made, as the options of the other displays are
-	// (decision 36).
-	ASCII bool
-
 	// o is what NewSummary was given.
 	o SummaryOptions
 
@@ -110,17 +93,6 @@ type SummaryOptions struct {
 // 46). NewSummary(SummaryOptions{}) is the same as the zero Summary.
 func NewSummary(o SummaryOptions) *Summary { return &Summary{o: o} }
 
-// options returns what NewSummary was given, with the deprecated fields
-// read where it was given a zero.
-func (s *Summary) options() SummaryOptions {
-	o := s.o
-	if o.Theme == (Theme{}) {
-		o.Theme = s.Theme
-	}
-	o.ASCII = o.ASCII || s.ASCII
-	return o
-}
-
 // outcomes counts targets by how they ended.
 type outcomes struct{ failed, canceled, skipped int }
 
@@ -155,10 +127,10 @@ func (s *Summary) begin(e progress.Event) {
 		s.command, s.name, s.start = e.Span, e.Name, e.Time
 	}
 	root := s.under[e.Parent]
-	counts := e.Kind == progress.KindBatch || e.Kind == progress.KindStep && e.Flags&progress.Fold != 0
+	counts := e.Kind == progress.KindBatch || e.Kind == progress.KindStep && e.Flags&progress.FlagFold != 0
 	// A hidden step is not shown, and neither is what it counts, as the
 	// counter does not show it.
-	if root == 0 && counts && e.Flags&progress.Hidden == 0 {
+	if root == 0 && counts && e.Flags&progress.FlagHidden == 0 {
 		root = e.Span
 		s.roots[root] = &outcomes{}
 	}
@@ -268,7 +240,7 @@ func (s *Summary) Line() string {
 	if d < time.Second {
 		return ""
 	}
-	o := s.options()
+	o := s.o
 	l := lookOf(o.Theme, o.ASCII)
 	line := fmt.Sprintf("%s: %s in %s", l.paint(roleTitle, s.name), wordIn(l, s.status), l.paint(roleMuted, took(d)))
 	if o.Theme.art != nil {

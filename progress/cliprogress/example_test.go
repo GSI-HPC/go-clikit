@@ -71,7 +71,7 @@ func ExampleStart() {
 func ExampleThemeFor() {
 	env := map[string]string{"TERM": "xterm-256color", "NO_COLOR": "1"}
 	theme := cliprogress.ThemeFor(display.Aurora, true, func(name string) string { return env[name] })
-	fmt.Println(theme, theme.Colours())
+	fmt.Println(theme, theme.Colors())
 	// Output:
 	// aurora none
 }

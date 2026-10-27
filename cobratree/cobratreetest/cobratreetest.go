@@ -181,15 +181,6 @@ func takesArgs(cmd *cobra.Command, args []string) bool {
 	return cmd.ValidateArgs(args) == nil
 }
 
-// CheckCommandLine reports whether args name a command of the tree under
-// root and flags it has, as ValidateCommandLine does.
-//
-// Deprecated: Use ValidateCommandLine; a name that starts with Check takes
-// a testing.TB and fails the test, as CheckCommandLines does (decision 36).
-func CheckCommandLine(root *cobra.Command, args []string) error {
-	return ValidateCommandLine(root, args)
-}
-
 // subcommand returns the subcommand of cmd that name names, or one of its
 // aliases; nil for none.
 func subcommand(cmd *cobra.Command, name string) *cobra.Command {

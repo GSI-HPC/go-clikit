@@ -324,19 +324,6 @@ func TestMisdirectedRefusal(t *testing.T) {
 	}
 }
 
-// Origin is still the policy, under its former name.
-func TestOriginIsOriginPolicy(t *testing.T) {
-	t.Parallel()
-
-	o := Origin{Navigate: true}
-	r := request("GET", map[string][]string{
-		"Sec-Fetch-Site": {"cross-site"}, "Sec-Fetch-Mode": {"navigate"}, "Sec-Fetch-Dest": {"document"},
-	})
-	if got := CrossSite(r, o); got != "" {
-		t.Errorf("CrossSite with an Origin: %q, want a navigation let in", got)
-	}
-}
-
 // Hosts refuses a nil answers when it is made, not on the first request.
 func TestHostsPanicsWithoutAnswers(t *testing.T) {
 	t.Parallel()

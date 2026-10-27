@@ -155,12 +155,6 @@ func (t Theme) Colors() Colors {
 	return t.colors
 }
 
-// Colours returns how many colours t draws in, as Colors does.
-//
-// Deprecated: Use Colors, whose name is spelt in American English, as
-// identifiers are (decision 36).
-func (t Theme) Colours() Colors { return t.Colors() }
-
 // Colors is how many colours a Theme draws in: as many as the terminal
 // shows, which the program finds out, from TERM or COLORTERM, say.
 type Colors uint8
@@ -194,28 +188,6 @@ func (c Colors) String() string {
 	}
 	return fmt.Sprintf("Colors(%d)", uint8(c))
 }
-
-// Colours is the old name of Colors.
-//
-// Deprecated: Use Colors, whose name is spelt in American English, as
-// identifiers are (decision 36).
-type Colours = Colors
-
-const (
-	// Colours256 is the old name of Colors256.
-	//
-	// Deprecated: Use Colors256 (decision 36).
-	Colours256 = Colors256
-	// Colours16 is the old name of Colors16.
-	//
-	// Deprecated: Use Colors16 (decision 36).
-	Colours16 = Colors16
-	// NoColours is the old name of ColorsNone.
-	//
-	// Deprecated: Use ColorsNone, which takes its type as a prefix, as
-	// every enum constant does (decision 36).
-	NoColours = ColorsNone
-)
 
 // role is what a part of a row is, which its colour follows.
 type role int
