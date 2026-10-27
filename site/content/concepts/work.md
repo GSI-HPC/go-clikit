@@ -39,7 +39,9 @@ span's end, so that the newest amount is never lost. An update of the span
 carries the newest amount too, so that work which learns its amount and its
 size sets the amount first, and a new size never meets an old amount. The
 event log writes an advance at most once a second by default, and counts the
-advances it leaves out in `leftOut` on the next advance it writes.
+advances it leaves out in `leftOut` on the next advance it writes. It holds
+the newest one it would leave out, and writes it once its second has passed,
+so that a reader of the log sees where the work stopped while it pauses.
 
 {{% call note %}}
 `Advance` and `SetAmount` read the clock of the Bus, `BusOptions.Now`, on

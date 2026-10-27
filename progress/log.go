@@ -58,7 +58,10 @@ const (
 // the first event that sets them, and an advance is written as "advance",
 // at most once each LogOptions.AdvanceEvery a span: the others are left out,
 // and counted in "leftOut" on the next advance written and on the span's
-// end.
+// end. The newest advance left out is held, and written once its place
+// comes, unless an event of the span comes first, so that the amount a
+// span stopped at, before a pause in its work, is in the log during the
+// pause; its line may follow lines of other spans with a greater seq.
 // A key whose value is zero or empty is left out. A line of output is
 // written without its text, which never leaves the process: the event says
 // only which stream it came from and how many lines before it were not
@@ -102,6 +105,10 @@ type Log struct {
 	// starts no write after it.
 	abandoned bool
 
+	// after starts the timer that writes an advance held, time.AfterFunc
+	// but in a test.
+	after func(time.Duration, func()) *time.Timer
+
 	// wake asks for the lines kept to be written now; kept says that the
 	// first of them came, which has them written LogOptions.FlushEvery
 	// later.
@@ -139,7 +146,9 @@ type LogOptions struct {
 	Run string
 	// AdvanceEvery is the least time between two advances of a span that
 	// the log writes, by the events' times; the advances in between are
-	// left out, and counted in "leftOut". 0 is DefaultAdvanceEvery; a
+	// left out, and counted in "leftOut", but for the newest, which is
+	// written once AdvanceEvery has passed, unless an event of the span
+	// comes first. 0 is DefaultAdvanceEvery; a
 	// negative value writes every advance the Bus sends.
 	AdvanceEvery time.Duration
 	// FlushEvery is how long a line waits at most before the log writes
@@ -171,17 +180,22 @@ func (o LogOptions) flushEvery() time.Duration {
 }
 
 // sampling is what the log keeps of a span's advances to sample them: when
-// it last wrote one, and how many it has left out, since then and in all.
+// it last wrote one, and how many it has left out, since then and in all,
+// and the newest advance it has not written yet, which its timer writes
+// once its place comes, unless an event of the span comes first.
 type sampling struct {
 	written time.Time
 	since   int
 	total   int
+	held    *logEvent
+	heldAt  time.Time
+	timer   *time.Timer
 }
 
 // NewLog returns a Log that writes to w, and starts the goroutine that
 // writes; Close stops it.
 func NewLog(w io.Writer, o LogOptions) *Log {
-	l := &Log{w: w, run: cmp.Or(o.RunID, o.Run), o: o,
+	l := &Log{w: w, run: cmp.Or(o.RunID, o.Run), o: o, after: time.AfterFunc,
 		wake: make(chan struct{}, 1), kept: make(chan struct{}, 1),
 		stop: make(chan struct{}), stopped: make(chan struct{})}
 	if l.run == "" {
@@ -344,8 +358,17 @@ func (l *Log) Handle(e Event) {
 
 // sample decides whether the log writes e, when it is an advance, and puts
 // the advances it left out on the line of the next advance it writes, and
-// on the line of the span's end. l.mu is held.
+// on the line of the span's end. An advance it leaves out it holds, the
+// newest of the span, and writes once AdvanceEvery has passed since the
+// last it wrote, so that the amount a span stopped at is in the log before
+// the span's next event, however long that takes to come. Any event of the
+// span that comes first carries a newer amount, and the advance held is
+// left out after all. l.mu is held.
 func (l *Log) sample(e Event, line *logEvent) bool {
+	s := l.sampled[e.Span]
+	if s != nil && s.held != nil {
+		s.drop()
+	}
 	switch e.Type {
 	case TypeAdvance:
 		every := l.o.advanceEvery()
@@ -355,24 +378,54 @@ func (l *Log) sample(e Event, line *logEvent) bool {
 		if l.sampled == nil {
 			l.sampled = make(map[SpanID]*sampling)
 		}
-		s := l.sampled[e.Span]
 		if s == nil {
 			l.sampled[e.Span] = &sampling{written: e.Time}
 			return true
 		}
-		if e.Time.Sub(s.written) < every {
-			s.since++
-			s.total++
+		if wait := every - e.Time.Sub(s.written); wait > 0 {
+			held := *line
+			s.held, s.heldAt = &held, e.Time
+			s.timer = l.after(wait, func() { l.late(s, &held) })
 			return false
 		}
 		s.written, line.LeftOut, s.since = e.Time, s.since, 0
 	case TypeEnd:
-		if s := l.sampled[e.Span]; s != nil {
+		if s != nil {
 			line.LeftOut = s.total
 			delete(l.sampled, e.Span)
 		}
 	}
 	return true
+}
+
+// drop leaves out the advance s holds, which a newer event of the span
+// makes old, and stops its timer. The log's mu is held.
+func (s *sampling) drop() {
+	s.timer.Stop()
+	s.held, s.timer = nil, nil
+	s.since++
+	s.total++
+}
+
+// late writes the advance held, when its place has come and no event of
+// the span came first. Its line follows those of other spans written in the
+// meantime, whose seq may be greater.
+func (l *Log) late(s *sampling, held *logEvent) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if s.held != held {
+		return
+	}
+	s.write(l)
+}
+
+// write writes the advance s holds, with the advances left out before it.
+// The log's mu is held.
+func (s *sampling) write(l *Log) {
+	held := s.held
+	s.held, s.timer = nil, nil
+	s.written, held.LeftOut, s.since = s.heldAt, s.since, 0
+	l.write(*held)
 }
 
 // write keeps v as a line, whole, for the goroutine that writes, and has it
@@ -489,6 +542,14 @@ func (l *Log) isAbandoned() bool {
 func (l *Log) Close() error {
 	l.mu.Lock()
 	if !l.closed {
+		// The advances still held are of spans that never ended, a run
+		// cut short: their amounts are the last there are.
+		for _, s := range l.sampled {
+			if s.held != nil {
+				s.timer.Stop()
+				s.write(l)
+			}
+		}
 		l.closed = true
 		close(l.stop)
 	}
